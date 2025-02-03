@@ -1,0 +1,303 @@
+2025-02-03 11:51:10,157 - INFO - Воспроизведение файла: D:\My Files\OldAssistant_v2\speak_voice\johnny\close_assist\а я то думал что мы друзья.ogg
+2025-02-03 11:51:10,161 - INFO - Остановка аудиопотока...
+2025-02-03 12:00:33,130 - INFO - Создан следующий путь для планировщика: D:\My Files\start_assistant.bat
+2025-02-03 12:00:33,174 - INFO - Воспроизведение файла: D:\My Files\OldAssistant_v2\speak_voice\johnny\start_greet\добрый вечер.ogg
+2025-02-03 12:00:34,783 - INFO - Попытка загрузки модели
+2025-02-03 12:00:34,783 - INFO - Используется модель по пути: D:\My Files\OldAssistant_v2\model_ru
+2025-02-03 12:00:35,336 - INFO - Модель успешно загружена.
+2025-02-03 12:00:37,700 - INFO - Воспроизведение файла: D:\My Files\OldAssistant_v2\speak_voice\johnny\approve\окей как скажешь.ogg
+2025-02-03 12:00:39,725 - INFO - Ярлыки сохранены в файле: D:\My Files\OldAssistant_v2\links.json
+2025-02-03 12:00:39,725 - INFO - Воспроизведение файла: D:\My Files\OldAssistant_v2\speak_voice\johnny\other\файлы проверены.ogg
+2025-02-03 12:01:31,286 - INFO - Воспроизведение файла: D:\My Files\OldAssistant_v2\speak_voice\johnny\close_assist\я бы не советовал тебе этого делать.ogg
+2025-02-03 12:01:31,311 - INFO - Остановка аудиопотока...
+2025-02-03 12:22:21,925 - INFO - Создан следующий путь для планировщика: D:\My Files\start_assistant.bat
+2025-02-03 12:22:21,986 - INFO - Воспроизведение файла: D:\My Files\OldAssistant_v2\speak_voice\johnny\start_greet\здравствуйте.ogg
+2025-02-03 12:22:23,604 - INFO - Попытка загрузки модели
+2025-02-03 12:22:23,604 - INFO - Используется модель по пути: D:\My Files\OldAssistant_v2\model_ru
+2025-02-03 12:22:24,225 - INFO - Модель успешно загружена.
+2025-02-03 12:22:36,064 - INFO - Воспроизведение файла: D:\My Files\OldAssistant_v2\speak_voice\johnny\approve\окей как скажешь.ogg
+2025-02-03 12:22:38,076 - INFO - Ярлыки сохранены в файле: D:\My Files\OldAssistant_v2\links.json
+2025-02-03 12:22:38,076 - INFO - Воспроизведение файла: D:\My Files\OldAssistant_v2\speak_voice\johnny\other\файлы проверены.ogg
+2025-02-03 12:22:53,027 - INFO - Команда обновлена в файле.
+2025-02-03 12:22:57,891 - INFO - Воспроизведение файла: D:\My Files\OldAssistant_v2\speak_voice\johnny\close_assist\я бы не советовал тебе этого делать.ogg
+2025-02-03 12:22:57,901 - INFO - Остановка аудиопотока...
+2025-02-03 12:23:17,709 - INFO - Создан следующий путь для планировщика: D:\My Files\start_assistant.bat
+2025-02-03 12:23:17,752 - INFO - Воспроизведение файла: D:\My Files\OldAssistant_v2\speak_voice\johnny\start_greet\с добрым утром.ogg
+2025-02-03 12:23:19,462 - INFO - Попытка загрузки модели
+2025-02-03 12:23:19,462 - INFO - Используется модель по пути: D:\My Files\OldAssistant_v2\model_ru
+2025-02-03 12:23:20,040 - INFO - Модель успешно загружена.
+2025-02-03 12:23:27,556 - INFO - Распознанный текст: джонни открой секира
+2025-02-03 12:23:27,567 - INFO - Воспроизведение файла: D:\My Files\OldAssistant_v2\speak_voice\johnny\start\в процессе.ogg
+2025-02-03 12:23:29,076 - INFO - Воспроизведение файла: D:\My Files\OldAssistant_v2\speak_voice\johnny\other\подожди. собираю данные о процессах.ogg
+2025-02-03 12:23:51,717 - INFO - Новые процессы: ['SekiroFpsUnlockAndMore_v1.2.5.2.exe']
+2025-02-03 12:23:51,717 - INFO - Имена процессов для ярлыка 'SekiroFpsUnlockAndMore_v1.2.5.2.exe — ярлык.lnk' сохранены в файл.
+2025-02-03 12:23:51,718 - INFO - Воспроизведение файла: D:\My Files\OldAssistant_v2\speak_voice\johnny\other\процессы записаны.ogg
+2025-02-03 12:23:53,635 - INFO - Остановка аудиопотока...
+2025-02-03 12:23:53,686 - ERROR - Ошибка в основном цикле ассистента: [WinError 2] Не удается найти указанный файл: 'SekiroFpsUnlockAndMore_v1.2.5.2.exe — ярлык.lnk'
+2025-02-03 12:24:16,086 - INFO - Воспроизведение файла: D:\My Files\OldAssistant_v2\speak_voice\johnny\approve\готово.ogg
+2025-02-03 12:24:17,294 - INFO - Ярлыки сохранены в файле: D:\My Files\OldAssistant_v2\links.json
+2025-02-03 12:24:17,294 - INFO - Воспроизведение файла: D:\My Files\OldAssistant_v2\speak_voice\johnny\other\файлы проверены.ogg
+2025-02-03 12:24:34,603 - INFO - Команда обновлена в файле.
+2025-02-03 12:24:41,080 - INFO - Список команд обновлён.
+2025-02-03 12:24:43,975 - INFO - Воспроизведение файла: D:\My Files\OldAssistant_v2\speak_voice\johnny\close_assist\не выключай меня пожалуйста.ogg
+2025-02-03 12:24:47,720 - INFO - Создан следующий путь для планировщика: D:\My Files\start_assistant.bat
+2025-02-03 12:24:47,784 - INFO - Воспроизведение файла: D:\My Files\OldAssistant_v2\speak_voice\johnny\start_greet\добрый вечер.ogg
+2025-02-03 12:24:49,403 - INFO - Попытка загрузки модели
+2025-02-03 12:24:49,403 - INFO - Используется модель по пути: D:\My Files\OldAssistant_v2\model_ru
+2025-02-03 12:24:50,105 - INFO - Модель успешно загружена.
+2025-02-03 12:24:59,726 - INFO - Распознанный текст: джонни запусти секира
+2025-02-03 12:24:59,739 - INFO - Воспроизведение файла: D:\My Files\OldAssistant_v2\speak_voice\johnny\start\выключаю комп, да это шутка.ogg
+2025-02-03 12:25:02,052 - INFO - Воспроизведение файла: D:\My Files\OldAssistant_v2\speak_voice\johnny\other\подожди. собираю данные о процессах.ogg
+2025-02-03 12:25:24,700 - INFO - Новые процессы: ['SekiroFpsUnlockAndMore_v1.2.5.2.exe']
+2025-02-03 12:25:24,701 - INFO - Имена процессов для ярлыка 'SekiroFpsUnlockAndMore_v1.2.5.2.exe—ярлык.lnk' сохранены в файл.
+2025-02-03 12:25:24,701 - INFO - Воспроизведение файла: D:\My Files\OldAssistant_v2\speak_voice\johnny\other\процессы записаны.ogg
+2025-02-03 12:25:26,615 - INFO - Остановка аудиопотока...
+2025-02-03 12:25:26,672 - ERROR - Ошибка в основном цикле ассистента: [WinError 2] Не удается найти указанный файл: 'SekiroFpsUnlockAndMore_v1.2.5.2.exe—ярлык.lnk'
+2025-02-03 12:25:55,498 - INFO - Воспроизведение файла: D:\My Files\OldAssistant_v2\speak_voice\johnny\close_assist\не выключай меня пожалуйста.ogg
+2025-02-03 12:25:57,613 - INFO - Воспроизведение файла: D:\My Files\OldAssistant_v2\speak_voice\johnny\start_greet\добрый вечер.ogg
+2025-02-03 12:25:59,222 - INFO - Попытка загрузки модели
+2025-02-03 12:25:59,222 - INFO - Используется модель по пути: D:\My Files\OldAssistant_v2\model_ru
+2025-02-03 12:25:59,853 - INFO - Список команд обновлён.
+2025-02-03 12:25:59,882 - INFO - Модель успешно загружена.
+2025-02-03 12:26:16,787 - INFO - Воспроизведение файла: D:\My Files\OldAssistant_v2\speak_voice\johnny\approve\окей как скажешь.ogg
+2025-02-03 12:26:18,799 - INFO - Ярлыки сохранены в файле: D:\My Files\OldAssistant_v2\links.json
+2025-02-03 12:26:18,799 - INFO - Воспроизведение файла: D:\My Files\OldAssistant_v2\speak_voice\johnny\other\файлы проверены.ogg
+2025-02-03 12:26:27,101 - INFO - Команда обновлена в файле.
+2025-02-03 12:26:32,042 - INFO - Воспроизведение файла: D:\My Files\OldAssistant_v2\speak_voice\johnny\close_assist\а я то думал что мы друзья.ogg
+2025-02-03 12:26:32,061 - INFO - Остановка аудиопотока...
+2025-02-03 12:26:38,704 - INFO - Создан следующий путь для планировщика: D:\My Files\start_assistant.bat
+2025-02-03 12:26:38,765 - INFO - Воспроизведение файла: D:\My Files\OldAssistant_v2\speak_voice\johnny\start_greet\здравствуйте.ogg
+2025-02-03 12:26:40,396 - INFO - Попытка загрузки модели
+2025-02-03 12:26:40,398 - INFO - Используется модель по пути: D:\My Files\OldAssistant_v2\model_ru
+2025-02-03 12:26:41,084 - INFO - Модель успешно загружена.
+2025-02-03 12:26:52,567 - INFO - Распознанный текст: джонни запусти секиру
+2025-02-03 12:26:52,579 - INFO - Воспроизведение файла: D:\My Files\OldAssistant_v2\speak_voice\johnny\start\выключаю комп, да это шутка.ogg
+2025-02-03 12:26:54,891 - INFO - Воспроизведение файла: D:\My Files\OldAssistant_v2\speak_voice\johnny\other\подожди. собираю данные о процессах.ogg
+2025-02-03 12:27:17,533 - INFO - Новые процессы: ['SekiroFpsUnlockAndMore_v1.2.5.2.exe']
+2025-02-03 12:27:17,533 - INFO - Имена процессов для ярлыка 'SekiroFpsUnlockAndMore_v1.2.5.2.lnk' сохранены в файл.
+2025-02-03 12:27:17,533 - INFO - Воспроизведение файла: D:\My Files\OldAssistant_v2\speak_voice\johnny\other\процессы записаны.ogg
+2025-02-03 12:27:19,450 - INFO - Остановка аудиопотока...
+2025-02-03 12:27:19,505 - ERROR - Ошибка в основном цикле ассистента: [WinError 2] Не удается найти указанный файл: 'SekiroFpsUnlockAndMore_v1.2.5.2.lnk'
+2025-02-03 12:31:30,463 - INFO - Создан следующий путь для планировщика: D:\My Files\start_assistant.bat
+2025-02-03 12:31:30,509 - INFO - Воспроизведение файла: D:\My Files\OldAssistant_v2\speak_voice\johnny\start_greet\здравствуйте.ogg
+2025-02-03 12:31:32,117 - INFO - Попытка загрузки модели
+2025-02-03 12:31:32,117 - INFO - Используется модель по пути: D:\My Files\OldAssistant_v2\model_ru
+2025-02-03 12:31:32,687 - INFO - Модель успешно загружена.
+2025-02-03 12:31:38,596 - INFO - Распознанный текст: не удаётся найти
+2025-02-03 12:31:41,958 - INFO - Распознанный текст: указанный файл
+2025-02-03 12:34:28,038 - INFO - Распознанный текст: связь пис
+2025-02-03 12:34:31,617 - INFO - Распознанный текст: с из
+2025-02-03 12:37:46,980 - INFO - Распознанный текст: так в чем проблема
+2025-02-03 12:38:12,907 - INFO - Распознанный текст: нахера
+2025-02-03 12:38:22,985 - INFO - Распознанный текст: хэнд
+2025-02-03 12:38:26,339 - INFO - Распознанный текст: просто возвращает электроугли фокус
+2025-02-03 12:38:47,716 - INFO - Распознанный текст: так она выполняется
+2025-02-03 12:38:53,958 - INFO - Распознанный текст: первым делом вот она выполняется дальше уходит фэн для жди мкс
+2025-02-03 12:38:59,240 - INFO - Распознанный текст: туда передаётся парней мэкшан файл
+2025-02-03 12:41:18,586 - INFO - Создан следующий путь для планировщика: D:\My Files\start_assistant.bat
+2025-02-03 12:41:18,630 - INFO - Воспроизведение файла: D:\My Files\OldAssistant_v2\speak_voice\johnny\start_greet\здравствуйте.ogg
+2025-02-03 12:41:20,263 - INFO - Попытка загрузки модели
+2025-02-03 12:41:20,263 - INFO - Используется модель по пути: D:\My Files\OldAssistant_v2\model_ru
+2025-02-03 12:41:20,889 - INFO - Модель успешно загружена.
+2025-02-03 12:41:32,716 - INFO - Распознанный текст: джонни запусти секира
+2025-02-03 12:41:32,727 - INFO - Воспроизведение файла: D:\My Files\OldAssistant_v2\speak_voice\johnny\start\выключаю комп, да это шутка.ogg
+2025-02-03 12:41:35,039 - INFO - Используем существующие процессы для игры 'SekiroFpsUnlockAndMore_v1.2.5.2.lnk': ['SekiroFpsUnlockAndMore_v1.2.5.2.exe']
+2025-02-03 12:41:35,057 - INFO - Остановка аудиопотока...
+2025-02-03 12:41:35,141 - ERROR - Ошибка в основном цикле ассистента: [WinError 2] Не удается найти указанный файл: 'SekiroFpsUnlockAndMore_v1.2.5.2.lnk'
+2025-02-03 12:46:49,411 - INFO - Создан следующий путь для планировщика: D:\My Files\start_assistant.bat
+2025-02-03 12:46:49,453 - INFO - Воспроизведение файла: D:\My Files\OldAssistant_v2\speak_voice\johnny\start_greet\добрый вечер.ogg
+2025-02-03 12:46:51,062 - INFO - Попытка загрузки модели
+2025-02-03 12:46:51,062 - INFO - Используется модель по пути: D:\My Files\OldAssistant_v2\model_ru
+2025-02-03 12:46:51,638 - INFO - Модель успешно загружена.
+2025-02-03 12:46:57,166 - INFO - Распознанный текст: джой запусти секира
+2025-02-03 12:47:03,177 - INFO - Распознанный текст: джон запусти секира
+2025-02-03 12:47:03,188 - INFO - Воспроизведение файла: D:\My Files\OldAssistant_v2\speak_voice\johnny\start\в процессе.ogg
+2025-02-03 12:47:04,697 - INFO - Используем существующие процессы для игры 'SekiroFpsUnlockAndMore_v1.2.5.2.lnk': ['SekiroFpsUnlockAndMore_v1.2.5.2.exe']
+2025-02-03 12:47:04,710 - INFO - Остановка аудиопотока...
+2025-02-03 12:47:04,763 - ERROR - Ошибка в основном цикле ассистента: [WinError 2] Не удается найти указанный файл: 'SekiroFpsUnlockAndMore_v1.2.5.2.lnk'
+2025-02-03 12:50:15,814 - INFO - Создан следующий путь для планировщика: D:\My Files\start_assistant.bat
+2025-02-03 12:50:15,854 - INFO - Воспроизведение файла: D:\My Files\OldAssistant_v2\speak_voice\johnny\start_greet\добрый вечер.ogg
+2025-02-03 12:50:17,463 - INFO - Попытка загрузки модели
+2025-02-03 12:50:17,464 - INFO - Используется модель по пути: D:\My Files\OldAssistant_v2\model_ru
+2025-02-03 12:50:18,034 - INFO - Модель успешно загружена.
+2025-02-03 12:50:23,957 - INFO - Распознанный текст: джонни запусти секира
+2025-02-03 12:50:23,968 - INFO - Воспроизведение файла: D:\My Files\OldAssistant_v2\speak_voice\johnny\start\выключаю комп, да это шутка.ogg
+2025-02-03 12:50:26,281 - INFO - Используем существующие процессы для игры 'SekiroFpsUnlockAndMore_v1.2.5.2.lnk': ['SekiroFpsUnlockAndMore_v1.2.5.2.exe']
+2025-02-03 12:50:26,295 - INFO - Остановка аудиопотока...
+2025-02-03 12:50:26,349 - ERROR - Ошибка в основном цикле ассистента: [WinError 2] Не удается найти указанный файл: 'SekiroFpsUnlockAndMore_v1.2.5.2.lnk'
+2025-02-03 12:50:26,350 - ERROR - Traceback (most recent call last):
+  File "D:\My Files\OldAssistant_v2\main_assistant.py", line 472, in run_script
+    if not self.handle_folder_command(text, 'open'):
+  File "D:\My Files\OldAssistant_v2\main_assistant.py", line 582, in handle_folder_command
+    handler_folder(folder_path, action)  # Вызываем обработчик ярлыков
+  File "D:\My Files\OldAssistant_v2\func_list.py", line 251, in handler_folder
+    os.startfile(folder_path)
+FileNotFoundError: [WinError 2] Не удается найти указанный файл: 'SekiroFpsUnlockAndMore_v1.2.5.2.lnk'
+
+2025-02-03 13:06:58,743 - INFO - Создан следующий путь для планировщика: D:\My Files\start_assistant.bat
+2025-02-03 13:06:58,805 - INFO - Воспроизведение файла: D:\My Files\OldAssistant_v2\speak_voice\johnny\start_greet\здравствуйте.ogg
+2025-02-03 13:07:00,420 - INFO - Попытка загрузки модели
+2025-02-03 13:07:00,420 - INFO - Используется модель по пути: D:\My Files\OldAssistant_v2\model_ru
+2025-02-03 13:07:01,019 - INFO - Модель успешно загружена.
+2025-02-03 13:07:06,776 - INFO - Распознанный текст: джой запусти секиру
+2025-02-03 13:07:12,058 - INFO - Распознанный текст: джонни запусти секиру
+2025-02-03 13:07:12,069 - INFO - Воспроизведение файла: D:\My Files\OldAssistant_v2\speak_voice\johnny\start\в процессе.ogg
+2025-02-03 13:07:13,580 - INFO - Используем существующие процессы для игры 'SekiroFpsUnlockAndMore_v1.2.5.2.lnk': ['SekiroFpsUnlockAndMore_v1.2.5.2.exe']
+2025-02-03 13:07:24,756 - INFO - Распознанный текст: джонни закрой секира
+2025-02-03 13:07:24,828 - INFO - Все процессы SekiroFpsUnlockAndMore_v1.2.5.2.exe успешно завершены.
+2025-02-03 13:07:24,829 - INFO - Воспроизведение файла: D:\My Files\OldAssistant_v2\speak_voice\johnny\close\сам не можешь закрыть. ну ладно.ogg
+2025-02-03 13:07:27,446 - INFO - Все процессы завершены.
+2025-02-03 13:07:35,022 - INFO - Распознанный текст: от этого
+2025-02-03 13:07:38,420 - INFO - Распознанный текст: берётся почему в принят хочется
+2025-02-03 13:07:48,976 - INFO - Распознанный текст: они все него
+2025-02-03 13:07:50,619 - INFO - Распознанный текст: лежат в одной парке
+2025-02-03 13:07:56,606 - INFO - Распознанный текст: так здесь
+2025-02-03 13:08:03,577 - INFO - Распознанный текст: брать
+2025-02-03 13:08:08,608 - INFO - Распознанный текст: при
+2025-02-03 13:08:13,659 - INFO - Распознанный текст: нет
+2025-02-03 13:08:30,941 - INFO - Распознанный текст: не при закрыть класс про
+2025-02-03 13:08:55,172 - INFO - Распознанный текст: мне это принято какого хера не выводятся
+2025-02-03 13:10:15,278 - INFO - Создан следующий путь для планировщика: D:\My Files\start_assistant.bat
+2025-02-03 13:10:15,322 - INFO - Воспроизведение файла: D:\My Files\OldAssistant_v2\speak_voice\johnny\start_greet\добрый вечер.ogg
+2025-02-03 13:10:16,932 - INFO - Попытка загрузки модели
+2025-02-03 13:10:16,932 - INFO - Используется модель по пути: D:\My Files\OldAssistant_v2\model_ru
+2025-02-03 13:10:17,559 - INFO - Модель успешно загружена.
+2025-02-03 13:10:22,096 - INFO - Распознанный текст: джой запусти секира
+2025-02-03 13:10:26,417 - INFO - Распознанный текст: джонни запусти секира
+2025-02-03 13:10:26,428 - INFO - Воспроизведение файла: D:\My Files\OldAssistant_v2\speak_voice\johnny\start\открываю.ogg
+2025-02-03 13:10:27,736 - INFO - Используем существующие процессы для игры 'SekiroFpsUnlockAndMore_v1.2.5.2.lnk': ['SekiroFpsUnlockAndMore_v1.2.5.2.exe']
+2025-02-03 13:10:33,159 - INFO - Распознанный текст: джонни закрой секира
+2025-02-03 13:10:33,504 - WARNING - Процесс SekiroFpsUnlockAndMore_v1.2.5.2.exe не найден.
+2025-02-03 13:10:33,504 - INFO - Воспроизведение файла: D:\My Files\OldAssistant_v2\speak_voice\johnny\close\наигрался, закрываю.ogg
+2025-02-03 13:10:35,616 - INFO - Все процессы завершены.
+2025-02-03 13:11:13,392 - INFO - Воспроизведение файла: D:\My Files\OldAssistant_v2\speak_voice\johnny\close_assist\не выключай меня пожалуйста.ogg
+2025-02-03 13:11:13,411 - INFO - Остановка аудиопотока...
+2025-02-03 13:16:02,574 - INFO - Создан следующий путь для планировщика: D:\My Files\start_assistant.bat
+2025-02-03 13:16:02,616 - INFO - Воспроизведение файла: D:\My Files\OldAssistant_v2\speak_voice\johnny\start_greet\добрый вечер.ogg
+2025-02-03 13:16:04,226 - INFO - Попытка загрузки модели
+2025-02-03 13:16:04,226 - INFO - Используется модель по пути: D:\My Files\OldAssistant_v2\model_ru
+2025-02-03 13:16:04,795 - INFO - Модель успешно загружена.
+2025-02-03 13:16:07,867 - INFO - Распознанный текст: город запусти
+2025-02-03 13:16:14,078 - INFO - Распознанный текст: джонни запусти
+2025-02-03 13:16:14,078 - INFO - Воспроизведение файла: D:\My Files\OldAssistant_v2\speak_voice\johnny\what\тебя плохо слышно.ogg
+2025-02-03 13:16:20,825 - INFO - Воспроизведение файла: D:\My Files\OldAssistant_v2\speak_voice\johnny\approve\окей как скажешь.ogg
+2025-02-03 13:16:22,835 - INFO - Ярлыки сохранены в файле: D:\My Files\OldAssistant_v2\links.json
+2025-02-03 13:16:22,835 - INFO - Воспроизведение файла: D:\My Files\OldAssistant_v2\speak_voice\johnny\other\файлы проверены.ogg
+2025-02-03 13:16:28,220 - INFO - Распознанный текст: джонни запусти
+2025-02-03 13:16:28,221 - INFO - Воспроизведение файла: D:\My Files\OldAssistant_v2\speak_voice\johnny\what\не понял.ogg
+2025-02-03 13:16:33,014 - INFO - Команда обновлена в файле.
+2025-02-03 13:16:35,751 - INFO - Воспроизведение файла: D:\My Files\OldAssistant_v2\speak_voice\johnny\close_assist\не выключай меня пожалуйста.ogg
+2025-02-03 13:16:35,752 - INFO - Остановка аудиопотока...
+2025-02-03 13:16:41,579 - INFO - Создан следующий путь для планировщика: D:\My Files\start_assistant.bat
+2025-02-03 13:16:41,636 - INFO - Воспроизведение файла: D:\My Files\OldAssistant_v2\speak_voice\johnny\start_greet\здравствуйте.ogg
+2025-02-03 13:16:43,248 - INFO - Попытка загрузки модели
+2025-02-03 13:16:43,248 - INFO - Используется модель по пути: D:\My Files\OldAssistant_v2\model_ru
+2025-02-03 13:16:43,815 - INFO - Модель успешно загружена.
+2025-02-03 13:16:51,126 - INFO - Распознанный текст: джонни запусти секира
+2025-02-03 13:16:51,139 - INFO - Воспроизведение файла: D:\My Files\OldAssistant_v2\speak_voice\johnny\start\открываю.ogg
+2025-02-03 13:16:52,547 - INFO - Воспроизведение файла: D:\My Files\OldAssistant_v2\speak_voice\johnny\other\подожди. собираю данные о процессах.ogg
+2025-02-03 13:17:15,189 - INFO - Новые процессы: ['SekiroFpsUnlockAndMore_v1.2.5.2.exe']
+2025-02-03 13:17:15,190 - INFO - Имена процессов для ярлыка 'SekiroFpsUnlockAndMore_v1.2.5.2.lnk' сохранены в файл.
+2025-02-03 13:17:15,190 - INFO - Воспроизведение файла: D:\My Files\OldAssistant_v2\speak_voice\johnny\other\процессы записаны.ogg
+2025-02-03 13:17:17,101 - INFO - Воспроизведение файла: D:\My Files\OldAssistant_v2\speak_voice\johnny\what\тебя плохо слышно.ogg
+2025-02-03 13:17:26,200 - INFO - Распознанный текст: джонни запусти к
+2025-02-03 13:17:26,200 - INFO - Воспроизведение файла: D:\My Files\OldAssistant_v2\speak_voice\johnny\what\не понял.ogg
+2025-02-03 13:17:32,297 - INFO - Распознанный текст: все сейчас нормальном от джонни закрой секира
+2025-02-03 13:17:32,353 - INFO - Все процессы SekiroFpsUnlockAndMore_v1.2.5.2.exe успешно завершены.
+2025-02-03 13:17:32,353 - INFO - Воспроизведение файла: D:\My Files\OldAssistant_v2\speak_voice\johnny\close\закрываю.ogg
+2025-02-03 13:17:33,761 - INFO - Все процессы завершены.
+2025-02-03 13:17:33,761 - INFO - Воспроизведение файла: D:\My Files\OldAssistant_v2\speak_voice\johnny\what\не понимаю о чем ты.ogg
+2025-02-03 13:18:24,446 - INFO - Распознанный текст: просто надо реакцию на базе ватсона
+2025-02-03 13:18:34,292 - INFO - Распознанный текст: или как
+2025-02-03 13:19:01,652 - INFO - Распознанный текст: ну не может плакать
+2025-02-03 13:19:05,006 - INFO - Распознанный текст: джонни запусти секира
+2025-02-03 13:19:05,008 - INFO - Воспроизведение файла: D:\My Files\OldAssistant_v2\speak_voice\johnny\start\выключаю комп, да это шутка.ogg
+2025-02-03 13:19:07,322 - INFO - Используем существующие процессы для игры 'SekiroFpsUnlockAndMore_v1.2.5.2.lnk': ['SekiroFpsUnlockAndMore_v1.2.5.2.exe']
+2025-02-03 13:19:07,330 - INFO - Воспроизведение файла: D:\My Files\OldAssistant_v2\speak_voice\johnny\what\не понимаю о чем ты.ogg
+2025-02-03 13:19:16,016 - INFO - Распознанный текст: она не обновляется
+2025-02-03 13:19:23,216 - INFO - Распознанный текст: является
+2025-02-03 13:22:03,538 - INFO - Распознанный текст: да пусть хочу чтобы меня открылась у это будет фолз
+2025-02-03 13:22:05,936 - INFO - Распознанный текст: о это быть тру
+2025-02-03 13:23:07,551 - INFO - Создан следующий путь для планировщика: D:\My Files\start_assistant.bat
+2025-02-03 13:23:07,596 - INFO - Воспроизведение файла: D:\My Files\OldAssistant_v2\speak_voice\johnny\start_greet\с добрым утром.ogg
+2025-02-03 13:23:09,407 - INFO - Попытка загрузки модели
+2025-02-03 13:23:09,407 - INFO - Используется модель по пути: D:\My Files\OldAssistant_v2\model_ru
+2025-02-03 13:23:09,966 - INFO - Модель успешно загружена.
+2025-02-03 13:23:13,267 - INFO - Распознанный текст: запусти секира
+2025-02-03 13:23:18,286 - INFO - Распознанный текст: джонни запусти секира
+2025-02-03 13:23:18,299 - INFO - Воспроизведение файла: D:\My Files\OldAssistant_v2\speak_voice\johnny\start\открываю.ogg
+2025-02-03 13:23:19,604 - INFO - Используем существующие процессы для игры 'SekiroFpsUnlockAndMore_v1.2.5.2.lnk': ['SekiroFpsUnlockAndMore_v1.2.5.2.exe']
+2025-02-03 13:23:26,467 - INFO - Распознанный текст: джонни закрой секира
+2025-02-03 13:23:26,524 - INFO - Все процессы SekiroFpsUnlockAndMore_v1.2.5.2.exe успешно завершены.
+2025-02-03 13:23:26,524 - INFO - Воспроизведение файла: D:\My Files\OldAssistant_v2\speak_voice\johnny\close\хорошо. выхожу из программы.ogg
+2025-02-03 13:23:28,544 - INFO - Все процессы завершены.
+2025-02-03 13:46:12,550 - INFO - Создан следующий путь для планировщика: D:\My Files\start_assistant.bat
+2025-02-03 13:46:12,594 - INFO - Воспроизведение файла: D:\My Files\OldAssistant_v2\speak_voice\johnny\start_greet\здравствуйте.ogg
+2025-02-03 13:46:14,206 - INFO - Попытка загрузки модели
+2025-02-03 13:46:14,206 - INFO - Используется модель по пути: D:\My Files\OldAssistant_v2\model_ru
+2025-02-03 13:46:14,786 - INFO - Модель успешно загружена.
+2025-02-03 13:46:27,791 - INFO - Воспроизведение файла: D:\My Files\OldAssistant_v2\speak_voice\johnny\approve\да без проблем.ogg
+2025-02-03 13:46:29,603 - INFO - Ярлыки сохранены в файле: D:\My Files\OldAssistant_v2\links.json
+2025-02-03 13:46:29,603 - INFO - Воспроизведение файла: D:\My Files\OldAssistant_v2\speak_voice\johnny\other\файлы проверены.ogg
+2025-02-03 13:46:41,691 - INFO - Команда обновлена в файле.
+2025-02-03 13:46:51,160 - INFO - Команда обновлена в файле.
+2025-02-03 13:46:53,398 - INFO - Воспроизведение файла: D:\My Files\OldAssistant_v2\speak_voice\johnny\close_assist\а я то думал что мы друзья.ogg
+2025-02-03 13:46:53,411 - INFO - Остановка аудиопотока...
+2025-02-03 13:46:57,256 - INFO - Создан следующий путь для планировщика: D:\My Files\start_assistant.bat
+2025-02-03 13:46:57,322 - INFO - Воспроизведение файла: D:\My Files\OldAssistant_v2\speak_voice\johnny\start_greet\добрый вечер.ogg
+2025-02-03 13:46:58,941 - INFO - Попытка загрузки модели
+2025-02-03 13:46:58,941 - INFO - Используется модель по пути: D:\My Files\OldAssistant_v2\model_ru
+2025-02-03 13:46:59,633 - INFO - Модель успешно загружена.
+2025-02-03 13:47:03,868 - INFO - Распознанный текст: джой запусти секира
+2025-02-03 13:47:08,667 - INFO - Распознанный текст: джонни запусти секиры
+2025-02-03 13:47:08,667 - INFO - Остановка аудиопотока...
+2025-02-03 13:47:08,729 - ERROR - Ошибка в основном цикле ассистента: 'Assistant' object has no attribute 'command_handled'
+2025-02-03 13:47:08,730 - ERROR - Traceback (most recent call last):
+  File "D:\My Files\OldAssistant_v2\main_assistant.py", line 459, in run_script
+    app_command_success = self.handle_app_command(text, 'open')
+  File "D:\My Files\OldAssistant_v2\main_assistant.py", line 581, in handle_app_command
+    if not self.command_handled:  # Проверка флага
+AttributeError: 'Assistant' object has no attribute 'command_handled'
+
+2025-02-03 13:48:08,207 - INFO - Создан следующий путь для планировщика: D:\My Files\start_assistant.bat
+2025-02-03 13:48:08,250 - INFO - Воспроизведение файла: D:\My Files\OldAssistant_v2\speak_voice\johnny\start_greet\ну привет.ogg
+2025-02-03 13:48:09,757 - INFO - Попытка загрузки модели
+2025-02-03 13:48:09,757 - INFO - Используется модель по пути: D:\My Files\OldAssistant_v2\model_ru
+2025-02-03 13:48:10,336 - INFO - Модель успешно загружена.
+2025-02-03 13:48:16,219 - INFO - Распознанный текст: джонни запусти секиры
+2025-02-03 13:48:16,234 - INFO - Воспроизведение файла: D:\My Files\OldAssistant_v2\speak_voice\johnny\start\выключаю комп, да это шутка.ogg
+2025-02-03 13:48:18,549 - INFO - Воспроизведение файла: D:\My Files\OldAssistant_v2\speak_voice\johnny\other\подожди. собираю данные о процессах.ogg
+2025-02-03 13:48:41,189 - INFO - Новые процессы: ['SekiroFpsUnlockAndMore_v1.2.5.2.exe']
+2025-02-03 13:48:41,191 - INFO - Имена процессов для ярлыка 'SekiroFpsUnlockAndMore_v1.2.5.2.lnk' сохранены в файл.
+2025-02-03 13:48:41,191 - INFO - Воспроизведение файла: D:\My Files\OldAssistant_v2\speak_voice\johnny\other\процессы записаны.ogg
+2025-02-03 13:48:43,103 - INFO - Остановка аудиопотока...
+2025-02-03 13:48:43,161 - ERROR - Ошибка в основном цикле ассистента: local variable 'reaction_triggered' referenced before assignment
+2025-02-03 13:48:43,161 - ERROR - Traceback (most recent call last):
+  File "D:\My Files\OldAssistant_v2\main_assistant.py", line 517, in run_script
+    if reaction_triggered:
+UnboundLocalError: local variable 'reaction_triggered' referenced before assignment
+
+2025-02-03 13:50:04,953 - INFO - Создан следующий путь для планировщика: D:\My Files\start_assistant.bat
+2025-02-03 13:50:04,995 - INFO - Воспроизведение файла: D:\My Files\OldAssistant_v2\speak_voice\johnny\start_greet\ну привет.ogg
+2025-02-03 13:50:06,767 - INFO - Попытка загрузки модели
+2025-02-03 13:50:06,767 - INFO - Используется модель по пути: D:\My Files\OldAssistant_v2\model_ru
+2025-02-03 13:50:07,440 - INFO - Модель успешно загружена.
+2025-02-03 13:50:12,378 - INFO - Распознанный текст: джонни проверь файлы
+2025-02-03 13:50:12,378 - INFO - Воспроизведение файла: D:\My Files\OldAssistant_v2\speak_voice\johnny\approve\да без проблем.ogg
+2025-02-03 13:50:14,190 - INFO - Ярлыки сохранены в файле: D:\My Files\OldAssistant_v2\links.json
+2025-02-03 13:50:14,191 - INFO - Воспроизведение файла: D:\My Files\OldAssistant_v2\speak_voice\johnny\other\файлы проверены.ogg
+2025-02-03 13:50:20,447 - INFO - Распознанный текст: джонни запусти секира
+2025-02-03 13:50:20,460 - INFO - Воспроизведение файла: D:\My Files\OldAssistant_v2\speak_voice\johnny\start\выключаю комп, да это шутка.ogg
+2025-02-03 13:50:22,781 - INFO - Используем существующие процессы для игры 'SekiroFpsUnlockAndMore_v1.2.5.2.lnk': ['SekiroFpsUnlockAndMore_v1.2.5.2.exe']
+2025-02-03 13:50:27,719 - INFO - Распознанный текст: джонни закрой секира
+2025-02-03 13:50:27,785 - INFO - Все процессы SekiroFpsUnlockAndMore_v1.2.5.2.exe успешно завершены.
+2025-02-03 13:50:27,786 - INFO - Воспроизведение файла: D:\My Files\OldAssistant_v2\speak_voice\johnny\close\завершаю процесс.ogg
+2025-02-03 13:50:29,700 - INFO - Все процессы завершены.
+2025-02-03 13:50:32,227 - INFO - Распознанный текст: джонни запусти загрузки
+2025-02-03 13:50:32,256 - INFO - Воспроизведение файла: D:\My Files\OldAssistant_v2\speak_voice\johnny\start\запускаю.ogg
+2025-02-03 13:50:37,061 - INFO - Распознанный текст: сть джонни загрузок русский
+2025-02-03 13:50:37,061 - INFO - Воспроизведение файла: D:\My Files\OldAssistant_v2\speak_voice\johnny\echo\внимательно слушаю.ogg
+2025-02-03 13:50:42,028 - INFO - Распознанный текст: джонни закрой загрузкой
+2025-02-03 13:50:42,030 - INFO - Воспроизведение файла: D:\My Files\OldAssistant_v2\speak_voice\johnny\close\наигрался, закрываю.ogg
+2025-02-03 13:50:44,853 - INFO - Воспроизведение файла: D:\My Files\OldAssistant_v2\speak_voice\johnny\close_assist\не выключай меня пожалуйста.ogg
+2025-02-03 13:50:44,882 - INFO - Остановка аудиопотока...
