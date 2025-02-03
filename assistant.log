@@ -301,3 +301,11 @@ UnboundLocalError: local variable 'reaction_triggered' referenced before assignm
 2025-02-03 13:50:42,030 - INFO - Воспроизведение файла: D:\My Files\OldAssistant_v2\speak_voice\johnny\close\наигрался, закрываю.ogg
 2025-02-03 13:50:44,853 - INFO - Воспроизведение файла: D:\My Files\OldAssistant_v2\speak_voice\johnny\close_assist\не выключай меня пожалуйста.ogg
 2025-02-03 13:50:44,882 - INFO - Остановка аудиопотока...
+2025-02-03 14:16:56,827 - INFO - Создан следующий путь для планировщика: D:\My Files\start_assistant.bat
+2025-02-03 14:16:56,873 - INFO - Воспроизведение файла: D:\My Files\OldAssistant_v2\speak_voice\johnny\start_greet\с добрым утром.ogg
+2025-02-03 14:16:58,582 - INFO - Попытка загрузки модели
+2025-02-03 14:16:58,582 - INFO - Используется модель по пути: D:\My Files\OldAssistant_v2\model_ru
+2025-02-03 14:16:59,145 - INFO - Модель успешно загружена.
+2025-02-03 14:17:00,446 - INFO - Воспроизведение файла: D:\My Files\OldAssistant_v2\speak_voice\johnny\approve\ага.ogg
+2025-02-03 14:17:01,552 - INFO - Ярлыки сохранены в файле: D:\My Files\OldAssistant_v2\links.json
+2025-02-03 14:17:01,552 - INFO - Воспроизведение файла: D:\My Files\OldAssistant_v2\speak_voice\johnny\other\файлы проверены.ogg
