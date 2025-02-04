@@ -7,16 +7,18 @@
 """
 import json
 import logging
+import os.path
 import traceback
 from func_list import search_links, handler_links, handler_folder
 from function_list_main import *
 import gc
 import threading
 import pyaudio
-from PyQt5.QtGui import QIcon
+from PyQt5.QtGui import QIcon, QColor
 from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QHBoxLayout, \
     QPushButton, QCheckBox, QSystemTrayIcon, QAction, qApp, QMenu, QMessageBox, \
-    QTextEdit, QDialog, QLabel, QComboBox, QLineEdit, QListWidget, QListWidgetItem, QFileDialog
+    QTextEdit, QDialog, QLabel, QComboBox, QLineEdit, QListWidget, QListWidgetItem, QFileDialog, QColorDialog, \
+    QInputDialog
 from PyQt5.QtCore import Qt, QFileSystemWatcher, QTimer, QEvent, pyqtSignal
 import subprocess
 from script_audio import controller
@@ -26,7 +28,7 @@ from lists import get_audio_paths
 from vosk import Model, KaldiRecognizer
 
 
-speakers = dict(Пласид='placide', Бестия='rogue', Джонни='johnny')
+speakers = dict(Пласид='placide', Бестия='rogue', Джонни='johnny', Санбой='sanboy')
 
 
 class Assistant(QWidget):
@@ -55,11 +57,13 @@ class Assistant(QWidget):
 
     def __init__(self):
         super().__init__()
+        self.styles = None
         self.log_file_path = os.path.join(self.get_base_directory(), 'assistant.log')
         self.init_logger()
         self.settings_file_path = os.path.join(self.get_base_directory(), 'settings.json')
+        self.color_settings_path = os.path.join(self.get_base_directory(), 'color_settings.json')
         self.commands = self.load_commands(os.path.join(self.get_base_directory(), 'commands.json'))
-        self.function_list_path = os.path.join(get_base_directory(), 'function_list.py')
+        self.default_preset_style = os.path.join(self.get_base_directory(), 'presets', 'default.json')
         self.last_position = 0
         self.steam_path = self.load_steam_path()
         self.is_assistant_running = False
@@ -67,35 +71,127 @@ class Assistant(QWidget):
         self.speaker = self.load_settings()
         self.assistant_name = self.load_settings_name()
         self.audio_paths = get_audio_paths(self.speaker)
-        self.version = "1.0.3"
+        self.version = "1.0.4"
+        self.label_version = QLabel(f"Версия: {self.version}", self)
+        self.label_message = QLabel('', self)
         self.initui()
-        self.setStyleSheet("""
-            QWidget {
-                background-color: #2E3440;
-                color: #88C0D0;
-                font-size: 13px;
-            }
-            QPushButton {
-                background-color: #2E3450;
-                height: 20px;
-                border: 1px solid;
-                border-radius: 4px;
-                color: #88C0D0;
-                font-size: 13px;
-            }
-            QTextEdit {
-                background-color: #2E3440;
-                border: 1px solid;
-                border-radius: 4px;
-                color: #88C0D0;
-                font-size: 12px;
-            }
-        """)
-
+        self.load_and_apply_styles()
+        self.apply_styles()
         # Проверка автозапуска при старте программы
         self.check_autostart()
         self.hide()
         self.run_assist()
+
+    def initui(self):
+        """Инициализация пользовательского интерфейса."""
+        main_layout = QHBoxLayout()
+        left_layout = QVBoxLayout()
+
+        # Инициализируем QSystemTrayIcon
+        self.tray_icon = QSystemTrayIcon(self)
+        self.tray_icon.setIcon(QIcon(os.path.join(self.get_base_directory(), 'assist-min.ico')))
+
+        show_action = QAction("Развернуть", self)
+        show_action.triggered.connect(self.show)
+
+        hide_action = QAction("Свернуть", self)
+        hide_action.triggered.connect(self.hide)
+
+        quit_action = QAction("Закрыть", self)
+        quit_action.triggered.connect(self.close_app)
+
+        tray_menu = QMenu()
+        tray_menu.addAction(show_action)
+        tray_menu.addAction(hide_action)
+        tray_menu.addAction(quit_action)
+
+        self.tray_icon.setContextMenu(tray_menu)
+        self.tray_icon.activated.connect(self.on_tray_icon_activated)
+        self.tray_icon.show()
+
+        # Кнопка "Старт ассистента"
+        self.start_button = QPushButton("Старт ассистента")
+        self.start_button.clicked.connect(self.start_assist_toggle)
+        left_layout.addWidget(self.start_button)
+
+        # Чекбокс "Автозапуск"
+        self.autostart_checkbox = QCheckBox("Автозапуск")
+        self.autostart_checkbox.stateChanged.connect(self.toggle_autostart)
+        left_layout.addWidget(self.autostart_checkbox)
+
+        # Кнопка "Открыть папку с ярлыками"
+        self.open_folder_button = QPushButton("Открыть папку с ярлыками")
+        self.open_folder_button.clicked.connect(self.open_folder)
+        left_layout.addWidget(self.open_folder_button)
+
+        # Кнопка "Проверка ярлыков"
+        self.check_shortcut_button = QPushButton("Проверка ярлыков")
+        self.check_shortcut_button.clicked.connect(self.check_shortcuts)
+        left_layout.addWidget(self.check_shortcut_button)
+
+        # Кнопка "Настройки"
+        self.settings_button = QPushButton("Настройки")
+        self.settings_button.clicked.connect(self.open_settings)
+        left_layout.addWidget(self.settings_button)
+
+        # Кнопка "Оформление интерфейса"
+        self.style_settings_button = QPushButton('Оформление интерфейса')
+        self.style_settings_button.clicked.connect(self.open_color_settings)
+        left_layout.addWidget(self.style_settings_button)
+
+        # Кнопка "Очистить логи"
+        self.clear_logs_button = QPushButton("Очистить логи")
+        self.clear_logs_button.clicked.connect(self.clear_logs)
+        left_layout.addWidget(self.clear_logs_button)
+
+        # Кнопка "Добавить команду для программы"
+        self.add_command_button = QPushButton("Создать команду для программы")
+        self.add_command_button.clicked.connect(self.add_new_command)
+        left_layout.addWidget(self.add_command_button)
+
+        # Кнопка "Добавить команду для открытия папки"
+        self.add_folder_button = QPushButton("Создать команду для папки")
+        self.add_folder_button.clicked.connect(self.add_folder_command)
+        left_layout.addWidget(self.add_folder_button)
+
+        # Кнопка "Добавленные команды"
+        self.added_commands_button = QPushButton("Добавленные команды")
+        self.added_commands_button.clicked.connect(self.added_commands)
+        left_layout.addWidget(self.added_commands_button)
+
+        # Добавляем растяжку, чтобы кнопки были вверху
+        left_layout.addStretch()
+
+        left_layout.addWidget(self.label_version)
+
+        # Правая часть (поле для логов)
+        self.log_area = QTextEdit()
+        self.log_area.setReadOnly(True)  # Запрещаем редактирование
+
+        # Добавляем левую и правую части в основной макет
+        main_layout.addLayout(left_layout, 1)
+        main_layout.addWidget(self.log_area, 2)
+
+        # Устанавливаем основной макет для окна
+        self.setLayout(main_layout)
+
+        # Настройки окна
+        self.setWindowTitle("Виртуальный помощник")
+        self.setGeometry(600, 300, 800, 500)
+
+        # Установка иконки для окна
+        self.setWindowIcon(QIcon(os.path.join(self.get_base_directory(), 'assist-min.ico')))
+
+        # Инициализация FileSystemWatcher
+        self.init_file_watcher()
+
+        # Загрузка предыдущих записей из файла логов
+        self.load_existing_logs()
+
+        # Таймер для периодической проверки файла
+        self.timer = QTimer()
+        self.timer.timeout.connect(self.check_for_updates)
+        self.timer.start(1000)  # Проверка каждую секунду
 
     def init_logger(self):
         """Инициализация логгера."""
@@ -155,113 +251,55 @@ class Assistant(QWidget):
         self.log_area.append(text)
         self.log_area.verticalScrollBar().setValue(self.log_area.verticalScrollBar().maximum())
 
-    def initui(self):
-        """Инициализация пользовательского интерфейса."""
-        main_layout = QHBoxLayout()
-        left_layout = QVBoxLayout()
+    def load_and_apply_styles(self):
+        """
+        Загружает стили из файла и применяет их к элементам интерфейса.
+        Если файл не найден или поврежден, устанавливает значения по умолчанию.
+        """
+        try:
+            with open(self.color_settings_path, 'r') as file:
+                self.styles = json.load(file)
+        except (FileNotFoundError, json.JSONDecodeError):
+            try:
+                with open(self.default_preset_style, 'r') as default_file:
+                    self.styles = json.load(default_file)
+            except (FileNotFoundError, json.JSONDecodeError):
+                self.styles = {}
 
-        # Инициализируем QSystemTrayIcon
-        self.tray_icon = QSystemTrayIcon(self)
-        self.tray_icon.setIcon(QIcon(os.path.join(self.get_base_directory(), 'assist-min.ico')))
+        # Применяем загруженные или значения по умолчанию
+        self.apply_styles()
 
-        show_action = QAction("Развернуть", self)
-        show_action.triggered.connect(self.show)
+    def apply_styles(self):
+        # Применяем стили к текущему окну
+        style_sheet = ""
+        for widget, styles in self.styles.items():
+            style_sheet += f"{widget} {{\n"
+            for prop, value in styles.items():
+                style_sheet += f"    {prop}: {value};\n"
+            style_sheet += "}\n"
 
-        hide_action = QAction("Свернуть", self)
-        hide_action.triggered.connect(self.hide)
+        # Устанавливаем стиль для текущего окна
+        self.setStyleSheet(style_sheet)
 
-        quit_action = QAction("Закрыть", self)
-        quit_action.triggered.connect(self.close_app)
+        # Применяем стили для label_version и label_message
+        if 'label_version' in self.styles:
+            self.label_version.setStyleSheet(self.format_style(self.styles['label_version']))
 
-        tray_menu = QMenu()
-        tray_menu.addAction(show_action)
-        tray_menu.addAction(hide_action)
-        tray_menu.addAction(quit_action)
+        if 'label_message' in self.styles:
+            self.label_message.setStyleSheet(self.format_style(self.styles['label_message']))
 
-        self.tray_icon.setContextMenu(tray_menu)
-        self.tray_icon.activated.connect(self.on_tray_icon_activated)
-        self.tray_icon.show()
+    def format_style(self, style_dict):
+        """Форматируем словарь стиля в строку для setStyleSheet"""
+        return '; '.join(f"{key}: {value}" for key, value in style_dict.items())
 
-        # Кнопка "Старт ассистента"
-        self.start_button = QPushButton("Старт ассистента")
-        self.start_button.clicked.connect(self.start_assist_toggle)
-        left_layout.addWidget(self.start_button)
-
-        # Чекбокс "Автозапуск"
-        self.autostart_checkbox = QCheckBox("Автозапуск")
-        self.autostart_checkbox.stateChanged.connect(self.toggle_autostart)
-        left_layout.addWidget(self.autostart_checkbox)
-
-        # Кнопка "Открыть папку с ярлыками"
-        self.open_folder_button = QPushButton("Открыть папку с ярлыками")
-        self.open_folder_button.clicked.connect(self.open_folder)
-        left_layout.addWidget(self.open_folder_button)
-
-        # Кнопка "Проверка ярлыков"
-        self.check_shortcut_button = QPushButton("Проверка ярлыков")
-        self.check_shortcut_button.clicked.connect(self.check_shortcuts)
-        left_layout.addWidget(self.check_shortcut_button)
-
-        # Кнопка "Настройки"
-        self.settings_button = QPushButton("Настройки")
-        self.settings_button.clicked.connect(self.open_settings)
-        left_layout.addWidget(self.settings_button)
-
-        # Кнопка "Очистить логи"
-        self.clear_logs_button = QPushButton("Очистить логи")
-        self.clear_logs_button.clicked.connect(self.clear_logs)
-        left_layout.addWidget(self.clear_logs_button)
-
-        # Кнопка "Добавить команду для программы"
-        self.add_command_button = QPushButton("Создать команду для программы")
-        self.add_command_button.clicked.connect(self.add_new_command)
-        left_layout.addWidget(self.add_command_button)
-
-        # Кнопка "Добавить команду для открытия папки"
-        self.add_folder_button = QPushButton("Создать команду для папки")
-        self.add_folder_button.clicked.connect(self.add_folder_command)
-        left_layout.addWidget(self.add_folder_button)
-
-        # Кнопка "Добавленные команды"
-        self.added_commands_button = QPushButton("Добавленные команды")
-        self.added_commands_button.clicked.connect(self.added_commands)
-        left_layout.addWidget(self.added_commands_button)
-
-        # Добавляем растяжку, чтобы кнопки были вверху
-        left_layout.addStretch()
-
-        version_label = QLabel(f"Версия: {self.version}")
-        left_layout.addStretch()  # Добавляем растяжку, чтобы сноска была внизу
-        left_layout.addWidget(version_label)
-
-        # Правая часть (поле для логов)
-        self.log_area = QTextEdit()
-        self.log_area.setReadOnly(True)  # Запрещаем редактирование
-
-        # Добавляем левую и правую части в основной макет
-        main_layout.addLayout(left_layout, 1)
-        main_layout.addWidget(self.log_area, 2)
-
-        # Устанавливаем основной макет для окна
-        self.setLayout(main_layout)
-
-        # Настройки окна
-        self.setWindowTitle("Виртуальный помощник")
-        self.setGeometry(600, 300, 700, 400)
-
-        # Установка иконки для окна
-        self.setWindowIcon(QIcon(os.path.join(self.get_base_directory(), 'assist-min.ico')))
-
-        # Инициализация FileSystemWatcher
-        self.init_file_watcher()
-
-        # Загрузка предыдущих записей из файла логов
-        self.load_existing_logs()
-
-        # Таймер для периодической проверки файла
-        self.timer = QTimer()
-        self.timer.timeout.connect(self.check_for_updates)
-        self.timer.start(1000)  # Проверка каждую секунду
+    def open_color_settings(self):
+        """Открывает диалоговое окно для настройки цветов."""
+        try:
+            color_dialog = ColorSettingsWindow(self.styles, self.color_settings_path, self)
+            color_dialog.colorChanged.connect(self.load_and_apply_styles)
+            color_dialog.exec_()
+        except Exception as e:
+            logger.info(f"Ошибка при открытии окна настроек: {e}")
 
     def close_app(self):
         """Закрытие приложения."""
@@ -363,20 +401,20 @@ class Assistant(QWidget):
         if self.is_assistant_running:
             dialog = QDialog(self)
             dialog.setWindowTitle('Подтверждение')
-            dialog.setFixedSize(200, 100)
+            dialog.setFixedSize(200, 110)
 
             main_layout = QVBoxLayout(dialog)
 
-            label = QLabel('Вы уверены?', dialog)
-            label.setAlignment(Qt.AlignCenter)  # Центрируем текст
-            main_layout.addWidget(label)
+            self.label_message.setText('Вы уверены?')  # Устанавливаем текст в label_message
+            self.label_message.setAlignment(Qt.AlignCenter)  # Центрируем текст
+            main_layout.addWidget(self.label_message)  # Добавляем self.label_message в макет
 
             button_layout = QHBoxLayout()
 
             yes_button = QPushButton('Да', dialog)
-            yes_button.setFixedSize(60, 30)
+            yes_button.setFixedSize(60, 25)
             no_button = QPushButton('Нет', dialog)
-            no_button.setFixedSize(60, 30)
+            no_button.setFixedSize(60, 25)
 
             yes_button.clicked.connect(lambda: self.handle_response(True, event, dialog))
             no_button.clicked.connect(lambda: self.handle_response(False, event, dialog))
@@ -503,12 +541,6 @@ class Assistant(QWidget):
                         approve_folder = self.audio_paths.get('approve_folder')
                         if approve_folder:
                             react(approve_folder)
-                    elif "чист" in text:
-                        gc.collect()
-                        cache_file = self.audio_paths.get('cache_file')
-                        if cache_file:
-                            react_detail(cache_file)
-
                     else:
                         echo_folder = self.audio_paths.get('echo_folder')
                         if echo_folder:
@@ -630,7 +662,7 @@ class Assistant(QWidget):
 
     def add_new_command(self):
         """Обработка нажатия кнопки 'Новая команда'"""
-        settings_dialog = AppCommandWindow()
+        settings_dialog = AppCommandWindow(self)
         settings_dialog.exec_()
 
     def added_commands(self):
@@ -640,7 +672,7 @@ class Assistant(QWidget):
 
     def add_folder_command(self):
         """Обработка нажатия кнопки 'Добавить команду для папки'"""
-        folder_dialog = AddFolderCommand()
+        folder_dialog = AddFolderCommand(self)
         folder_dialog.exec_()
 
     def update_voice(self, new_voice):
@@ -760,7 +792,7 @@ class Assistant(QWidget):
 class SettingsDialog(QDialog):
     voice_changed = pyqtSignal(str)  # Сигнал для передачи нового голоса
 
-    def __init__(self, current_voice: str, current_name: str, current_steam_path: str, parent=None):
+    def __init__(self, current_voice: str, current_name: str, current_steam_path: str, parent):
         """
         Конструктор диалога настроек.
         :param current_voice: Текущий выбранный голос.
@@ -890,39 +922,18 @@ class SettingsDialog(QDialog):
 
 
 class AppCommandWindow(QDialog):
-    def __init__(self):
-        super().__init__()
+    """
+    Обработка создания окна для добавления новых команд
+    """
+
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.parent = parent
         self.init_ui()
         self.base_path = get_base_directory()
         self.commands = self.load_commands(os.path.join(self.base_path, 'commands.json'))
         self.load_shortcuts()  # Загружаем ярлыки при инициализации
-
-        self.setFixedSize(300, 350)
-        self.setStyleSheet("""
-                    QDialog {
-                        background-color: #2E3440;
-                        color: #88C0D0;
-                    }
-                    QLabel {
-                        color: #88C0D0;
-                    }
-                    QLineEdit {
-                        background-color: #2E3450;
-                        color: #88C0D0;
-                    }
-                    QPushButton {
-                        background-color: #2E3450;
-                        color: #88C0D0;
-                    }
-                    QComboBox {
-                        background-color: #2E3450;
-                        border: 1px solid;
-                        border-radius: 4px;
-                        color: #88C0D0;
-                        font-size: 12px;
-                        padding: 5px;
-                    }
-                """)
+        self.setFixedSize(350, 300)
         self.setWindowIcon(QIcon(os.path.join(self.base_path, 'assist-min.ico')))
 
     def init_ui(self):
@@ -1016,6 +1027,7 @@ class AddedCommandsWindow(QDialog):
     """
         Класс для обработки окна "Добавленные функции"
     """
+
     def __init__(self, parent):
         super().__init__(parent)
         self.parent = parent  # Сохраняем ссылку на родительский класс
@@ -1109,29 +1121,13 @@ class AddFolderCommand(QDialog):
         Класс для обработки окна "Добавить команду для папки"
     """
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.parent = parent
         self.init_ui()
         self.base_path = get_base_directory()
         self.commands = self.load_commands(os.path.join(self.base_path, 'commands.json'))
-        self.setFixedSize(300, 250)
-        self.setStyleSheet("""
-                    QDialog {
-                        background-color: #2E3440;
-                        color: #88C0D0;
-                    }
-                    QLabel {
-                        color: #88C0D0;
-                    }
-                    QLineEdit {
-                        background-color: #2E3450;
-                        color: #88C0D0;
-                    }
-                    QPushButton {
-                        background-color: #2E3450;
-                        color: #88C0D0;
-                    }
-                """)
+        self.setFixedSize(350, 250)
         self.setWindowIcon(QIcon(os.path.join(self.base_path, 'assist-min.ico')))
 
     def init_ui(self):
@@ -1231,6 +1227,278 @@ class AddFolderCommand(QDialog):
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", str(e))
             logger.error(f"Ошибка: {e}")
+
+
+class ColorSettingsWindow(QDialog):
+    """
+    Класс обрабатывающий окно изменения оформления интерфейса
+    (изменение цветовой палитры, сохранение и выбор пресетов)
+    """
+    colorChanged = pyqtSignal()  # Определяем сигнал
+
+    def get_base_directory(self):
+        """
+        Возвращает базовую директорию для файлов в зависимости от режима выполнения.
+        - Если программа запущена как исполняемый файл, возвращает директорию исполняемого файла.
+        - Если программа запущена как скрипт, возвращает директорию скрипта.
+        """
+        if getattr(sys, 'frozen', False):
+            # Если программа запущена как исполняемый файл
+            if hasattr(sys, '_MEIPASS'):
+                # Если ресурсы упакованы в исполняемый файл (один файл)
+                base_path = sys._MEIPASS
+            else:
+                # Если ресурсы находятся рядом с исполняемым файлом (папка dist)
+                base_path = os.path.dirname(sys.executable)
+        else:
+            # Если программа запущена как скрипт
+            base_path = os.path.dirname(os.path.abspath(__file__))
+        return base_path
+
+    def __init__(self, current_styles, color_setting_path, parent=None):
+        super().__init__(parent)
+        self.styles = current_styles  # Передаем текущие стили
+        self.color_settings_path = color_setting_path
+        self.init_ui()
+        self.load_color_settings()  # Загружаем текущие цвета
+
+    def init_ui(self):
+        self.setWindowTitle('Настройка цветов интерфейса')
+        self.setFixedSize(300, 400)
+
+        # Инициализация переменных для цветов
+        self.bg_color = ""
+        self.btn_color = ""
+        self.text_color = ""
+        self.text_edit_color = ""
+
+        # Кнопки для выбора цветов
+        self.bg_button = QPushButton('Выберите цвет фона')
+        self.bg_button.clicked.connect(self.choose_background_color)
+
+        self.btn_button = QPushButton('Выберите цвет кнопок')
+        self.btn_button.clicked.connect(self.choose_button_color)
+
+        self.text_button = QPushButton('Выберите цвет текста')
+        self.text_button.clicked.connect(self.choose_text_color)
+
+        self.text_edit_button = QPushButton('Выберите цвет текста в логах')
+        self.text_edit_button.clicked.connect(self.choose_text_edit_color)
+
+        # Кнопка для применения изменений
+        self.apply_button = QPushButton('Применить')
+        self.apply_button.clicked.connect(self.apply_changes)
+
+        # Кнопка для сохранения пресета
+        self.save_preset_button = QPushButton('Сохранить пресет')
+        self.save_preset_button.clicked.connect(self.save_preset)
+
+        # Выпадающий список для выбора существующих пресетов
+        self.preset_combo_box = QComboBox()
+        self.load_presets()  # Загружаем существующие пресеты
+        self.preset_combo_box.setCurrentIndex(0)
+        self.preset_combo_box.currentIndexChanged.connect(self.load_preset)
+
+        # Размещение элементов
+        layout = QVBoxLayout()
+        layout.addWidget(self.bg_button)
+        layout.addWidget(self.btn_button)
+        layout.addWidget(self.text_button)
+        layout.addWidget(self.text_edit_button)
+        layout.addWidget(self.save_preset_button)
+        layout.addWidget(QLabel('Пресеты:'))
+        layout.addWidget(self.preset_combo_box)
+        layout.addStretch()
+        layout.addWidget(self.apply_button)
+
+        self.setLayout(layout)
+
+    def load_color_settings(self):
+        """Загружает текущие цвета из переданных стилей."""
+        self.bg_color = self.styles.get("QWidget", {}).get("background-color", "#2E3440")
+        self.btn_color = self.styles.get("QPushButton", {}).get("background-color", "#3858c7")
+        self.text_color = self.styles.get("QWidget", {}).get("color", "#8eaee5")
+        self.text_edit_color = self.styles.get("QTextEdit", {}).get("background-color", "#2E3440")
+
+    def choose_background_color(self):
+        color = QColorDialog.getColor(Qt.white, self)
+        if color.isValid():
+            self.bg_color = color.name()
+
+    def choose_button_color(self):
+        color = QColorDialog.getColor(Qt.white, self)
+        if color.isValid():
+            self.btn_color = color.name()
+
+    def choose_text_color(self):
+        color = QColorDialog.getColor(Qt.white, self)
+        if color.isValid():
+            self.text_color = color.name()
+
+    def choose_text_edit_color(self):
+        color = QColorDialog.getColor(Qt.white, self)
+        if color.isValid():
+            self.text_edit_color = color.name()
+
+    def apply_changes(self):
+        try:
+            new_styles = {
+                "QWidget": {
+                    "background-color": self.bg_color,
+                    "color": self.text_edit_color,
+                    "font-size": "13px"
+                },
+                "QPushButton": {
+                    "background-color": self.btn_color,
+                    "color": self.text_edit_color,
+                    "height": "25px",
+                    "border": f"1px solid {self.btn_color}",
+                    "font-size": "13px"
+                },
+                "QPushButton:hover": {
+                    "background-color": self.darken_color(self.btn_color, 10),
+                    "color": self.text_edit_color,
+                    "font-size": "13px"
+                },
+                "QPushButton:pressed": {
+                    "background-color": self.darken_color(self.btn_color, 30),
+                    "padding-left": "3px",
+                    "padding-top": "3px",
+                },
+                "QTextEdit": {
+                    "background-color": self.bg_color,
+                    "color": self.text_color,
+                    "border": "1px solid",
+                    "border-radius": "4px",
+                    "font-size": "12px"
+                },
+                "label_version": {
+                    "color": self.text_color,
+                    "font-size": "10px"
+                },
+                "label_message": {
+                    "color": self.text_edit_color,
+                    "font-size": "13px"
+                }
+            }
+
+            self.save_color_settings(new_styles)  # Сохранение в файл
+            self.colorChanged.emit()  # Излучаем сигнал о изменении цвета
+        except Exception as e:
+            logger.info(f"Ошибка при применении изменений: {e}")
+            QMessageBox.critical(self, "Ошибка", f"Не удалось применить изменения: {e}")
+
+    def save_color_settings(self, new_styles):
+        """Сохраняет новые стили в color_settings.json."""
+        with open(self.color_settings_path, 'w') as json_file:
+            json.dump(new_styles, json_file, indent=4)
+
+    def save_preset(self):
+        """Сохраняет текущие стили как новый пресет."""
+        preset_name, ok = QInputDialog.getText(self, 'Сохранить пресет', 'Введите имя пресета:')
+        if ok and preset_name:
+            preset_path = os.path.join(self.get_base_directory(), 'presets', f'{preset_name}.json')
+            new_styles = {
+                "QWidget": {
+                    "background-color": self.bg_color,
+                    "color": self.text_color,
+                    "font-size": "13px"
+                },
+                "QPushButton": {
+                    "background-color": self.btn_color,
+                    "color": self.text_color,
+                    "height": "25px",
+                    "border": f"1px solid {self.btn_color}",
+                    "font-size": "13px"
+                },
+                "QPushButton:hover": {
+                    "background-color": self.darken_color(self.btn_color, 10),
+                    "color": self.text_color,
+                    "font-size": "13px"
+                },
+                "QPushButton:pressed": {
+                    "background-color": self.darken_color(self.btn_color, 30),
+                    "padding-left": "3px",
+                    "padding-top": "3px",
+                },
+                "QTextEdit": {
+                    "background-color": self.bg_color,
+                    "color": self.text_edit_color,
+                    "border": "1px solid",
+                    "border-radius": "4px",
+                    "font-size": "12px"
+                },
+                "label_version": {
+                    "color": self.text_edit_color,
+                    "font-size": "10px"
+                },
+                "label_message": {
+                    "color": self.text_color,
+                    "font-size": "13px"
+                }
+            }
+            with open(preset_path, 'w') as json_file:
+                json.dump(new_styles, json_file, indent=4)
+            self.load_presets()  # Обновляем список пресетов
+
+    def load_presets(self):
+        """Загружает существующие пресеты в выпадающий список."""
+        self.preset_combo_box.clear()
+        self.preset_combo_box.addItem("Выбрать пресет")
+
+        # Получаем базовую директорию
+        base_dir = self.get_base_directory()
+        presets_dir = os.path.join(base_dir, 'presets')  # Объединяем базовую директорию с папкой presets
+
+        # Проверяем, существует ли директория, если нет - создаем
+        if not os.path.exists(presets_dir):
+            os.makedirs(presets_dir)
+
+        # Загружаем все файлы .json из директории пресетов
+        for filename in os.listdir(presets_dir):
+            if filename.endswith('.json'):
+                self.preset_combo_box.addItem(filename[:-5])  # Добавляем имя файла без .json
+
+    def load_preset(self):
+        """Загружает выбранный пресет из файла."""
+        selected_preset = self.preset_combo_box.currentText()
+        if selected_preset and selected_preset != "Выбрать пресет":
+            # Получаем базовую директорию
+            base_dir = self.get_base_directory()
+            preset_path = os.path.join(base_dir, 'presets', f'{selected_preset}.json')
+            try:
+                with open(preset_path, 'r') as json_file:
+                    styles = json.load(json_file)
+                    # Загружаем цвета для основных элементов
+                    self.bg_color = styles.get("QWidget", {}).get("background-color", "#2E3440")
+                    self.btn_color = styles.get("QPushButton", {}).get("background-color", "#3858c7")
+                    self.text_color = styles.get("QWidget", {}).get("color", "#ffffff")
+                    self.text_edit_color = styles.get("QTextEdit", {}).get("color", "#2E3440")
+
+                    # Загружаем цвета для меток
+                    label_version_color = styles.get("label_version", {}).get("color", self.text_edit_color)
+                    label_message_color = styles.get("label_message", {}).get("color", self.text_color)
+
+                    # Обновляем переменные для меток
+                    self.text_color = label_version_color  # Используем цвет из label_version
+                    self.text_edit_color = label_message_color  # Используем цвет из label_message
+
+                    logger.info("Пресет успешно загружен.")
+            except FileNotFoundError:
+                logger.error(f"Файл пресета '{preset_path}' не найден.")
+            except json.JSONDecodeError:
+                logger.error(f"Ошибка: файл пресета '{preset_path}' содержит некорректный JSON.")
+            except Exception as e:
+                logger.error(f"Ошибка при загрузке пресета: {e}")
+
+    def darken_color(self, color_str, amount):
+        """Уменьшает яркость цвета на заданное количество (в формате hex)."""
+        color = QColor(color_str)
+        color.setRed(max(0, color.red() - amount))
+        color.setGreen(max(0, color.green() - amount))
+        color.setBlue(max(0, color.blue() - amount))
+        return color.name()
+
 
 # Запуск приложения
 if __name__ == '__main__':

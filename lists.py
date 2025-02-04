@@ -34,7 +34,6 @@ def get_audio_paths(speaker):
     cache_file = os.path.join(other_folder, 'кэш очищен, думаешь это поможет.ogg')
     restart_file = os.path.join(other_folder, 'я ненадолго.ogg')
     check_file = os.path.join(other_folder, 'файлы проверены.ogg')
-    add_func_file = os.path.join(other_folder, 'добавил новые функции для запуска.ogg')
     check_func_file = os.path.join(other_folder, 'некоторые функции были обновлены. возможно ярлык не найден.ogg')
     wait_load_file = os.path.join(other_folder, 'подожди. собираю данные о процессах.ogg')
     done_load_file = os.path.join(other_folder, 'процессы записаны.ogg')
@@ -54,7 +53,6 @@ def get_audio_paths(speaker):
         'cache_file': cache_file,
         'restart_file': restart_file,
         'check_file': check_file,
-        'add_func_file': add_func_file,
         'check_func_file': check_func_file,
         'wait_load_file': wait_load_file,
         'done_load_file': done_load_file,
