@@ -492,8 +492,11 @@ class Assistant(QWidget):
                 if self.assistant_name in text:
                     reaction_triggered = False
 
+                    if 'выключи комп' in text:
+                        logger.info("Выключаю компьютер")
+                        shutdown_windows()
                     # Обработка команд на запуск
-                    if any(keyword in text for keyword in ['запус', 'откр', 'вкл']):
+                    elif any(keyword in text for keyword in ['запус', 'откр', 'вкл']):
                         # Пытаемся обработать команду через handle_app_command
                         app_command_success = self.handle_app_command(text, 'open')
                         # Пытаемся обработать команду через handle_folder_command
@@ -511,21 +514,17 @@ class Assistant(QWidget):
                         # Если ни одна команда не была успешно обработана, устанавливаем флаг
                         if not app_command_success and not folder_command_success:
                             reaction_triggered = True
-
                     elif "поищи" in text or 'найди' in text:
                         query = text.replace("поищи", "").replace("найди", "").replace(self.assistant_name, "").strip()
                         approve_folder = self.audio_paths.get('approve_folder')
                         if approve_folder:
                             react(approve_folder)
                         search_yandex(query)
-
                     elif 'проверь' in text:
                         approve_folder = self.audio_paths.get('approve_folder')
                         if approve_folder:
                             react(approve_folder)
                         search_links()
-                    elif 'выключи комп' in text:
-                        shutdown_windows()
                     elif "пауз" in text or "вруб" in text:
                         controller.play_pause()
                         approve_folder = self.audio_paths.get('approve_folder')
