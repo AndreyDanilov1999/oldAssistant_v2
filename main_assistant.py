@@ -1494,7 +1494,8 @@ class ColorSettingsWindow(QDialog):
 
         # Получаем базовую директорию
         base_dir = self.get_base_directory()
-        presets_dir = os.path.join(base_dir, 'user_settings', 'presets')  # Объединяем базовую директорию с папкой presets
+        presets_dir = os.path.join(base_dir, 'user_settings',
+                                   'presets')  # Объединяем базовую директорию с папкой presets
 
         # Проверяем, существует ли директория, если нет - создаем
         if not os.path.exists(presets_dir):

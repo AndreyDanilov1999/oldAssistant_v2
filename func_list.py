@@ -107,7 +107,8 @@ def save_process_names(shortcut_name, process_names):
     """Сохраняет имена процессов в файл, обновляя данные, если они уже существуют."""
     try:
         new_data = {shortcut_name: process_names}
-        process_names_file = os.path.join(get_base_directory(), 'process_names.json')  # Полный путь к файлу
+        process_names_file = os.path.join(get_base_directory(), 'user_settings',
+                                          'process_names.json')  # Полный путь к файлу
 
         if os.path.exists(process_names_file):
             with open(process_names_file, 'r', encoding='utf-8') as file:
@@ -140,7 +141,8 @@ def get_process_names_from_file(shortcut_name):
     """Возвращает список имен процессов для указанного ярлыка из файла."""
     try:
         process_names = []
-        process_names_file = os.path.join(get_base_directory(), 'process_names.json')  # Полный путь к файлу
+        process_names_file = os.path.join(get_base_directory(), 'user_settings',
+                                          'process_names.json')  # Полный путь к файлу
 
         if os.path.exists(process_names_file):
             with open(process_names_file, 'r', encoding='utf-8') as file:
