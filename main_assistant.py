@@ -8,6 +8,7 @@
 import json
 import logging
 import os.path
+import sys
 import traceback
 from func_list import search_links, handler_links, handler_folder
 from function_list_main import *
@@ -57,6 +58,10 @@ class Assistant(QWidget):
 
     def __init__(self):
         super().__init__()
+        self.open_folder_button = None
+        self.autostart_checkbox = None
+        self.tray_icon = None
+        self.start_button = None
         self.styles = None
         self.log_file_path = os.path.join(self.get_base_directory(), 'assistant.log')
         self.init_logger()
@@ -71,8 +76,9 @@ class Assistant(QWidget):
         self.speaker = self.load_settings()
         self.assistant_name = self.load_settings_name()
         self.audio_paths = get_audio_paths(self.speaker)
-        self.version = "1.0.4"
-        self.label_version = QLabel(f"Версия: {self.version}", self)
+        self.version = "1.0.5"
+        self.ps = "Powered by theoldman"
+        self.label_version = QLabel(f"Версия: {self.version} {self.ps}", self)
         self.label_message = QLabel('', self)
         self.initui()
         self.load_and_apply_styles()
@@ -472,11 +478,15 @@ class Assistant(QWidget):
         if close_assist_folder:
             react(close_assist_folder)
         else:
-            self.log_area.append("Ошибка: путь для закрытия ассистента не найден.")
+            logger.info("Ошибка: не найден аудиофайл.")
 
         # Остановка ассистента
         if self.assistant_thread and self.assistant_thread.is_alive():
             self.assistant_thread.join()  # Ожидание завершения потока
+
+# "Основной цикл ассистента"
+# "--------------------------------------------------------------------------------------------------"
+# "Основной цикл ассистента"
 
     def run_script(self):
         """Основной цикл ассистента"""
@@ -495,23 +505,21 @@ class Assistant(QWidget):
                     if 'выключи комп' in text:
                         logger.info("Выключаю компьютер")
                         shutdown_windows()
+                        """
+                        Поочередная попытка обработки сначала как файл потом как папка
+                        если ничего не удалось, то ассистент переспрашивает 
+                        ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
+                        """
                     # Обработка команд на запуск
-                    elif any(keyword in text for keyword in ['запус', 'откр', 'вкл']):
-                        # Пытаемся обработать команду через handle_app_command
+                    elif any(keyword in text for keyword in ['запус', 'откр', 'вкл', 'вруб']):
                         app_command_success = self.handle_app_command(text, 'open')
-                        # Пытаемся обработать команду через handle_folder_command
                         folder_command_success = self.handle_folder_command(text, 'open')
-                        # Если ни одна команда не была успешно обработана, устанавливаем флаг
                         if not app_command_success and not folder_command_success:
                             reaction_triggered = True
-
                     # Обработка команд на закрытие
                     elif any(keyword in text for keyword in ['закр', 'выкл', 'выруб', 'отруб']):
-                        # Пытаемся обработать команду через handle_app_command
                         app_command_success = self.handle_app_command(text, 'close')
-                        # Пытаемся обработать команду через handle_folder_command
                         folder_command_success = self.handle_folder_command(text, 'close')
-                        # Если ни одна команда не была успешно обработана, устанавливаем флаг
                         if not app_command_success and not folder_command_success:
                             reaction_triggered = True
                     elif "поищи" in text or 'найди' in text:
@@ -525,21 +533,6 @@ class Assistant(QWidget):
                         if approve_folder:
                             react(approve_folder)
                         search_links()
-                    elif "пауз" in text or "вруб" in text:
-                        controller.play_pause()
-                        approve_folder = self.audio_paths.get('approve_folder')
-                        if approve_folder:
-                            react(approve_folder)
-                    elif "след" in text:
-                        controller.next_track()
-                        approve_folder = self.audio_paths.get('approve_folder')
-                        if approve_folder:
-                            react(approve_folder)
-                    elif "пред" in text:
-                        controller.previous_track()
-                        approve_folder = self.audio_paths.get('approve_folder')
-                        if approve_folder:
-                            react(approve_folder)
                     else:
                         echo_folder = self.audio_paths.get('echo_folder')
                         if echo_folder:
@@ -551,12 +544,28 @@ class Assistant(QWidget):
                         if what_folder:
                             react(what_folder)
 
-                elif "перезагрузка ассистент" in text:
-                    restart_system()
-                    break
+                elif any(keyword in text for keyword in ['пауз', 'вкл', 'вруб', 'отруб', 'выкл']):
+                    controller.play_pause()
+                    approve_folder = self.audio_paths.get('approve_folder')
+                    if approve_folder:
+                        react(approve_folder)
+                elif "след" in text:
+                    controller.next_track()
+                    approve_folder = self.audio_paths.get('approve_folder')
+                    if approve_folder:
+                        react(approve_folder)
+                elif "пред" in text:
+                    controller.previous_track()
+                    approve_folder = self.audio_paths.get('approve_folder')
+                    if approve_folder:
+                        react(approve_folder)
         except Exception as e:
             logger.error(f"Ошибка в основном цикле ассистента: {e}")
             logger.error(traceback.format_exc())
+
+    # "Основной цикл ассистента(конец)"
+    # "--------------------------------------------------------------------------------------------------"
+    # "Основной цикл ассистента(конец)"
 
     def get_audio(self):
         """Преобразование речи с микрофона в текст."""
@@ -1382,7 +1391,7 @@ class ColorSettingsWindow(QDialog):
             }
 
             self.save_color_settings(new_styles)  # Сохранение в файл
-            self.colorChanged.emit()  # Излучаем сигнал о изменении цвета
+            self.colorChanged.emit()  # Излучаем сигнал об изменении цвета
         except Exception as e:
             logger.info(f"Ошибка при применении изменений: {e}")
             QMessageBox.critical(self, "Ошибка", f"Не удалось применить изменения: {e}")
