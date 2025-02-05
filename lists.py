@@ -37,6 +37,7 @@ def get_audio_paths(speaker):
     check_func_file = os.path.join(other_folder, 'некоторые функции были обновлены. возможно ярлык не найден.ogg')
     wait_load_file = os.path.join(other_folder, 'подожди. собираю данные о процессах.ogg')
     done_load_file = os.path.join(other_folder, 'процессы записаны.ogg')
+    check_file_start = os.path.join(other_folder, 'подожди. проверяю папку с ярлыками.ogg')
 
     return {
         'what_folder': what_folder,
@@ -56,4 +57,5 @@ def get_audio_paths(speaker):
         'check_func_file': check_func_file,
         'wait_load_file': wait_load_file,
         'done_load_file': done_load_file,
+        'check_file_start': check_file_start,
     }

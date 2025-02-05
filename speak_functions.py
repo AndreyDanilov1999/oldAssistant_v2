@@ -45,7 +45,8 @@ def react(folder_path, volume_reduction_factor=0.2):
 
         # Выбор случайного файла
         random_audio_file = random.choice(audio_files)
-        logger.info(f"Воспроизведение файла: {random_audio_file}")
+        random_filename = os.path.basename(random_audio_file)[:-4]
+        logger.info(f"Ответ ассистента: {random_filename}")
 
         # Загрузка и воспроизведение аудиофайла
         pygame.mixer.music.load(random_audio_file)
@@ -66,7 +67,8 @@ def react_detail(file_path, volume_reduction_factor=0.2):
     :param volume_reduction_factor: Коэффициент уменьшения громкости (по умолчанию 0.2).
     """
     try:
-        logger.info(f"Воспроизведение файла: {file_path}")
+        file_name = os.path.basename(file_path)[:-4]
+        logger.info(f"Ответ ассистента: {file_name}")
 
         # Загрузка и воспроизведение аудиофайла
         pygame.mixer.music.load(file_path)

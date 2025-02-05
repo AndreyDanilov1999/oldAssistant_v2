@@ -173,10 +173,15 @@ def search_links():
     Поиск ярлыков по ключевой папке
     Получение и сохранение имени ярлыков в json
     """
-    root_folder = os.path.join(get_base_directory(), "links for assist")  # Полный путь к папке с ярлыками
-    root_links = os.path.join(get_base_directory(), "links.json")
-    settings_file = os.path.join(get_base_directory(), "settings.json")  # Полный путь к файлу настроек
+    root_folder = os.path.join(get_base_directory(), 'user_settings',
+                               "links for assist")  # Полный путь к папке с ярлыками
+    root_links = os.path.join(get_base_directory(), 'user_settings', "links.json")
+    settings_file = os.path.join(get_base_directory(), 'user_settings', "settings.json")  # Полный путь к файлу настроек
     speaker = get_current_speaker(settings_file)
+
+    # Очистка файла links.json перед началом поиска
+    with open(root_links, 'w', encoding='utf-8') as file:
+        file.write('{}')  # Записываем пустой JSON объект
 
     # Поиск новых ярлыков в директории
     current_shortcuts = {}
@@ -201,10 +206,10 @@ def handler_links(filename, action):
     Обработчик ярлыков в зависимости от их расширения
     """
     global game_id, target_path, process_name
-    root_folder = os.path.join(get_base_directory(), "links for assist")
+    root_folder = os.path.join(get_base_directory(), 'user_settings', "links for assist")
     # Получаем путь к ярлыку
     shortcut_path = os.path.join(root_folder, filename)
-    settings_file = os.path.join(get_base_directory(), "settings.json")  # Полный путь к файлу настроек
+    settings_file = os.path.join(get_base_directory(), 'user_settings', "settings.json")  # Полный путь к файлу настроек
     speaker = get_current_speaker(settings_file)  # Получаем текущий голос
 
     # Обработка .lnk файлов
@@ -244,7 +249,7 @@ def handler_folder(folder_path, action):
     :param folder_path: путь к папке
     :param action: действие(open or close)
     """
-    settings_file = os.path.join(get_base_directory(), "settings.json")  # Полный путь к файлу настроек
+    settings_file = os.path.join(get_base_directory(), 'user_settings', "settings.json")  # Полный путь к файлу настроек
     speaker = get_current_speaker(settings_file)  # Получаем текущий голос
     if action == 'open':
         os.startfile(folder_path)
@@ -271,7 +276,7 @@ def handler_folder(folder_path, action):
 
 
 def open_steam_link(game_id, filename):
-    settings_file = os.path.join(get_base_directory(), "settings.json")  # Полный путь к файлу настроек
+    settings_file = os.path.join(get_base_directory(), 'user_settings', "settings.json")  # Полный путь к файлу настроек
     speaker = get_current_speaker(settings_file)  # Получаем текущий голос
     steam_path = get_steam_path(settings_file)
 
@@ -321,7 +326,7 @@ def open_steam_link(game_id, filename):
 
 
 def open_link(filename, target_path):
-    settings_file = os.path.join(get_base_directory(), "settings.json")  # Полный путь к файлу настроек
+    settings_file = os.path.join(get_base_directory(), 'user_settings', "settings.json")  # Полный путь к файлу настроек
     speaker = get_current_speaker(settings_file)  # Получаем текущий голос
     try:
         audio_paths = get_audio_paths(speaker)
@@ -370,7 +375,7 @@ def open_link(filename, target_path):
         logger.error(f"Ошибка при открытии программы: {e}")
 
 def close_link(filename):
-    settings_file = os.path.join(get_base_directory(), "settings.json")  # Полный путь к файлу настроек
+    settings_file = os.path.join(get_base_directory(), 'user_settings', "settings.json")  # Полный путь к файлу настроек
     speaker = get_current_speaker(settings_file)  # Получаем текущий голос
     process_names = get_process_names_from_file(filename)  # Читаем имена процессов из файла
     if process_names:

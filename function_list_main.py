@@ -9,7 +9,7 @@ import subprocess
 import webbrowser
 from speak_functions import react_detail
 
-settings_file = os.path.join(get_base_directory(), "settings.json")  # Полный путь к файлу настроек
+settings_file = os.path.join(get_base_directory(), 'user_settings', "settings.json")  # Полный путь к файлу настроек
 speaker = get_current_speaker(settings_file)  # Получаем текущий голос
 
 

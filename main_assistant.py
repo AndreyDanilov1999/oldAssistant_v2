@@ -12,14 +12,15 @@ import sys
 import traceback
 from func_list import search_links, handler_links, handler_folder
 from function_list_main import *
-import gc
+import simpleaudio as sa
+import numpy as np
 import threading
 import pyaudio
 from PyQt5.QtGui import QIcon, QColor
 from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QHBoxLayout, \
     QPushButton, QCheckBox, QSystemTrayIcon, QAction, qApp, QMenu, QMessageBox, \
     QTextEdit, QDialog, QLabel, QComboBox, QLineEdit, QListWidget, QListWidgetItem, QFileDialog, QColorDialog, \
-    QInputDialog
+    QInputDialog, QSlider
 from PyQt5.QtCore import Qt, QFileSystemWatcher, QTimer, QEvent, pyqtSignal
 import subprocess
 from script_audio import controller
@@ -58,6 +59,7 @@ class Assistant(QWidget):
 
     def __init__(self):
         super().__init__()
+        self.relax_button = None
         self.open_folder_button = None
         self.autostart_checkbox = None
         self.tray_icon = None
@@ -65,10 +67,10 @@ class Assistant(QWidget):
         self.styles = None
         self.log_file_path = os.path.join(self.get_base_directory(), 'assistant.log')
         self.init_logger()
-        self.settings_file_path = os.path.join(self.get_base_directory(), 'settings.json')
-        self.color_settings_path = os.path.join(self.get_base_directory(), 'color_settings.json')
-        self.commands = self.load_commands(os.path.join(self.get_base_directory(), 'commands.json'))
-        self.default_preset_style = os.path.join(self.get_base_directory(), 'presets', 'default.json')
+        self.settings_file_path = os.path.join(self.get_base_directory(), 'user_settings', 'settings.json')
+        self.color_settings_path = os.path.join(self.get_base_directory(), 'user_settings', 'color_settings.json')
+        self.commands = self.load_commands(os.path.join(self.get_base_directory(), 'user_settings', 'commands.json'))
+        self.default_preset_style = os.path.join(self.get_base_directory(), 'user_settings', 'presets', 'default.json')
         self.last_position = 0
         self.steam_path = self.load_steam_path()
         self.is_assistant_running = False
@@ -76,11 +78,12 @@ class Assistant(QWidget):
         self.speaker = self.load_settings()
         self.assistant_name = self.load_settings_name()
         self.audio_paths = get_audio_paths(self.speaker)
-        self.version = "1.0.5"
+        self.version = "1.1.0"
         self.ps = "Powered by theoldman"
         self.label_version = QLabel(f"Версия: {self.version} {self.ps}", self)
         self.label_message = QLabel('', self)
         self.initui()
+        self.check_or_create_folder()
         self.load_and_apply_styles()
         self.apply_styles()
         # Проверка автозапуска при старте программы
@@ -164,6 +167,11 @@ class Assistant(QWidget):
         self.added_commands_button = QPushButton("Добавленные команды")
         self.added_commands_button.clicked.connect(self.added_commands)
         left_layout.addWidget(self.added_commands_button)
+
+        # Кнопка "Релакс?"
+        self.relax_button = QPushButton("Релакс?")
+        self.relax_button.clicked.connect(self.relax_window)
+        left_layout.addWidget(self.relax_button)
 
         # Добавляем растяжку, чтобы кнопки были вверху
         left_layout.addStretch()
@@ -256,6 +264,21 @@ class Assistant(QWidget):
         """Добавление текста в QTextEdit с автоматической прокруткой."""
         self.log_area.append(text)
         self.log_area.verticalScrollBar().setValue(self.log_area.verticalScrollBar().maximum())
+
+    def check_or_create_folder(self):
+        folder_path = os.path.join(get_base_directory(), 'user_settings', "links for assist")
+        self.log_area.append(folder_path)
+
+        # Проверяем, существует ли папка
+        if os.path.exists(folder_path) and os.path.isdir(folder_path):
+            pass
+        else:
+            # Если папка не существует, создаем её
+            try:
+                os.makedirs(folder_path)  # Создаем папку
+                self.log_area.append(f'Папка "{folder_path}" была создана.')
+            except Exception as e:
+                self.log_area.append(f'Ошибка при создании папки: {e}')
 
     def load_and_apply_styles(self):
         """
@@ -378,7 +401,7 @@ class Assistant(QWidget):
 
     def save_settings(self):
         """Сохраняет настройки в файл settings.json."""
-        settings_file = os.path.join(self.get_base_directory(), 'settings.json')
+        settings_file = os.path.join(self.get_base_directory(), 'user_settings', 'settings.json')
         settings_data = {
             "voice": self.speaker,
             "assistant_name": self.assistant_name,
@@ -597,7 +620,7 @@ class Assistant(QWidget):
                         result = rec_ru.Result()
                         result = result[14:-3]  # Обрезаем результат для получения только текста
                         if result:
-                            logger.info(f"Распознанный текст: {result}")  # Логируем распознанный текст
+                            logger.info(result)  # Логируем распознанный текст
                         yield result.lower()  # Возвращаем результат с помощью yield
                 except Exception as e:
                     logger.error(f"Ошибка при обработке аудиоданных: {e}")  # Логируем ошибку обработки данных
@@ -636,7 +659,7 @@ class Assistant(QWidget):
     def open_folder(self):
         """Обработка нажатия кнопки 'Открыть папку с ярлыками'"""
         current_directory = get_base_directory()  # Используем функцию для получения базового пути
-        folder_path = os.path.join(current_directory, "links for assist")
+        folder_path = os.path.join(current_directory, 'user_settings', "links for assist")
         self.log_area.append(folder_path)
 
         # Проверяем, существует ли папка
@@ -682,6 +705,11 @@ class Assistant(QWidget):
         """Обработка нажатия кнопки 'Добавить команду для папки'"""
         folder_dialog = AddFolderCommand(self)
         folder_dialog.exec_()
+
+    def relax_window(self):
+        """Обработка нажатия кнопки Релакс"""
+        dialog = RelaxWindow(self)
+        dialog.exec_()
 
     def update_voice(self, new_voice):
         """Обновление голоса и путей к аудиофайлам"""
@@ -937,9 +965,10 @@ class AppCommandWindow(QDialog):
     def __init__(self, parent):
         super().__init__(parent)
         self.parent = parent
+        self.get_links()
         self.init_ui()
         self.base_path = get_base_directory()
-        self.commands = self.load_commands(os.path.join(self.base_path, 'commands.json'))
+        self.commands = self.load_commands(os.path.join(self.base_path, 'user_settings', 'commands.json'))
         self.load_shortcuts()  # Загружаем ярлыки при инициализации
         self.setFixedSize(350, 300)
         self.setWindowIcon(QIcon(os.path.join(self.base_path, 'assist-min.ico')))
@@ -970,6 +999,15 @@ class AppCommandWindow(QDialog):
 
         self.setLayout(layout)
 
+    def get_links(self):
+        settings_file = os.path.join(get_base_directory(), 'user_settings',
+                                     "settings.json")  # Полный путь к файлу настроек
+        speaker = get_current_speaker(settings_file)
+        audio_paths = get_audio_paths(speaker)
+        check_file = audio_paths['check_file_start']
+        react_detail(check_file)
+        search_links()
+
     def load_commands(self, filename):
         """Загружает команды из JSON-файла."""
         file_path = os.path.join(self.base_path, filename)
@@ -994,7 +1032,7 @@ class AppCommandWindow(QDialog):
 
     def load_shortcuts(self):
         """Загружает имена ярлыков из файла links.json."""
-        links_file = os.path.join(self.base_path, 'links.json')
+        links_file = os.path.join(self.base_path, 'user_settings', 'links.json')
         try:
             with open(links_file, 'r', encoding='utf-8') as file:
                 links = json.load(file)
@@ -1021,7 +1059,7 @@ class AppCommandWindow(QDialog):
             # Добавляем новую команду в словарь commands
             self.commands[key] = selected_shortcut_name
             # Сохраняем обновленный словарь в JSON-файл
-            self.save_commands('commands.json')
+            self.save_commands('user_settings/commands.json')
 
             QMessageBox.information(self, "Внимание",
                                     f"Команда '{key}' успешно добавлена.\nНеобходим перезапуск программы.")
@@ -1078,7 +1116,7 @@ class AddedCommandsWindow(QDialog):
         """Обновляет список команд в QListWidget, загружая их из файла."""
         self.commands_list.clear()  # Очищаем текущий список
         # Загружаем команды из файла
-        commands_file = os.path.join(self.base_path, 'commands.json')  # Полный путь к файлу
+        commands_file = os.path.join(self.base_path, 'user_settings', 'commands.json')  # Полный путь к файлу
         self.commands = self.load_commands_from_file(commands_file)
 
         if not isinstance(self.commands, dict):
@@ -1114,7 +1152,7 @@ class AddedCommandsWindow(QDialog):
 
     def save_commands(self):
         """Сохраняет команды в файл commands.json."""
-        commands_file = os.path.join(self.base_path, 'commands.json')  # Полный путь к файлу
+        commands_file = os.path.join(self.base_path, 'user_settings', 'commands.json')  # Полный путь к файлу
         try:
             with open(commands_file, 'w', encoding='utf-8') as file:
                 json.dump(self.commands, file, ensure_ascii=False, indent=4)
@@ -1134,7 +1172,7 @@ class AddFolderCommand(QDialog):
         self.parent = parent
         self.init_ui()
         self.base_path = get_base_directory()
-        self.commands = self.load_commands(os.path.join(self.base_path, 'commands.json'))
+        self.commands = self.load_commands(os.path.join(self.base_path, 'user_settings', 'commands.json'))
         self.setFixedSize(350, 250)
         self.setWindowIcon(QIcon(os.path.join(self.base_path, 'assist-min.ico')))
 
@@ -1228,7 +1266,7 @@ class AddFolderCommand(QDialog):
             # Добавляем новую команду в словарь commands
             self.commands[key] = selected_folder_path
             # Сохраняем обновленный словарь в JSON-файл
-            self.save_commands('commands.json')
+            self.save_commands('user_settings/commands.json')
 
             QMessageBox.information(self, "Внимание",
                                     f"Команда '{key}' успешно добавлена.\nНеобходим перезапуск программы.")
@@ -1506,6 +1544,121 @@ class ColorSettingsWindow(QDialog):
         color.setGreen(max(0, color.green() - amount))
         color.setBlue(max(0, color.blue() - amount))
         return color.name()
+
+
+class RelaxWindow(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.duration = 30
+        self.rate = 60
+        self.volume_factor = 0.5
+        self.is_playing = False  # Переменная состояния
+        self.play_obj = None  # Для хранения ссылки на объект воспроизведения
+        self.timer = QTimer(self)  # Создаем таймер
+
+        self.timer.timeout.connect(self.timer_finished)  # Подключаем сигнал таймера к методу
+
+        self.init_ui()
+
+    def init_ui(self):
+        self.setWindowTitle('Релакс?')
+        self.setFixedSize(300, 400)
+
+        # Поля и кнопки для настройки выходного звука
+        self.duration_title = QLabel('Укажите длительность в секундах')
+        self.duration_field = QLineEdit('30')
+        self.duration_button = QPushButton('Выбрать')
+        self.duration_button.clicked.connect(self.choose_duration)
+
+        self.rate_title = QLabel('Укажите частоту (не рекомендую выше 450)')
+        self.rate_field = QLineEdit('60')
+        self.rate_button = QPushButton('Выбрать')
+        self.rate_button.clicked.connect(self.choose_rate)
+
+        self.apply_button = QPushButton('Запустить')
+        self.apply_button.clicked.connect(self.toggle_play)
+
+        # Создание QLabel для отображения значения
+        self.label = QLabel('Значение: 0.50', self)
+
+        # Создание горизонтального ползунка
+        self.slider = QSlider(Qt.Horizontal, self)
+        self.slider.setMinimum(0)  # Минимальное значение
+        self.slider.setMaximum(100)  # Максимальное значение
+        self.slider.setValue(50)  # Начальное значение
+        self.slider.setTickInterval(10)  # Интервал для отметок
+        self.slider.setSingleStep(1)  # Шаг при перемещении ползунка
+
+        # Подключение сигнала изменения значения ползунка к слоту
+        self.slider.valueChanged.connect(self.update_volume)
+
+        # Создание вертикального layout
+        layout = QVBoxLayout()
+        layout.addWidget(self.duration_title)
+        layout.addWidget(self.duration_field)
+        layout.addWidget(self.duration_button)
+        layout.addWidget(self.rate_title)
+        layout.addWidget(self.rate_field)
+        layout.addWidget(self.rate_button)
+        layout.addWidget(self.label)
+        layout.addWidget(self.slider)
+        layout.addStretch()
+        layout.addWidget(self.apply_button)
+
+        # Установка layout для виджета
+        self.setLayout(layout)
+
+    def update_volume(self, value):
+        # Обновление текста в QLabel
+        normalized_value = value / 100.0  # Нормализация значения от 0 до 1
+        self.volume_factor = normalized_value
+        self.label.setText(f'Значение: {normalized_value:.2f}')
+
+    def choose_duration(self):
+        try:
+            self.duration = int(self.duration_field.text())
+            self.label.setText(f'Длительность: {self.duration} секунд')
+        except ValueError:
+            self.label.setText('Введите корректное значение для длительности')
+
+    def choose_rate(self):
+        try:
+            self.rate = int(self.rate_field.text())
+            self.label.setText(f'Частота: {self.rate} Гц')
+        except ValueError:
+            self.label.setText('Введите корректное значение для частоты')
+
+    def toggle_play(self):
+        if self.is_playing:
+            self.stop_sound()
+        else:
+            self.generate_sound()
+            self.apply_button.setText('Стоп')
+            self.timer.start(self.duration * 1000)  # Запускаем таймер на длительность в миллисекундах
+            self.is_playing = True  # Устанавливаем состояние воспроизведения
+
+    def stop_sound(self):
+        if self.play_obj is not None:
+            self.play_obj.stop()  # Остановка воспроизведения
+        self.apply_button.setText('Запустить')
+        self.timer.stop()  # Останавливаем таймер
+        self.is_playing = False  # Устанавливаем состояние не воспроизведения
+
+    def timer_finished(self):
+        self.stop_sound()  # Останавливаем звук, когда таймер истекает
+
+    def generate_sound(self):
+        sample_rate = 48000
+        new_frequency = self.rate
+        volume_factor = self.volume_factor
+
+        # Создаем временной массив
+        t = np.linspace(0, self.duration, int(sample_rate * self.duration), endpoint=False)
+        audio_data = np.sin(2 * np.pi * new_frequency * t)
+        audio_data = (audio_data * volume_factor * 32767).astype(np.int16)
+
+        # Воспроизведение аудио
+        self.play_obj = sa.play_buffer(audio_data, 1, 2, sample_rate)
 
 
 # Запуск приложения
