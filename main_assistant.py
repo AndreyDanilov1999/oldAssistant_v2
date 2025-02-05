@@ -1443,7 +1443,7 @@ class ColorSettingsWindow(QDialog):
         """Сохраняет текущие стили как новый пресет."""
         preset_name, ok = QInputDialog.getText(self, 'Сохранить пресет', 'Введите имя пресета:')
         if ok and preset_name:
-            preset_path = os.path.join(self.get_base_directory(), 'presets', f'{preset_name}.json')
+            preset_path = os.path.join(self.get_base_directory(), 'user_settings', 'presets', f'{preset_name}.json')
             new_styles = {
                 "QWidget": {
                     "background-color": self.bg_color,
@@ -1494,7 +1494,7 @@ class ColorSettingsWindow(QDialog):
 
         # Получаем базовую директорию
         base_dir = self.get_base_directory()
-        presets_dir = os.path.join(base_dir, 'presets')  # Объединяем базовую директорию с папкой presets
+        presets_dir = os.path.join(base_dir, 'user_settings', 'presets')  # Объединяем базовую директорию с папкой presets
 
         # Проверяем, существует ли директория, если нет - создаем
         if not os.path.exists(presets_dir):
@@ -1511,7 +1511,7 @@ class ColorSettingsWindow(QDialog):
         if selected_preset and selected_preset != "Выбрать пресет":
             # Получаем базовую директорию
             base_dir = self.get_base_directory()
-            preset_path = os.path.join(base_dir, 'presets', f'{selected_preset}.json')
+            preset_path = os.path.join(base_dir, 'user_settings', 'presets', f'{selected_preset}.json')
             try:
                 with open(preset_path, 'r') as json_file:
                     styles = json.load(json_file)
