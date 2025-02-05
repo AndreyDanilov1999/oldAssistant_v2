@@ -650,7 +650,7 @@ class Assistant(QWidget):
         """Обработка команд для папок"""
         for keyword, folder_path in self.commands.items():
             if keyword in text:
-                if folder_path.endswith('.lnk'):
+                if folder_path.endswith('.lnk') or folder_path.endswith('.url'):
                     return False  # Прекращаем обработку, если это файл приложения
                 handler_folder(folder_path, action)  # Вызываем обработчик папок
                 return True  # Возвращаем True, если команда была успешно обработана
