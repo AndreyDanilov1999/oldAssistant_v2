@@ -8,6 +8,7 @@
       <excludeFolder url="file://$MODULE_DIR$/build/main_assinstant" />
       <excludeFolder url="file://$MODULE_DIR$/build/main_assistant/localpycs" />
       <excludeFolder url="file://$MODULE_DIR$/dist" />
+      <excludeFolder url="file://$MODULE_DIR$/build" />
     </content>
     <orderEntry type="jdk" jdkName="Python 3.9 (oldAssistant_v2)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
