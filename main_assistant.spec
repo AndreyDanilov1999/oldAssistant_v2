@@ -21,6 +21,7 @@ a = Analysis(
         ('G:/PycharmProjects/oldAssistant_v2/speak_functions.py', '.'),
         ('G:/PycharmProjects/oldAssistant_v2/speak_voice', 'speak_voice'),
         ('G:/PycharmProjects/oldAssistant_v2/model_ru', 'model_ru'),
+        ('G:/PycharmProjects/oldAssistant_v2/model_en', 'model_en'),
         ('G:/PycharmProjects/oldAssistant_v2/user_settings/links for assist', 'user_settings/links for assist'),
         ('G:/PycharmProjects/oldAssistant_v2/user_settings/presets', 'user_settings/presets'),
     ],

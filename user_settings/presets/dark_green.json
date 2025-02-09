@@ -1,19 +1,19 @@
 {
     "QWidget": {
         "background-color": "#0f0e0d",
-        "color": "#ffffff",
+        "color": "#93ba93",
         "font-size": "13px"
     },
     "QPushButton": {
         "background-color": "#327017",
-        "color": "#ffffff",
+        "color": "#93ba93",
         "height": "25px",
         "border": "1px solid #327017",
         "font-size": "13px"
     },
     "QPushButton:hover": {
         "background-color": "#28660d",
-        "color": "#ffffff",
+        "color": "#93ba93",
         "font-size": "13px"
     },
     "QPushButton:pressed": {
@@ -23,17 +23,17 @@
     },
     "QTextEdit": {
         "background-color": "#0f0e0d",
-        "color": "#93ba93",
+        "color": "#ffffff",
         "border": "1px solid",
         "border-radius": "4px",
         "font-size": "12px"
     },
     "label_version": {
-        "color": "#93ba93",
+        "color": "#ffffff",
         "font-size": "10px"
     },
     "label_message": {
-        "color": "#ffffff",
+        "color": "#93ba93",
         "font-size": "13px"
     }
 }

@@ -8,6 +8,7 @@
 import json
 import logging
 import os.path
+import random
 import sys
 import traceback
 from func_list import search_links, handler_links, handler_folder
@@ -30,7 +31,7 @@ from lists import get_audio_paths
 from vosk import Model, KaldiRecognizer
 
 
-speakers = dict(Пласид='placide', Бестия='rogue', Джонни='johnny', Санбой='sanboy')
+speakers = dict(Пласид='placide', Бестия='rogue', Джонни='johnny', Санбой='sanboy', Тигрица='tigress')
 
 
 class Assistant(QWidget):
@@ -78,7 +79,7 @@ class Assistant(QWidget):
         self.speaker = self.load_settings()
         self.assistant_name = self.load_settings_name()
         self.audio_paths = get_audio_paths(self.speaker)
-        self.version = "1.1.0"
+        self.version = "1.1.1"
         self.ps = "Powered by theoldman"
         self.label_version = QLabel(f"Версия: {self.version} {self.ps}", self)
         self.label_message = QLabel('', self)
@@ -535,10 +536,13 @@ class Assistant(QWidget):
                         """
                     # Обработка команд на запуск
                     elif any(keyword in text for keyword in ['запус', 'откр', 'вкл', 'вруб']):
-                        app_command_success = self.handle_app_command(text, 'open')
-                        folder_command_success = self.handle_folder_command(text, 'open')
-                        if not app_command_success and not folder_command_success:
-                            reaction_triggered = True
+                        if "микшер" in text:
+                            open_volume_mixer()
+                        else:
+                            app_command_success = self.handle_app_command(text, 'open')
+                            folder_command_success = self.handle_folder_command(text, 'open')
+                            if not app_command_success and not folder_command_success:
+                                reaction_triggered = True
                     # Обработка команд на закрытие
                     elif any(keyword in text for keyword in ['закр', 'выкл', 'выруб', 'отруб']):
                         app_command_success = self.handle_app_command(text, 'close')
@@ -566,22 +570,25 @@ class Assistant(QWidget):
                         what_folder = self.audio_paths.get('what_folder')
                         if what_folder:
                             react(what_folder)
+                        if speaker == "sanboy":
+                            if random.random() <= 0.7:
+                                prorok_sanboy = self.audio_paths.get('prorok_sanboy')
+                                react_detail(prorok_sanboy)
 
-                elif any(keyword in text for keyword in ['пауз', 'вкл', 'вруб', 'отруб', 'выкл']):
-                    controller.play_pause()
-                    approve_folder = self.audio_paths.get('approve_folder')
-                    if approve_folder:
-                        react(approve_folder)
-                elif "след" in text:
-                    controller.next_track()
-                    approve_folder = self.audio_paths.get('approve_folder')
-                    if approve_folder:
-                        react(approve_folder)
-                elif "пред" in text:
-                    controller.previous_track()
-                    approve_folder = self.audio_paths.get('approve_folder')
-                    if approve_folder:
-                        react(approve_folder)
+                if 'плеер' in text:
+                    if any(keyword in text for keyword in ['пауз', 'вкл', 'вруб', 'отруб', 'выкл']):
+                        controller.play_pause()
+                        player_folder = self.audio_paths.get('player_folder')
+                        react(player_folder)
+                    elif "след" in text:
+                        controller.next_track()
+                        player_folder = self.audio_paths.get('player_folder')
+                        react(player_folder)
+                    elif "пред" in text:
+                        controller.previous_track()
+                        player_folder = self.audio_paths.get('player_folder')
+                        react(player_folder)
+
         except Exception as e:
             logger.error(f"Ошибка в основном цикле ассистента: {e}")
             logger.error(traceback.format_exc())
@@ -592,36 +599,63 @@ class Assistant(QWidget):
 
     def get_audio(self):
         """Преобразование речи с микрофона в текст."""
-        model_path = os.path.join(get_base_directory(), "model_ru")  # Используем правильный путь к модели
-        logger.info(f"Используется модель по пути: {model_path}")  # Логируем путь к модели
+        model_path_ru = os.path.join(get_base_directory(), "model_ru")  # Используем правильный путь к модели
+        model_path_en = os.path.join(get_base_directory(), "model_en")
+        logger.info(f"Используются модели:  ru - {model_path_ru}; en - {model_path_en}")  # Логируем путь к модели
 
         try:
             # Преобразуем путь в UTF-8
-            model_path_utf8 = model_path.encode("utf-8").decode("utf-8")
+            model_path_ru_utf8 = model_path_ru.encode("utf-8").decode("utf-8")
+            model_path_en_utf8 = model_path_en.encode("utf-8").decode("utf-8")
+
             # Пытаемся загрузить модель
-            model = Model(model_path_utf8)
-            logger.info("Модель успешно загружена.")  # Логируем успешную загрузку модели
+            model_ru = Model(model_path_ru_utf8)
+            model_en = Model(model_path_en_utf8)
+            logger.info("Модели успешно загружены.")  # Логируем успешную загрузку модели
         except Exception as e:
             # Логируем полный стек вызовов при ошибке
             logger.error(f"Ошибка при загрузке модели: {e}. Возможно путь содержит кириллицу.")
             return
-        rec_ru = KaldiRecognizer(model, 16000)
+        rec_ru = KaldiRecognizer(model_ru, 16000)
+        rec_en = KaldiRecognizer(model_en, 16000)
         p = pyaudio.PyAudio()
         try:
             stream = p.open(format=pyaudio.paInt16, channels=1, rate=16000, input=True, frames_per_buffer=512)
             stream.start_stream()
+            # Переменная для объединенного результата
+            combined_result = ""
+
             while self.is_assistant_running:
                 try:
+                    # Чтение данных из аудиопотока
                     data = stream.read(256, exception_on_overflow=False)
                     if len(data) == 0:
                         break
 
+                    # Распознавание с использованием русской модели
                     if rec_ru.AcceptWaveform(data):
-                        result = rec_ru.Result()
-                        result = result[14:-3]  # Обрезаем результат для получения только текста
-                        if result:
-                            logger.info(result)  # Логируем распознанный текст
-                        yield result.lower()  # Возвращаем результат с помощью yield
+                        result_ru = rec_ru.Result()
+                        result_ru = json.loads(result_ru)  # Обрезаем результат для получения только текста
+                        text = result_ru.get("text", "").strip()
+                        if text:
+                            logger.info(f"Распознано: {text}")  # Логируем распознанный текст
+                            combined_result += text + " "  # Добавляем результат в общую переменную
+
+                    # Распознавание с использованием английской модели
+                    if rec_en.AcceptWaveform(data):
+                        result_en = rec_en.Result()
+                        result_en = json.loads(result_en)  # Парсим JSON
+                        text = result_en.get("text", "").strip()  # Извлекаем текст
+                        if text == "huh":
+                            continue  # Игнорируем это распознавание
+                        elif text:  # Проверяем, что текст не пустой
+                            logger.info(f"Распознано: {text}")  # Логируем распознанный текст
+                            combined_result += text + " "  # Добавляем результат в общую переменную
+
+                    yield combined_result.strip().lower()
+                    combined_result = ""
+
+
                 except Exception as e:
                     logger.error(f"Ошибка при обработке аудиоданных: {e}")  # Логируем ошибку обработки данных
                     logger.error("Подробная информация об ошибке:")
@@ -676,9 +710,15 @@ class Assistant(QWidget):
 
     def check_shortcuts(self):
         """Обработка нажатия кнопки 'Проверка ярлыков'"""
-        approve_folder = self.audio_paths.get('approve_folder')
-        react(approve_folder)
+        settings_file = os.path.join(get_base_directory(), 'user_settings',
+                                     "settings.json")  # Полный путь к файлу настроек
+        speaker = get_current_speaker(settings_file)
+        audio_paths = get_audio_paths(speaker)
+        check_file = audio_paths['check_file_start']
+        react_detail(check_file)
         search_links()
+        check_file = audio_paths['check_file']
+        react_detail(check_file)
 
     def open_settings(self):
         """Обработка нажатия кнопки 'Настройки'"""
@@ -936,23 +976,18 @@ class SettingsDialog(QDialog):
         # Проверяем, изменилось ли имя ассистента
         if new_assistant_name != self.parent().assistant_name:
             self.parent().assistant_name = new_assistant_name  # Сохраняем новое имя в родительском классе
-            changes_made = True
 
         # Проверяем, изменился ли голос
         if self.current_voice != self.parent().speaker:
             self.parent().speaker = self.current_voice  # Обновляем голос в родительском классе
-            changes_made = True
 
         # Проверяем, изменился ли путь к steam.exe
         if new_steam_path != self.parent().steam_path:
             self.parent().steam_path = new_steam_path  # Обновляем путь к steam.exe в родительском классе
-            changes_made = True
 
-        # Если были изменения, сохраняем настройки и показываем сообщение
-        if changes_made:
-            self.parent().save_settings()  # Сохраняем настройки
-            QMessageBox.information(self, "Внимание", "Настройки применены")
-            logger.info("Настройки успешно применены.")
+        self.parent().save_settings()  # Сохраняем настройки
+        QMessageBox.information(self, "Внимание", "Настройки применены")
+        logger.info("Настройки успешно применены.")
 
         self.close()
 
@@ -1000,12 +1035,6 @@ class AppCommandWindow(QDialog):
         self.setLayout(layout)
 
     def get_links(self):
-        settings_file = os.path.join(get_base_directory(), 'user_settings',
-                                     "settings.json")  # Полный путь к файлу настроек
-        speaker = get_current_speaker(settings_file)
-        audio_paths = get_audio_paths(speaker)
-        check_file = audio_paths['check_file_start']
-        react_detail(check_file)
         search_links()
 
     def load_commands(self, filename):
@@ -1306,17 +1335,16 @@ class ColorSettingsWindow(QDialog):
         self.styles = current_styles  # Передаем текущие стили
         self.color_settings_path = color_setting_path
         self.init_ui()
-        self.load_color_settings()  # Загружаем текущие цвета
-
-    def init_ui(self):
-        self.setWindowTitle('Настройка цветов интерфейса')
-        self.setFixedSize(300, 400)
-
         # Инициализация переменных для цветов
         self.bg_color = ""
         self.btn_color = ""
         self.text_color = ""
         self.text_edit_color = ""
+        self.load_color_settings()  # Загружаем текущие цвета
+
+    def init_ui(self):
+        self.setWindowTitle('Настройка цветов интерфейса')
+        self.setFixedSize(300, 400)
 
         # Кнопки для выбора цветов
         self.bg_button = QPushButton('Выберите цвет фона')
@@ -1360,50 +1388,66 @@ class ColorSettingsWindow(QDialog):
         self.setLayout(layout)
 
     def load_color_settings(self):
-        """Загружает текущие цвета из переданных стилей."""
+        """Загружает текущие цвета из файла настроек."""
         self.bg_color = self.styles.get("QWidget", {}).get("background-color", "#2E3440")
         self.btn_color = self.styles.get("QPushButton", {}).get("background-color", "#3858c7")
         self.text_color = self.styles.get("QWidget", {}).get("color", "#8eaee5")
         self.text_edit_color = self.styles.get("QTextEdit", {}).get("background-color", "#2E3440")
 
     def choose_background_color(self):
-        color = QColorDialog.getColor(Qt.white, self)
-        if color.isValid():
-            self.bg_color = color.name()
+        try:
+            initial_color = QColor(self.bg_color) if hasattr(self, 'bg_color') else Qt.white
+            color = QColorDialog.getColor(initial_color, self)
+            if color.isValid():
+                self.bg_color = color.name()
+        except Exception as e:
+            logger.error(e)
 
     def choose_button_color(self):
-        color = QColorDialog.getColor(Qt.white, self)
-        if color.isValid():
-            self.btn_color = color.name()
+        try:
+            initial_color = QColor(self.btn_color) if hasattr(self, 'btn_color') else Qt.white
+            color = QColorDialog.getColor(initial_color, self)
+            if color.isValid():
+                self.btn_color = color.name()
+        except Exception as e:
+            logger.error(e)
 
     def choose_text_color(self):
-        color = QColorDialog.getColor(Qt.white, self)
-        if color.isValid():
-            self.text_color = color.name()
+        try:
+            initial_color = QColor(self.text_color) if hasattr(self, 'text_color') else Qt.white
+            color = QColorDialog.getColor(initial_color, self)
+            if color.isValid():
+                self.text_color = color.name()
+        except Exception as e:
+            logger.error(e)
 
     def choose_text_edit_color(self):
-        color = QColorDialog.getColor(Qt.white, self)
-        if color.isValid():
-            self.text_edit_color = color.name()
+        try:
+            initial_color = QColor(self.text_edit_color) if hasattr(self, 'text_edit_color') else Qt.white
+            color = QColorDialog.getColor(initial_color, self)
+            if color.isValid():
+                self.text_edit_color = color.name()
+        except Exception as e:
+            logger.error(e)
 
     def apply_changes(self):
         try:
             new_styles = {
                 "QWidget": {
                     "background-color": self.bg_color,
-                    "color": self.text_edit_color,
+                    "color": self.text_color,
                     "font-size": "13px"
                 },
                 "QPushButton": {
                     "background-color": self.btn_color,
-                    "color": self.text_edit_color,
+                    "color": self.text_color,
                     "height": "25px",
                     "border": f"1px solid {self.btn_color}",
                     "font-size": "13px"
                 },
                 "QPushButton:hover": {
                     "background-color": self.darken_color(self.btn_color, 10),
-                    "color": self.text_edit_color,
+                    "color": self.text_color,
                     "font-size": "13px"
                 },
                 "QPushButton:pressed": {
@@ -1413,21 +1457,20 @@ class ColorSettingsWindow(QDialog):
                 },
                 "QTextEdit": {
                     "background-color": self.bg_color,
-                    "color": self.text_color,
+                    "color": self.text_edit_color,
                     "border": "1px solid",
                     "border-radius": "4px",
                     "font-size": "12px"
                 },
                 "label_version": {
-                    "color": self.text_color,
+                    "color": self.text_edit_color,
                     "font-size": "10px"
                 },
                 "label_message": {
-                    "color": self.text_edit_color,
+                    "color": self.text_color,
                     "font-size": "13px"
                 }
             }
-
             self.save_color_settings(new_styles)  # Сохранение в файл
             self.colorChanged.emit()  # Излучаем сигнал об изменении цвета
         except Exception as e:
@@ -1447,19 +1490,19 @@ class ColorSettingsWindow(QDialog):
             new_styles = {
                 "QWidget": {
                     "background-color": self.bg_color,
-                    "color": self.text_color,
+                    "color": self.text_edit_color,
                     "font-size": "13px"
                 },
                 "QPushButton": {
                     "background-color": self.btn_color,
-                    "color": self.text_color,
+                    "color": self.text_edit_color,
                     "height": "25px",
                     "border": f"1px solid {self.btn_color}",
                     "font-size": "13px"
                 },
                 "QPushButton:hover": {
                     "background-color": self.darken_color(self.btn_color, 10),
-                    "color": self.text_color,
+                    "color": self.text_edit_color,
                     "font-size": "13px"
                 },
                 "QPushButton:pressed": {
@@ -1469,17 +1512,17 @@ class ColorSettingsWindow(QDialog):
                 },
                 "QTextEdit": {
                     "background-color": self.bg_color,
-                    "color": self.text_edit_color,
+                    "color": self.text_color,
                     "border": "1px solid",
                     "border-radius": "4px",
                     "font-size": "12px"
                 },
                 "label_version": {
-                    "color": self.text_edit_color,
+                    "color": self.text_color,
                     "font-size": "10px"
                 },
                 "label_message": {
-                    "color": self.text_color,
+                    "color": self.text_edit_color,
                     "font-size": "13px"
                 }
             }
@@ -1519,7 +1562,7 @@ class ColorSettingsWindow(QDialog):
                     # Загружаем цвета для основных элементов
                     self.bg_color = styles.get("QWidget", {}).get("background-color", "#2E3440")
                     self.btn_color = styles.get("QPushButton", {}).get("background-color", "#3858c7")
-                    self.text_color = styles.get("QWidget", {}).get("color", "#ffffff")
+                    self.text_color = styles.get("QPushButton", {}).get("color", "#ffffff")
                     self.text_edit_color = styles.get("QTextEdit", {}).get("color", "#2E3440")
 
                     # Загружаем цвета для меток
@@ -1565,16 +1608,12 @@ class RelaxWindow(QDialog):
         self.setWindowTitle('Релакс?')
         self.setFixedSize(300, 400)
 
-        # Поля и кнопки для настройки выходного звука
+        # Поля для настройки выходного звука
         self.duration_title = QLabel('Укажите длительность в секундах')
         self.duration_field = QLineEdit('30')
-        self.duration_button = QPushButton('Выбрать')
-        self.duration_button.clicked.connect(self.choose_duration)
 
         self.rate_title = QLabel('Укажите частоту (не рекомендую выше 450)')
         self.rate_field = QLineEdit('60')
-        self.rate_button = QPushButton('Выбрать')
-        self.rate_button.clicked.connect(self.choose_rate)
 
         self.apply_button = QPushButton('Запустить')
         self.apply_button.clicked.connect(self.toggle_play)
@@ -1597,10 +1636,8 @@ class RelaxWindow(QDialog):
         layout = QVBoxLayout()
         layout.addWidget(self.duration_title)
         layout.addWidget(self.duration_field)
-        layout.addWidget(self.duration_button)
         layout.addWidget(self.rate_title)
         layout.addWidget(self.rate_field)
-        layout.addWidget(self.rate_button)
         layout.addWidget(self.label)
         layout.addWidget(self.slider)
         layout.addStretch()
@@ -1615,21 +1652,22 @@ class RelaxWindow(QDialog):
         self.volume_factor = normalized_value
         self.label.setText(f'Значение: {normalized_value:.2f}')
 
-    def choose_duration(self):
+    def toggle_play(self):
+        # Считываем значения длительности и частоты
         try:
             self.duration = int(self.duration_field.text())
             self.label.setText(f'Длительность: {self.duration} секунд')
         except ValueError:
             self.label.setText('Введите корректное значение для длительности')
+            return  # Выход, если значение некорректно
 
-    def choose_rate(self):
         try:
             self.rate = int(self.rate_field.text())
             self.label.setText(f'Частота: {self.rate} Гц')
         except ValueError:
             self.label.setText('Введите корректное значение для частоты')
+            return  # Выход, если значение некорректно
 
-    def toggle_play(self):
         if self.is_playing:
             self.stop_sound()
         else:

@@ -1,6 +1,7 @@
 import logging
 import os
 import sys
+from logging.handlers import RotatingFileHandler
 
 # Определяем базовый путь
 if getattr(sys, 'frozen', False):
@@ -20,12 +21,20 @@ else:
 log_file_path = os.path.join(internal_dir, 'assistant.log')
 
 # Настройка логгера
-logging.basicConfig(
-    level=logging.INFO,  # Уровень логирования (INFO, DEBUG, ERROR и т.д.)
-    format="%(asctime)s - %(levelname)s - %(message)s",  # Формат сообщений
-    filename=log_file_path,  # Используйте полный путь к файлу для записи логов
-    filemode="a",  # Режим записи (добавление в конец файла)
-    encoding="utf-8",
+logger = logging.getLogger("assistant")
+logger.setLevel(logging.INFO)  # Уровень логирования (INFO, DEBUG, ERROR и т.д.)
+
+# Настройка обработчика с ротацией файлов
+handler = RotatingFileHandler(
+    log_file_path,
+    maxBytes=5 * 1024 * 1024,  # Максимальный размер файла (5 МБ)
+    backupCount=5,  # Количество резервных файлов
+    encoding='utf-8'
 )
 
-logger = logging.getLogger("assistant")
+# Формат сообщений
+formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+handler.setFormatter(formatter)
+
+# Добавление обработчика к логгеру
+logger.addHandler(handler)

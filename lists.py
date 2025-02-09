@@ -26,6 +26,7 @@ def get_audio_paths(speaker):
     other_folder = os.path.join(base_path_to, 'other')
     echo_folder = os.path.join(base_path_to, 'echo')
     close_assist_folder = os.path.join(base_path_to, 'close_assist')
+    player_folder = os.path.join(base_path_to, 'player')
 
     # Пути к файлам
     error_file = os.path.join(other_folder, 'произошла ошибка.ogg')
@@ -38,6 +39,8 @@ def get_audio_paths(speaker):
     wait_load_file = os.path.join(other_folder, 'подожди. собираю данные о процессах.ogg')
     done_load_file = os.path.join(other_folder, 'процессы записаны.ogg')
     check_file_start = os.path.join(other_folder, 'подожди. проверяю папку с ярлыками.ogg')
+    start_rust = os.path.join(other_folder, 'я в раст не пойду.ogg')
+    prorok_sanboy = os.path.join(other_folder, 'пророк санбой.ogg')
 
     return {
         'what_folder': what_folder,
@@ -48,6 +51,7 @@ def get_audio_paths(speaker):
         'other_folder': other_folder,
         'echo_folder': echo_folder,
         'close_assist_folder': close_assist_folder,
+        'player_folder': player_folder,
         'error_file': error_file,
         'off_file': off_file,
         'del_file': del_file,
@@ -58,4 +62,6 @@ def get_audio_paths(speaker):
         'wait_load_file': wait_load_file,
         'done_load_file': done_load_file,
         'check_file_start': check_file_start,
+        'start_rust': start_rust,
+        'prorok_sanboy': prorok_sanboy,
     }

@@ -73,3 +73,65 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+    def get_audio(self):
+        """Преобразование речи с микрофона в текст."""
+        model_path_ru = os.path.join(get_base_directory(), "model_ru")  # Используем правильный путь к модели
+        model_path_en = os.path.join(get_base_directory(), "model_en")
+        logger.info(f"Используются модели:  ru - {model_path_ru}; en - {model_path_en}")  # Логируем путь к модели
+
+        try:
+            # Преобразуем путь в UTF-8
+            model_path_ru_utf8 = model_path_ru.encode("utf-8").decode("utf-8")
+            model_path_en_utf8 = model_path_en.encode("utf-8").decode("utf-8")
+
+            # Пытаемся загрузить модель
+            model_ru = Model(model_path_ru_utf8)
+            model_en = Model(model_path_en_utf8)
+            logger.info("Модели успешно загружены.")  # Логируем успешную загрузку модели
+        except Exception as e:
+            # Логируем полный стек вызовов при ошибке
+            logger.error(f"Ошибка при загрузке модели: {e}. Возможно путь содержит кириллицу.")
+            return
+        rec_ru = KaldiRecognizer(model_ru, 16000)
+        rec_en = KaldiRecognizer(model_en, 16000)
+        p = pyaudio.PyAudio()
+        try:
+            stream = p.open(format=pyaudio.paInt16, channels=1, rate=16000, input=True, frames_per_buffer=512)
+            stream.start_stream()
+            # Переменная для объединенного результата
+            combined_result = ""
+            result_ru = ""
+            result_en = ""
+
+            while self.is_assistant_running:
+                try:
+                    # Чтение данных из аудиопотока
+                    data = stream.read(256, exception_on_overflow=False)
+                    if len(data) == 0:
+                        break
+
+                    # Распознавание с использованием русской модели
+                    if rec_ru.AcceptWaveform(data):
+                        result_ru = rec_ru.Result()
+                        result_ru = result_ru[14:-3]  # Обрезаем результат для получения только текста
+                        if result_ru:
+                            # logger.info(f"Русский: {result_ru}")  # Логируем распознанный текст
+                            combined_result += result_ru + " "  # Добавляем результат в общую переменную
+
+                    # Распознавание с использованием английской модели
+                    if rec_en.AcceptWaveform(data):
+                        result_en = rec_en.Result()
+                        result_en = result_en[14:-3]  # Обрезаем результат для получения только текста
+                        if result_en:
+                            # logger.info(f"Английский: {result_en}")  # Логируем распознанный текст
+                            combined_result += result_en + " "  # Добавляем результат в общую переменную
+
+                    if result_en:
+                        logger.info(combined_result)
+
+                    yield combined_result.strip().lower()
+                    combined_result = ""
+                    result_ru = ""
+                    result_en = ""

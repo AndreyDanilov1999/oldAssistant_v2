@@ -76,15 +76,36 @@ def get_process_name(target_path):
         return None
     return os.path.basename(target_path)
 
+# def read_url_shortcut(url_path):
+#     """Читает .url файл и извлекает game_id."""
+#     try:
+#         with open(url_path, 'r', encoding='utf-8') as file:
+#             content = file.read()
+#
+#         for line in content.splitlines():
+#             if line.startswith('URL='):
+#                 return line[22:]  # Возвращаем значение после "URL="
+#         return None
+#     except Exception as e:
+#         raise Exception(f"Ошибка при чтении файла .url: {e}")
+
 def read_url_shortcut(url_path):
-    """Читает .url файл и извлекает game_id."""
+    """Читает .url файл и извлекает game_id или URL."""
     try:
         with open(url_path, 'r', encoding='utf-8') as file:
             content = file.read()
 
         for line in content.splitlines():
             if line.startswith('URL='):
-                return line[22:]  # Возвращаем значение после "URL="
+                url = line[4:]  # Извлекаем значение после "URL="
+                # Если это Steam-ссылка, извлекаем game_id
+                if url.startswith("steam://rungameid/"):
+                    return url[18:]  # Возвращаем game_id
+                # Если это Epic Games-ссылка, возвращаем полный URL
+                elif url.startswith("com.epicgames.launcher://"):
+                    return url
+                # Иначе возвращаем как есть (на случай других типов ссылок)
+                return url
         return None
     except Exception as e:
         raise Exception(f"Ошибка при чтении файла .url: {e}")
@@ -197,17 +218,13 @@ def search_links():
     with open(root_links, 'w', encoding='utf-8') as file:
         json.dump(current_shortcuts, file, ensure_ascii=False, indent=4)
         logger.info("Ярлыки сохранены в файле: %s", root_links)
-    # Озвучиваем успешное создание функций
-    audio_paths = get_audio_paths(speaker)
-    check_file = audio_paths['check_file']
-    react_detail(check_file)
 
 
 def handler_links(filename, action):
     """
     Обработчик ярлыков в зависимости от их расширения
     """
-    global game_id, target_path, process_name
+    global game_id, target_path, process_name, game_id_or_url
     root_folder = os.path.join(get_base_directory(), 'user_settings', "links for assist")
     # Получаем путь к ярлыку
     shortcut_path = os.path.join(root_folder, filename)
@@ -231,17 +248,17 @@ def handler_links(filename, action):
         if action == 'close':
             close_link(filename)
 
-    # Обработка .url файлов (Steam-игры)
+    # Обработка .url файлов (Steam и Epic Games)
     if filename.endswith(".url"):
         try:
-            game_id = read_url_shortcut(shortcut_path)
-            if not game_id:
-                logger.info(f"Не удалось извлечь game_id из файла {filename}")
+            game_id_or_url = read_url_shortcut(shortcut_path)
+            if not game_id_or_url:
+                logger.info(f"Не удалось извлечь game_id или URL из файла {filename}")
         except Exception as e:
             logger.info(f"Ошибка при чтении .url файла {filename}: {e}")
 
         if action == 'open':
-            open_steam_link(game_id, filename)
+            open_url_link(game_id_or_url, filename)  # Передаём game_id или URL
         if action == 'close':
             close_link(filename)
 
@@ -277,49 +294,84 @@ def handler_folder(folder_path, action):
             logger.error("Окно с указанным заголовком не найдено.")
 
 
-def open_steam_link(game_id, filename):
+def open_url_link(game_id_or_url, filename):
     settings_file = os.path.join(get_base_directory(), 'user_settings', "settings.json")  # Полный путь к файлу настроек
     speaker = get_current_speaker(settings_file)  # Получаем текущий голос
     steam_path = get_steam_path(settings_file)
 
     try:
-        # Проверяем, есть ли уже сохраненные процессы для этой игры
-        existing_processes = get_process_names_from_file(filename)
-        audio_paths = get_audio_paths(speaker)
-        start_folder = audio_paths['start_folder']
-        react(start_folder)
-        if existing_processes:
-            logger.info(f"Используем существующие процессы для игры '{filename}': {existing_processes}")
-
-            # Запускаем игру через Steam
-            subprocess.Popen([steam_path, '-applaunch', game_id], shell=True)
-        else:
+        # Проверяем, является ли game_id_or_url URL Epic Games
+        if game_id_or_url.startswith("com.epicgames.launcher://"):
+            # Проверяем, есть ли уже сохраненные процессы для этой игры
+            existing_processes = get_process_names_from_file(filename)
             audio_paths = get_audio_paths(speaker)
-            wait_load_file = audio_paths['wait_load_file']
-            react_detail(wait_load_file)
-            # Если процессов нет, собираем их
-            before_processes = get_all_processes()
-
-            # Запускаем игру через Steam
-            subprocess.Popen([steam_path, '-applaunch', game_id], shell=True)
-
-            # Ждем несколько секунд, чтобы процесс успел запуститься
-            time.sleep(30)
-
-            # Собираем процессы после запуска
-            after_processes = get_all_processes()
-
-            # Находим все новые процессы
-            new_processes = find_new_processes(before_processes, after_processes)
-
-            if new_processes:
-                logger.info(f"Новые процессы: {new_processes}")
-                save_process_names(filename, new_processes)  # Сохраняем все новые процессы
-                audio_paths = get_audio_paths(speaker)
-                done_load_file = audio_paths['done_load_file']
-                react_detail(done_load_file)
+            start_folder = audio_paths['start_folder']
+            react(start_folder)
+            logger.info(f"Запуск {filename} через Epic Games Launcher")
+            if existing_processes:
+                logger.info(f"Используем существующие процессы для игры '{filename}': {existing_processes}")
+                # Открываем URL через стандартный механизм
+                subprocess.Popen(["start", game_id_or_url], shell=True)
             else:
-                logger.error("Не удалось определить новые процессы.")
+                audio_paths = get_audio_paths(speaker)
+                wait_load_file = audio_paths['wait_load_file']
+                react_detail(wait_load_file)
+                # Если процессов нет, собираем их
+                before_processes = get_all_processes()
+                # Открываем URL через стандартный механизм
+                subprocess.Popen(["start", game_id_or_url], shell=True)
+                # Ждем несколько секунд, чтобы процесс успел запуститься
+                time.sleep(20)
+                # Собираем процессы после запуска
+                after_processes = get_all_processes()
+                # Находим все новые процессы
+                new_processes = find_new_processes(before_processes, after_processes)
+                if new_processes:
+                    logger.info(f"Новые процессы: {new_processes}")
+                    save_process_names(filename, new_processes)  # Сохраняем все новые процессы
+                    audio_paths = get_audio_paths(speaker)
+                    done_load_file = audio_paths['done_load_file']
+                    react_detail(done_load_file)
+                else:
+                    logger.error("Не удалось определить новые процессы.")
+        else:
+            # Иначе считаем, что это Steam-игра
+            logger.info(f"Запуск игры через Steam: {game_id_or_url}")
+            subprocess.Popen([steam_path, '-applaunch', game_id_or_url], shell=True)
+            # Проверяем, есть ли уже сохраненные процессы для этой игры
+            existing_processes = get_process_names_from_file(filename)
+            audio_paths = get_audio_paths(speaker)
+            start_folder = audio_paths['start_folder']
+            react(start_folder)
+            if existing_processes:
+                logger.info(f"Используем существующие процессы для игры '{filename}': {existing_processes}")
+                if game_id_or_url == '252490' and speaker == 'sanboy':
+                    start_rust = audio_paths['start_rust']
+                    react_detail(start_rust)
+                # Запускаем игру через Steam
+                subprocess.Popen([steam_path, '-applaunch', game_id_or_url], shell=True)
+            else:
+                audio_paths = get_audio_paths(speaker)
+                wait_load_file = audio_paths['wait_load_file']
+                react_detail(wait_load_file)
+                # Если процессов нет, собираем их
+                before_processes = get_all_processes()
+                # Запускаем игру через Steam
+                subprocess.Popen([steam_path, '-applaunch', game_id_or_url], shell=True)
+                # Ждем несколько секунд, чтобы процесс успел запуститься
+                time.sleep(20)
+                # Собираем процессы после запуска
+                after_processes = get_all_processes()
+                # Находим все новые процессы
+                new_processes = find_new_processes(before_processes, after_processes)
+                if new_processes:
+                    logger.info(f"Новые процессы: {new_processes}")
+                    save_process_names(filename, new_processes)  # Сохраняем все новые процессы
+                    audio_paths = get_audio_paths(speaker)
+                    done_load_file = audio_paths['done_load_file']
+                    react_detail(done_load_file)
+                else:
+                    logger.error("Не удалось определить новые процессы.")
     except Exception as e:
         audio_paths = get_audio_paths(speaker)
         error_file = audio_paths['error_file']

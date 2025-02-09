@@ -7,7 +7,8 @@ import os
 from logging_config import logger
 import subprocess
 import webbrowser
-from speak_functions import react_detail
+import pygetwindow as gw
+from speak_functions import react_detail, react
 
 settings_file = os.path.join(get_base_directory(), 'user_settings', "settings.json")  # Полный путь к файлу настроек
 speaker = get_current_speaker(settings_file)  # Получаем текущий голос
@@ -31,3 +32,14 @@ def shutdown_windows():
     react_detail(off_file)
     subprocess.run(["shutdown", "/s", "/t", "0"])
 
+def open_volume_mixer():
+    """ Открывает микшер виндовс """
+    try:
+        subprocess.Popen(["sndvol.exe", "/R"])
+        logger.info("Микшер громкости открыт.")
+        audio_paths = get_audio_paths(speaker)
+        start_folder = audio_paths.get('start_folder')
+        if start_folder:
+            react(start_folder)
+    except Exception as e:
+        logger.error(f"Ошибка при открытии микшера громкости: {e}", exc_info=True)
