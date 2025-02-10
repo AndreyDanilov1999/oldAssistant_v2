@@ -27,6 +27,7 @@ def get_audio_paths(speaker):
     echo_folder = os.path.join(base_path_to, 'echo')
     close_assist_folder = os.path.join(base_path_to, 'close_assist')
     player_folder = os.path.join(base_path_to, 'player')
+    censored_folder = os.path.join(base_path_to, 'censored')
 
     # Пути к файлам
     error_file = os.path.join(other_folder, 'произошла ошибка.ogg')
@@ -64,4 +65,5 @@ def get_audio_paths(speaker):
         'check_file_start': check_file_start,
         'start_rust': start_rust,
         'prorok_sanboy': prorok_sanboy,
+        'censored_folder': censored_folder,
     }

@@ -11,6 +11,9 @@ import os.path
 import random
 import sys
 import traceback
+
+import winsound
+
 from func_list import search_links, handler_links, handler_folder
 from function_list_main import *
 import simpleaudio as sa
@@ -76,10 +79,12 @@ class Assistant(QWidget):
         self.steam_path = self.load_steam_path()
         self.is_assistant_running = False
         self.assistant_thread = None
+        self.is_censored = self.load_censored()
+        self.censored_thread = None
         self.speaker = self.load_settings()
         self.assistant_name = self.load_settings_name()
         self.audio_paths = get_audio_paths(self.speaker)
-        self.version = "1.1.1"
+        self.version = "1.1.2"
         self.ps = "Powered by theoldman"
         self.label_version = QLabel(f"Версия: {self.version} {self.ps}", self)
         self.label_message = QLabel('', self)
@@ -91,6 +96,7 @@ class Assistant(QWidget):
         self.check_autostart()
         self.hide()
         self.run_assist()
+        self.run_censored()
 
     def initui(self):
         """Инициализация пользовательского интерфейса."""
@@ -277,7 +283,7 @@ class Assistant(QWidget):
             # Если папка не существует, создаем её
             try:
                 os.makedirs(folder_path)  # Создаем папку
-                self.log_area.append(f'Папка "{folder_path}" была создана.')
+                self.log_area.append('Папка "links for assist" была создана.')
             except Exception as e:
                 self.log_area.append(f'Ошибка при создании папки: {e}')
 
@@ -362,13 +368,13 @@ class Assistant(QWidget):
             try:
                 with open(self.settings_file_path, 'r', encoding='utf-8') as f:
                     settings = json.load(f)
-                    return settings.get('voice', 'rogue')  # Возвращаем значение по умолчанию, если ключ отсутствует
+                    return settings.get('voice', 'johnny')  # Возвращаем значение по умолчанию, если ключ отсутствует
             except json.JSONDecodeError:
                 self.logger.error(f"Ошибка: файл {self.settings_file_path} содержит некорректный JSON.")
         else:
             self.logger.error(f"Файл настроек {self.settings_file_path} не найден.")
 
-        return 'rogue'  # Возвращаем значение по умолчанию, если файл не найден или ошибка
+        return 'johnny'  # Возвращаем значение по умолчанию, если файл не найден или ошибка
 
     def load_settings_name(self):
         """Загрузка имени ассистента из файла."""
@@ -383,7 +389,7 @@ class Assistant(QWidget):
         else:
             self.logger.error(f"Файл настроек {self.settings_file_path} не найден.")
 
-        return 'джон'  # Возвращаем значение по умолчанию, если файл не найден или ошибка
+        return 'джо'  # Возвращаем значение по умолчанию, если файл не найден или ошибка
 
     def load_steam_path(self):
         """Загрузка пути steam.exe из файла."""
@@ -400,13 +406,28 @@ class Assistant(QWidget):
 
         return ''  # Возвращаем значение по умолчанию, если файл не найден или ошибка
 
+    def load_censored(self):
+        """Загрузка состояния цензуры из файла."""
+        if os.path.exists(self.settings_file_path):
+            try:
+                with open(self.settings_file_path, 'r', encoding='utf-8') as f:
+                    settings = json.load(f)
+                    return settings.get('is_censored', False)  # Возвращаем значение по умолчанию, если ключ отсутствует
+            except json.JSONDecodeError:
+                self.logger.error(f"Ошибка: файл {self.settings_file_path} содержит некорректный JSON.")
+        else:
+            self.logger.error(f"Файл настроек {self.settings_file_path} не найден.")
+
+        return False  # Возвращаем значение по умолчанию, если файл не найден или ошибка
+
     def save_settings(self):
         """Сохраняет настройки в файл settings.json."""
         settings_file = os.path.join(self.get_base_directory(), 'user_settings', 'settings.json')
         settings_data = {
             "voice": self.speaker,
             "assistant_name": self.assistant_name,
-            "steam_path": self.steam_path
+            "steam_path": self.steam_path,
+            "is_censored": self.is_censored
         }
         with open(settings_file, 'w', encoding='utf-8') as file:
             json.dump(settings_data, file, ensure_ascii=False, indent=4)
@@ -488,6 +509,11 @@ class Assistant(QWidget):
         # Запуск ассистента в отдельном потоке
         self.assistant_thread = threading.Thread(target=self.run_script)
         self.assistant_thread.start()
+
+    def run_censored(self):
+        if self.is_censored:  # Запускаем поток только если цензура включена
+            self.censored_thread = threading.Thread(target=self.censored)
+            self.censored_thread.start()
 
     def stop_assist(self):
         """Остановка ассистента"""
@@ -593,15 +619,46 @@ class Assistant(QWidget):
             logger.error(f"Ошибка в основном цикле ассистента: {e}")
             logger.error(traceback.format_exc())
 
+            winsound.MessageBeep(winsound.MB_ICONHAND)
+            msg_box = QMessageBox(self)
+            msg_box.setWindowTitle('Ошибка')
+            msg_box.setText(f"Ошибка в основном цикле ассистента: {e}")
+            ok_button = msg_box.addButton("ОК", QMessageBox.AcceptRole)
+            ok_button.setStyleSheet("padding: 1px 10px;")
+            msg_box.exec_()
+
     # "Основной цикл ассистента(конец)"
     # "--------------------------------------------------------------------------------------------------"
     # "Основной цикл ассистента(конец)"
 
+    def censored(self):
+        if not self.is_censored:  # Проверяем, включена ли цензура
+            return
+
+        try:
+            for text in self.get_audio():
+                if any(keyword in text for keyword in ['сук', 'суч', 'пизд', '',
+                                                       'еба', 'ёба', 'нах', 'хуй', 'бля',
+                                                       'ебу', 'епт', 'ёпт', '']):
+                    censored_folder = self.audio_paths.get('censored_folder')
+                    react(censored_folder)
+        except Exception as e:
+            logger.error(f"Ошибка в цикле цензуры ассистента: {e}")
+            logger.error(traceback.format_exc())
+
+            winsound.MessageBeep(winsound.MB_ICONHAND)
+            msg_box = QMessageBox(self)
+            msg_box.setWindowTitle('Ошибка')
+            msg_box.setText(f"Ошибка в цикле цензуры ассистента: {e}")
+            ok_button = msg_box.addButton("ОК", QMessageBox.AcceptRole)
+            ok_button.setStyleSheet("padding: 1px 10px;")
+            msg_box.exec_()
+
     def get_audio(self):
         """Преобразование речи с микрофона в текст."""
-        model_path_ru = os.path.join(get_base_directory(), "model_ru")  # Используем правильный путь к модели
+        model_path_ru = os.path.join(get_base_directory(), "model_ru")
         model_path_en = os.path.join(get_base_directory(), "model_en")
-        logger.info(f"Используются модели:  ru - {model_path_ru}; en - {model_path_en}")  # Логируем путь к модели
+        logger.info(f"Используются модели:  ru - {model_path_ru}; en - {model_path_en}")
 
         try:
             # Преобразуем путь в UTF-8
@@ -729,7 +786,13 @@ class Assistant(QWidget):
             settings_dialog.exec_()
         except Exception as e:
             logger.error(f"Ошибка при открытии настроек: {e}")
-            QMessageBox.critical(self, "Ошибка", "Не удалось открыть настройки.")
+            winsound.MessageBeep(winsound.MB_ICONHAND)
+            msg_box = QMessageBox(self)
+            msg_box.setWindowTitle('Ошибка')
+            msg_box.setText(f"Ошибка при открытии настроек: {e}")
+            ok_button = msg_box.addButton("ОК", QMessageBox.AcceptRole)
+            ok_button.setStyleSheet("padding: 1px 10px;")
+            msg_box.exec_()
 
     def add_new_command(self):
         """Обработка нажатия кнопки 'Новая команда'"""
@@ -877,6 +940,7 @@ class SettingsDialog(QDialog):
         :param parent: Родительский виджет.
         """
         super().__init__(parent)
+        self.parent = parent
         self.setWindowTitle("Настройки")
         self.setFixedSize(300, 400)
 
@@ -923,6 +987,11 @@ class SettingsDialog(QDialog):
         select_steam_button.clicked.connect(self.select_steam_file)
         main_layout.addWidget(select_steam_button)
 
+        self.censor_check = QCheckBox("Реагировать на мат")
+        self.censor_check.setChecked(self.parent.is_censored)  # Устанавливаем состояние галочки
+        self.censor_check.stateChanged.connect(self.toggle_censor)
+        main_layout.addWidget(self.censor_check)
+
         main_layout.addStretch()
 
         # Кнопка для закрытия настроек
@@ -930,6 +999,19 @@ class SettingsDialog(QDialog):
         close_button.clicked.connect(self.apply_settings)
         main_layout.addWidget(close_button)
         main_layout.setAlignment(close_button, Qt.AlignBottom)
+
+    def toggle_censor(self):
+        """Включение или отключение реакции на мат"""
+        self.parent.is_censored = self.censor_check.isChecked()
+
+        # бокс уведомления
+        winsound.MessageBeep(winsound.MB_ICONASTERISK)
+        msg_box = QMessageBox(self)
+        msg_box.setWindowTitle('Внимание!')
+        msg_box.setText('Для вступления в силу требуется перезагрузка программы')
+        ok_button = msg_box.addButton("ОК", QMessageBox.AcceptRole)
+        ok_button.setStyleSheet("padding: 1px 10px;")
+        msg_box.exec_()
 
     def select_steam_file(self):
         """Открывает диалог для выбора файла steam.exe."""
@@ -974,21 +1056,28 @@ class SettingsDialog(QDialog):
         changes_made = False  # Флаг, указывающий на изменения
 
         # Проверяем, изменилось ли имя ассистента
-        if new_assistant_name != self.parent().assistant_name:
-            self.parent().assistant_name = new_assistant_name  # Сохраняем новое имя в родительском классе
+        if new_assistant_name != self.parent.assistant_name:
+            self.parent.assistant_name = new_assistant_name  # Сохраняем новое имя в родительском классе
 
         # Проверяем, изменился ли голос
-        if self.current_voice != self.parent().speaker:
-            self.parent().speaker = self.current_voice  # Обновляем голос в родительском классе
+        if self.current_voice != self.parent.speaker:
+            self.parent.speaker = self.current_voice  # Обновляем голос в родительском классе
 
         # Проверяем, изменился ли путь к steam.exe
-        if new_steam_path != self.parent().steam_path:
-            self.parent().steam_path = new_steam_path  # Обновляем путь к steam.exe в родительском классе
+        if new_steam_path != self.parent.steam_path:
+            self.parent.steam_path = new_steam_path  # Обновляем путь к steam.exe в родительском классе
 
-        self.parent().save_settings()  # Сохраняем настройки
-        QMessageBox.information(self, "Внимание", "Настройки применены")
+        self.parent.save_settings()  # Сохраняем настройки
+
+        winsound.MessageBeep(winsound.MB_ICONASTERISK)
+        msg_box = QMessageBox(self)
+        msg_box.setWindowTitle('Информация')
+        msg_box.setText('Настройки применены!')
+        ok_button = msg_box.addButton("ОК", QMessageBox.AcceptRole)
+        ok_button.setStyleSheet("padding: 1px 10px;")
+        msg_box.exec_()
+
         logger.info("Настройки успешно применены.")
-
         self.close()
 
 
@@ -1045,11 +1134,23 @@ class AppCommandWindow(QDialog):
                 return json.load(file)
         except FileNotFoundError:
             logger.error(f"Файл {filename} не найден по пути: {file_path}")
-            QMessageBox.critical(self, "Ошибка", f"Файл {filename} не найден.")
+            winsound.MessageBeep(winsound.MB_ICONHAND)
+            msg_box = QMessageBox(self)
+            msg_box.setWindowTitle('Ошибка')
+            msg_box.setText(f"Файл {filename} не найден.")
+            ok_button = msg_box.addButton("ОК", QMessageBox.AcceptRole)
+            ok_button.setStyleSheet("padding: 1px 10px;")
+            msg_box.exec_()
             return {}
         except json.JSONDecodeError:
             logger.error(f"Ошибка: файл {filename} содержит некорректный JSON.")
-            QMessageBox.critical(self, "Ошибка", "Ошибка в формате файла JSON.")
+            winsound.MessageBeep(winsound.MB_ICONHAND)
+            msg_box = QMessageBox(self)
+            msg_box.setWindowTitle('Ошибка')
+            msg_box.setText("Ошибка в формате файла JSON.")
+            ok_button = msg_box.addButton("ОК", QMessageBox.AcceptRole)
+            ok_button.setStyleSheet("padding: 1px 10px;")
+            msg_box.exec_()
             return {}
 
     def save_commands(self, filename):
@@ -1069,10 +1170,22 @@ class AppCommandWindow(QDialog):
                 self.shortcut_combo.addItems(shortcut_names)  # Добавляем имена ярлыков в комбобокс
         except FileNotFoundError:
             logger.error(f"Файл {links_file} не найден.")
-            QMessageBox.critical(self, "Ошибка", f"Файл {links_file} не найден.")
+            winsound.MessageBeep(winsound.MB_ICONHAND)
+            msg_box = QMessageBox(self)
+            msg_box.setWindowTitle('Ошибка')
+            msg_box.setText(f"Файл {links_file} не найден.")
+            ok_button = msg_box.addButton("ОК", QMessageBox.AcceptRole)
+            ok_button.setStyleSheet("padding: 1px 10px;")
+            msg_box.exec_()
         except json.JSONDecodeError:
             logger.error(f"Ошибка: файл {links_file} содержит некорректный JSON.")
-            QMessageBox.critical(self, "Ошибка", "Ошибка в формате файла JSON.")
+            winsound.MessageBeep(winsound.MB_ICONHAND)
+            msg_box = QMessageBox(self)
+            msg_box.setWindowTitle('Ошибка')
+            msg_box.setText("Ошибка в формате файла JSON.")
+            ok_button = msg_box.addButton("ОК", QMessageBox.AcceptRole)
+            ok_button.setStyleSheet("padding: 1px 10px;")
+            msg_box.exec_()
 
     def apply_command(self):
         """Добавляет новую команду в JSON-файл."""
@@ -1080,9 +1193,24 @@ class AppCommandWindow(QDialog):
         selected_shortcut_name = self.shortcut_combo.currentText()
 
         try:
+            if not key:
+                winsound.MessageBeep(winsound.MB_ICONHAND)
+                msg_box = QMessageBox(self)
+                msg_box.setWindowTitle('Предупреждение')
+                msg_box.setText("Команда не указана!")
+                ok_button = msg_box.addButton("ОК", QMessageBox.AcceptRole)
+                ok_button.setStyleSheet("padding: 1px 10px;")
+                msg_box.exec_()
+                return
             # Проверка на существование ключа
             if key in self.commands:
-                QMessageBox.warning(self, "Предупреждение", f"Команда '{key}' уже существует.")
+                winsound.MessageBeep(winsound.MB_ICONHAND)
+                msg_box = QMessageBox(self)
+                msg_box.setWindowTitle('Предупреждение')
+                msg_box.setText(f"Команда '{key}' уже существует.")
+                ok_button = msg_box.addButton("ОК", QMessageBox.AcceptRole)
+                ok_button.setStyleSheet("padding: 1px 10px;")
+                msg_box.exec_()
                 return
 
             # Добавляем новую команду в словарь commands
@@ -1090,11 +1218,22 @@ class AppCommandWindow(QDialog):
             # Сохраняем обновленный словарь в JSON-файл
             self.save_commands('user_settings/commands.json')
 
-            QMessageBox.information(self, "Внимание",
-                                    f"Команда '{key}' успешно добавлена.\nНеобходим перезапуск программы.")
+            winsound.MessageBeep(winsound.MB_ICONASTERISK)
+            msg_box = QMessageBox(self)
+            msg_box.setWindowTitle('Информация')
+            msg_box.setText(f"Команда '{key}' успешно добавлена.\nНеобходим перезапуск программы")
+            ok_button = msg_box.addButton("ОК", QMessageBox.AcceptRole)
+            ok_button.setStyleSheet("padding: 1px 10px;")
+            msg_box.exec_()
 
         except Exception as e:
-            QMessageBox.critical(self, "Ошибка", str(e))
+            winsound.MessageBeep(winsound.MB_ICONHAND)
+            msg_box = QMessageBox(self)
+            msg_box.setWindowTitle('Ошибка')
+            msg_box.setText(str(e))
+            ok_button = msg_box.addButton("ОК", QMessageBox.AcceptRole)
+            ok_button.setStyleSheet("padding: 1px 10px;")
+            msg_box.exec_()
             logger.error(f"Ошибка: {e}")
 
 
@@ -1138,7 +1277,13 @@ class AddedCommandsWindow(QDialog):
             return {}
         except json.JSONDecodeError:
             logger.error("Ошибка: файл содержит некорректный JSON.")
-            QMessageBox.critical(self, "Ошибка", "Ошибка в формате файла JSON.")
+            winsound.MessageBeep(winsound.MB_ICONHAND)
+            msg_box = QMessageBox(self)
+            msg_box.setWindowTitle('Ошибка')
+            msg_box.setText("Ошибка в формате файла JSON.")
+            ok_button = msg_box.addButton("ОК", QMessageBox.AcceptRole)
+            ok_button.setStyleSheet("padding: 1px 10px;")
+            msg_box.exec_()
             return {}
 
     def update_commands_list(self):
@@ -1150,7 +1295,13 @@ class AddedCommandsWindow(QDialog):
 
         if not isinstance(self.commands, dict):
             logger.error("Файл JSON не содержит словарь.")
-            QMessageBox.critical(self, "Ошибка", "Файл JSON имеет некорректный формат.")
+            winsound.MessageBeep(winsound.MB_ICONHAND)
+            msg_box = QMessageBox(self)
+            msg_box.setWindowTitle('Ошибка')
+            msg_box.setText("Файл JSON имеет некорректный формат.")
+            ok_button = msg_box.addButton("ОК", QMessageBox.AcceptRole)
+            ok_button.setStyleSheet("padding: 1px 10px;")
+            msg_box.exec_()
             self.commands = {}  # Сбрасываем команды
 
         for key, value in self.commands.items():
@@ -1167,7 +1318,13 @@ class AddedCommandsWindow(QDialog):
         selected_items = self.commands_list.selectedItems()  # Получаем выбранные элементы
 
         if not selected_items:
-            QMessageBox.warning(self, "Предупреждение", "Пожалуйста, выберите команду для удаления.")
+            winsound.MessageBeep(winsound.MB_ICONHAND)
+            msg_box = QMessageBox(self)
+            msg_box.setWindowTitle('Предупреждение')
+            msg_box.setText("Пожалуйста, выберите команду для удаления.")
+            ok_button = msg_box.addButton("ОК", QMessageBox.AcceptRole)
+            ok_button.setStyleSheet("padding: 1px 10px;")
+            msg_box.exec_()
             return  # Если ничего не выбрано, выходим
 
         for item in selected_items:
@@ -1188,7 +1345,13 @@ class AddedCommandsWindow(QDialog):
                 logger.info("Список команд обновлён.")
         except IOError as e:
             logger.error(f"Ошибка записи в файл {commands_file}: {e}")
-            QMessageBox.critical(self, "Ошибка", "Не удалось сохранить команды.")
+            winsound.MessageBeep(winsound.MB_ICONHAND)
+            msg_box = QMessageBox(self)
+            msg_box.setWindowTitle('Ошибка')
+            msg_box.setText("Не удалось сохранить команды.")
+            ok_button = msg_box.addButton("ОК", QMessageBox.AcceptRole)
+            ok_button.setStyleSheet("padding: 1px 10px;")
+            msg_box.exec_()
 
 
 class AddFolderCommand(QDialog):
@@ -1259,11 +1422,23 @@ class AddFolderCommand(QDialog):
                 return {}
         except json.JSONDecodeError as e:
             logger.error(f"Ошибка при чтении файла {filename}: {e}")
-            QMessageBox.critical(self, "Ошибка", f"Ошибка в формате файла JSON: {e}")
+            winsound.MessageBeep(winsound.MB_ICONHAND)
+            msg_box = QMessageBox(self)
+            msg_box.setWindowTitle('Ошибка')
+            msg_box.setText(f"Ошибка в формате файла JSON: {e}")
+            ok_button = msg_box.addButton("ОК", QMessageBox.AcceptRole)
+            ok_button.setStyleSheet("padding: 1px 10px;")
+            msg_box.exec_()
             return {}
         except Exception as e:
             logger.error(f"Ошибка при загрузке команд: {e}")
-            QMessageBox.critical(self, "Ошибка", f"Ошибка при загрузке команд: {e}")
+            winsound.MessageBeep(winsound.MB_ICONHAND)
+            msg_box = QMessageBox(self)
+            msg_box.setWindowTitle('Ошибка')
+            msg_box.setText(f"Ошибка при загрузке команд: {e}")
+            ok_button = msg_box.addButton("ОК", QMessageBox.AcceptRole)
+            ok_button.setStyleSheet("padding: 1px 10px;")
+            msg_box.exec_()
             return {}
 
     def save_commands(self, filename):
@@ -1275,7 +1450,13 @@ class AddFolderCommand(QDialog):
                 logger.info("Команда обновлена в файле.")
         except Exception as e:
             logger.error(f"Ошибка при сохранении команд: {e}")
-            QMessageBox.critical(self, "Ошибка", f"Ошибка при сохранении команд: {e}")
+            winsound.MessageBeep(winsound.MB_ICONHAND)
+            msg_box = QMessageBox(self)
+            msg_box.setWindowTitle('Ошибка')
+            msg_box.setText(f"Ошибка при сохранении команд: {e}")
+            ok_button = msg_box.addButton("ОК", QMessageBox.AcceptRole)
+            ok_button.setStyleSheet("padding: 1px 10px;")
+            msg_box.exec_()
 
     def apply_command(self):
         """Добавляет новую команду в JSON-файл."""
@@ -1283,13 +1464,25 @@ class AddFolderCommand(QDialog):
         selected_folder_path = self.folder_path.text().strip()
 
         if not key or not selected_folder_path:
-            QMessageBox.warning(self, "Ошибка", "Пожалуйста, заполните все поля.")
+            winsound.MessageBeep(winsound.MB_ICONHAND)
+            msg_box = QMessageBox(self)
+            msg_box.setWindowTitle('Ошибка')
+            msg_box.setText("Пожалуйста, заполните все поля.")
+            ok_button = msg_box.addButton("ОК", QMessageBox.AcceptRole)
+            ok_button.setStyleSheet("padding: 1px 10px;")
+            msg_box.exec_()
             return
 
         try:
             # Проверка на существование ключа
             if key in self.commands:
-                QMessageBox.warning(self, "Предупреждение", f"Команда '{key}' уже существует.")
+                winsound.MessageBeep(winsound.MB_ICONHAND)
+                msg_box = QMessageBox(self)
+                msg_box.setWindowTitle('Предупреждение')
+                msg_box.setText(f"Команда '{key}' уже существует.")
+                ok_button = msg_box.addButton("ОК", QMessageBox.AcceptRole)
+                ok_button.setStyleSheet("padding: 1px 10px;")
+                msg_box.exec_()
                 return
 
             # Добавляем новую команду в словарь commands
@@ -1297,8 +1490,14 @@ class AddFolderCommand(QDialog):
             # Сохраняем обновленный словарь в JSON-файл
             self.save_commands('user_settings/commands.json')
 
-            QMessageBox.information(self, "Внимание",
-                                    f"Команда '{key}' успешно добавлена.\nНеобходим перезапуск программы.")
+            winsound.MessageBeep(winsound.MB_ICONASTERISK)
+            msg_box = QMessageBox(self)
+            msg_box.setWindowTitle('Информация')
+            msg_box.setText(f"Команда '{key}' успешно добавлена.\nНеобходим перезапуск программы")
+            ok_button = msg_box.addButton("ОК", QMessageBox.AcceptRole)
+            ok_button.setStyleSheet("padding: 1px 10px;")
+            msg_box.exec_()
+
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", str(e))
             logger.error(f"Ошибка: {e}")
@@ -1475,7 +1674,13 @@ class ColorSettingsWindow(QDialog):
             self.colorChanged.emit()  # Излучаем сигнал об изменении цвета
         except Exception as e:
             logger.info(f"Ошибка при применении изменений: {e}")
-            QMessageBox.critical(self, "Ошибка", f"Не удалось применить изменения: {e}")
+            winsound.MessageBeep(winsound.MB_ICONHAND)
+            msg_box = QMessageBox(self)
+            msg_box.setWindowTitle('Ошибка')
+            msg_box.setText(f"Не удалось применить изменения: {e}")
+            ok_button = msg_box.addButton("ОК", QMessageBox.AcceptRole)
+            ok_button.setStyleSheet("padding: 1px 10px;")
+            msg_box.exec_()
 
     def save_color_settings(self, new_styles):
         """Сохраняет новые стили в color_settings.json."""
