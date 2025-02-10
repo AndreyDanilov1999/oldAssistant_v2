@@ -2,5 +2,5 @@
     "voice": "johnny",
     "assistant_name": "джо",
     "steam_path": "D:/Steam/steam.exe",
-    "is_censored": false
+    "is_censored": true
 }

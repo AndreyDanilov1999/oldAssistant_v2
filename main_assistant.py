@@ -634,12 +634,10 @@ class Assistant(QWidget):
     def censored(self):
         if not self.is_censored:  # Проверяем, включена ли цензура
             return
-
         try:
             for text in self.get_audio():
-                if any(keyword in text for keyword in ['сук', 'суч', 'пизд', '',
-                                                       'еба', 'ёба', 'нах', 'хуй', 'бля',
-                                                       'ебу', 'епт', 'ёпт', '']):
+                if any(keyword in text for keyword in ['сук', 'суч', 'пизд', 'еба', 'ёба',
+                                                       'нах', 'хуй', 'бля', 'ебу', 'епт', 'ёпт']):
                     censored_folder = self.audio_paths.get('censored_folder')
                     react(censored_folder)
         except Exception as e:
