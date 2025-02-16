@@ -7,8 +7,9 @@
     "QPushButton": {
         "background-color": "#293f85",
         "color": "#8eaee5",
-        "height": "25px",
+        "height": "30px",
         "border": "1px solid #293f85",
+        "border-radius": "3px",
         "font-size": "13px"
     },
     "QPushButton:hover": {
@@ -23,7 +24,7 @@
     },
     "QTextEdit": {
         "background-color": "#1d2028",
-        "color": "ffffff",
+        "color": "#ffffff",
         "border": "1px solid",
         "border-radius": "4px",
         "font-size": "12px"

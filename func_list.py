@@ -48,13 +48,26 @@ def load_settings(settings_file):
 
     return {}  # Возвращаем пустой словарь, если файл не найден или ошибка
 
+
 def get_current_speaker(settings_file):
+    """
+    Получение текущего спикера
+    :param settings_file:
+    :return:
+    """
     settings = load_settings(settings_file)
     return settings.get("voice", "rogue")  # Возвращаем голос или значение по умолчанию
 
+
 def get_steam_path(settings_file):
+    """
+    Получение текущего пути к исполняемому файлу Steam
+    :param settings_file:
+    :return:
+    """
     settings = load_settings(settings_file)
     return settings.get("steam_path", "")  # Возвращаем путь к стим или пустую строку, если не нашлось
+
 
 def get_target_path(shortcut_path):
     """Извлекает путь к исполняемому файлу и аргументы из ярлыка."""
@@ -66,9 +79,11 @@ def get_target_path(shortcut_path):
         logger.error(f"Ошибка при извлечении пути из ярлыка {shortcut_path}: {e}")
         return None, None
 
+
 def fix_path(path):
     """Заменяет обратные слэши на прямые в пути."""
     return path.replace("\\", "/")
+
 
 def get_process_name(target_path):
     """Извлекает имя процесса из пути к исполняемому файлу."""
@@ -76,18 +91,6 @@ def get_process_name(target_path):
         return None
     return os.path.basename(target_path)
 
-# def read_url_shortcut(url_path):
-#     """Читает .url файл и извлекает game_id."""
-#     try:
-#         with open(url_path, 'r', encoding='utf-8') as file:
-#             content = file.read()
-#
-#         for line in content.splitlines():
-#             if line.startswith('URL='):
-#                 return line[22:]  # Возвращаем значение после "URL="
-#         return None
-#     except Exception as e:
-#         raise Exception(f"Ошибка при чтении файла .url: {e}")
 
 def read_url_shortcut(url_path):
     """Читает .url файл и извлекает game_id или URL."""
@@ -110,6 +113,7 @@ def read_url_shortcut(url_path):
     except Exception as e:
         raise Exception(f"Ошибка при чтении файла .url: {e}")
 
+
 def get_all_processes():
     """Возвращает список всех текущих процессов."""
     processes = []
@@ -117,12 +121,14 @@ def get_all_processes():
         processes.append(proc.info['name'])
     return processes
 
+
 def find_new_processes(before_processes, after_processes):
     """Находит все новые процессы, которые появились после запуска программы."""
     before_set = set(before_processes)
     after_set = set(after_processes)
     new_processes = after_set - before_set  # Находим разницу
     return list(new_processes)  # Возвращаем все новые процессы
+
 
 def save_process_names(shortcut_name, process_names):
     """Сохраняет имена процессов в файл, обновляя данные, если они уже существуют."""
@@ -158,6 +164,7 @@ def save_process_names(shortcut_name, process_names):
     except Exception as e:
         logger.error(f"Ошибка при сохранении имен процессов: {e}")
 
+
 def get_process_names_from_file(shortcut_name):
     """Возвращает список имен процессов для указанного ярлыка из файла."""
     try:
@@ -180,6 +187,7 @@ def get_process_names_from_file(shortcut_name):
         logger.error(f"Ошибка при чтении имен процессов: {e}")
         return []
 
+
 def close_program(process_name):
     """Завершает все процессы с указанным именем."""
     try:
@@ -199,8 +207,6 @@ def search_links():
     root_folder = os.path.join(get_base_directory(), 'user_settings',
                                "links for assist")  # Полный путь к папке с ярлыками
     root_links = os.path.join(get_base_directory(), 'user_settings', "links.json")
-    settings_file = os.path.join(get_base_directory(), 'user_settings', "settings.json")  # Полный путь к файлу настроек
-    speaker = get_current_speaker(settings_file)
 
     # Очистка файла links.json перед началом поиска
     with open(root_links, 'w', encoding='utf-8') as file:
@@ -228,8 +234,6 @@ def handler_links(filename, action):
     root_folder = os.path.join(get_base_directory(), 'user_settings', "links for assist")
     # Получаем путь к ярлыку
     shortcut_path = os.path.join(root_folder, filename)
-    settings_file = os.path.join(get_base_directory(), 'user_settings', "settings.json")  # Полный путь к файлу настроек
-    speaker = get_current_speaker(settings_file)  # Получаем текущий голос
 
     # Обработка .lnk файлов
     if filename.endswith(".lnk"):
@@ -262,9 +266,10 @@ def handler_links(filename, action):
         if action == 'close':
             close_link(filename)
 
+
 def handler_folder(folder_path, action):
     """
-        Обработчик команд для открытия и закрытия папок
+    Обработчик команд для открытия и закрытия папок
     :param folder_path: путь к папке
     :param action: действие(open or close)
     """
@@ -295,6 +300,11 @@ def handler_folder(folder_path, action):
 
 
 def open_url_link(game_id_or_url, filename):
+    """
+    Функция для открытия ярлыков (.url)
+    :param game_id_or_url: id игры извлекается из ярлыка
+    :param filename: Имя файла
+    """
     settings_file = os.path.join(get_base_directory(), 'user_settings', "settings.json")  # Полный путь к файлу настроек
     speaker = get_current_speaker(settings_file)  # Получаем текущий голос
     steam_path = get_steam_path(settings_file)
@@ -380,6 +390,11 @@ def open_url_link(game_id_or_url, filename):
 
 
 def open_link(filename, target_path):
+    """
+    Функция для открытия обычных ярлыков (.lnk)
+    :param filename: Имя файла
+    :param target_path: Путь к исполняемому файлу (берется из ярлыка)
+    """
     settings_file = os.path.join(get_base_directory(), 'user_settings', "settings.json")  # Полный путь к файлу настроек
     speaker = get_current_speaker(settings_file)  # Получаем текущий голос
     try:
@@ -428,7 +443,12 @@ def open_link(filename, target_path):
         react_detail(error_file)
         logger.error(f"Ошибка при открытии программы: {e}")
 
+
 def close_link(filename):
+    """
+    Функция для закрытия программы
+    :param filename: Имя файла
+    """
     settings_file = os.path.join(get_base_directory(), 'user_settings', "settings.json")  # Полный путь к файлу настроек
     speaker = get_current_speaker(settings_file)  # Получаем текущий голос
     process_names = get_process_names_from_file(filename)  # Читаем имена процессов из файла

@@ -7,8 +7,9 @@
     "QPushButton": {
         "background-color": "#ad77ff",
         "color": "#000000",
-        "height": "25px",
+        "height": "30px",
         "border": "1px solid #ad77ff",
+        "border-radius": "3px",
         "font-size": "13px"
     },
     "QPushButton:hover": {

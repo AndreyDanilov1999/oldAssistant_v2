@@ -26,8 +26,9 @@ def get_base_directory():
         base_path = os.path.dirname(os.path.abspath(__file__))
     return base_path
 
-# Инициализация pygame.mixer
+
 pygame.mixer.init()
+
 
 def react(folder_path, volume_reduction_factor=0.2):
     """
@@ -59,6 +60,7 @@ def react(folder_path, volume_reduction_factor=0.2):
 
     except Exception as e:
         logger.error(f"Ошибка при воспроизведении аудио: {e}")
+
 
 def react_detail(file_path, volume_reduction_factor=0.2):
     """

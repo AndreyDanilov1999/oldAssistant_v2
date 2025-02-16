@@ -6,7 +6,7 @@ a = Analysis(
     pathex=['G:/PycharmProjects/oldAssistant_v2'],
     binaries=[(r'G:\PycharmProjects\oldAssistant_v2\venv_1\Lib\site-packages\vosk\libvosk.dll', 'vosk')],
     datas=[
-        ('G:/PycharmProjects/oldAssistant_v2/assist-min.ico', '.'),
+        ('G:/PycharmProjects/oldAssistant_v2/icon_assist.ico', '.'),
         ('G:/PycharmProjects/oldAssistant_v2/user_settings/settings.json', 'user_settings'),
         ('G:/PycharmProjects/oldAssistant_v2/user_settings/process_names.json', 'user_settings'),
         ('G:/PycharmProjects/oldAssistant_v2/user_settings/color_settings.json', 'user_settings'),
@@ -51,7 +51,8 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=['assist-min.ico'],
+    icon=['icon_assist.ico'],
+    manifest='app.manifest',
 )
 coll = COLLECT(
     exe,

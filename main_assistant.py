@@ -11,9 +11,8 @@ import os.path
 import random
 import sys
 import traceback
-
+import psutil
 import winsound
-
 from func_list import search_links, handler_links, handler_folder
 from function_list_main import *
 import simpleaudio as sa
@@ -21,10 +20,10 @@ import numpy as np
 import threading
 import pyaudio
 from PyQt5.QtGui import QIcon, QColor
-from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QHBoxLayout, \
-    QPushButton, QCheckBox, QSystemTrayIcon, QAction, qApp, QMenu, QMessageBox, \
-    QTextEdit, QDialog, QLabel, QComboBox, QLineEdit, QListWidget, QListWidgetItem, QFileDialog, QColorDialog, \
-    QInputDialog, QSlider
+from PyQt5.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout, \
+                             QPushButton, QCheckBox, QSystemTrayIcon, QAction, qApp, QMenu, QMessageBox, \
+                             QTextEdit, QDialog, QLabel, QComboBox, QLineEdit, QListWidget, QListWidgetItem, \
+                             QFileDialog, QColorDialog, QSlider)
 from PyQt5.QtCore import Qt, QFileSystemWatcher, QTimer, QEvent, pyqtSignal
 import subprocess
 from script_audio import controller
@@ -32,7 +31,6 @@ from speak_functions import react, react_detail
 from logging_config import logger
 from lists import get_audio_paths
 from vosk import Model, KaldiRecognizer
-
 
 speakers = dict(Пласид='placide', Бестия='rogue', Джонни='johnny', Санбой='sanboy', Тигрица='tigress')
 
@@ -61,6 +59,14 @@ class Assistant(QWidget):
             base_path = os.path.dirname(os.path.abspath(__file__))
         return base_path
 
+    def check_memory_usage(self, limit_mb):
+        process = psutil.Process(os.getpid())
+        memory_usage = process.memory_info().rss / 1024 / 1024  # В МБ
+        if memory_usage > limit_mb:
+            logger.error(f"Превышен лимит памяти: {memory_usage} МБ > {limit_mb} МБ")
+            return False
+        return True
+
     def __init__(self):
         super().__init__()
         self.relax_button = None
@@ -84,7 +90,8 @@ class Assistant(QWidget):
         self.speaker = self.load_settings()
         self.assistant_name = self.load_settings_name()
         self.audio_paths = get_audio_paths(self.speaker)
-        self.version = "1.1.2"
+        self.MEMORY_LIMIT_MB = 1024
+        self.version = "1.1.3"
         self.ps = "Powered by theoldman"
         self.label_version = QLabel(f"Версия: {self.version} {self.ps}", self)
         self.label_message = QLabel('', self)
@@ -96,7 +103,6 @@ class Assistant(QWidget):
         self.check_autostart()
         self.hide()
         self.run_assist()
-        self.run_censored()
 
     def initui(self):
         """Инициализация пользовательского интерфейса."""
@@ -105,7 +111,7 @@ class Assistant(QWidget):
 
         # Инициализируем QSystemTrayIcon
         self.tray_icon = QSystemTrayIcon(self)
-        self.tray_icon.setIcon(QIcon(os.path.join(self.get_base_directory(), 'assist-min.ico')))
+        self.tray_icon.setIcon(QIcon(os.path.join(self.get_base_directory(), 'icon_assist.ico')))
 
         show_action = QAction("Развернуть", self)
         show_action.triggered.connect(self.show)
@@ -139,11 +145,6 @@ class Assistant(QWidget):
         self.open_folder_button = QPushButton("Открыть папку с ярлыками")
         self.open_folder_button.clicked.connect(self.open_folder)
         left_layout.addWidget(self.open_folder_button)
-
-        # Кнопка "Проверка ярлыков"
-        self.check_shortcut_button = QPushButton("Проверка ярлыков")
-        self.check_shortcut_button.clicked.connect(self.check_shortcuts)
-        left_layout.addWidget(self.check_shortcut_button)
 
         # Кнопка "Настройки"
         self.settings_button = QPushButton("Настройки")
@@ -201,7 +202,7 @@ class Assistant(QWidget):
         self.setGeometry(600, 300, 800, 500)
 
         # Установка иконки для окна
-        self.setWindowIcon(QIcon(os.path.join(self.get_base_directory(), 'assist-min.ico')))
+        self.setWindowIcon(QIcon(os.path.join(self.get_base_directory(), 'icon_assist.ico')))
 
         # Инициализация FileSystemWatcher
         self.init_file_watcher()
@@ -510,11 +511,6 @@ class Assistant(QWidget):
         self.assistant_thread = threading.Thread(target=self.run_script)
         self.assistant_thread.start()
 
-    def run_censored(self):
-        if self.is_censored:  # Запускаем поток только если цензура включена
-            self.censored_thread = threading.Thread(target=self.censored)
-            self.censored_thread.start()
-
     def stop_assist(self):
         """Остановка ассистента"""
         self.is_assistant_running = False
@@ -544,14 +540,29 @@ class Assistant(QWidget):
         if start_greet_folder:
             react(start_greet_folder)
 
+        if not self.initialize_audio():
+            return  # Если инициализация не удалась, завершаем выполнение
+
         try:
-            logger.info('Попытка загрузки модели')
             for text in self.get_audio():
                 if not self.is_assistant_running:  # Проверяем флаг is_assistant_running
                     break
+
+                # Проверка использования памяти
+                if not self.check_memory_usage(self.MEMORY_LIMIT_MB):
+                    logger.error("Превышен лимит памяти. Завершение работы.")
+                    break
+
+                # Проверка на мат, если цензура включена
+                if self.is_censored and any(keyword in text for keyword in ['сук', 'суч', 'пизд', 'еба', 'ёба',
+                                                                            'нах', 'хуй', 'бля', 'ебу', 'епт',
+                                                                            'ёпт']):
+                    censored_folder = self.audio_paths.get('censored_folder')
+                    react(censored_folder)
+                    continue  # Пропускаем дальнейшую обработку, если обнаружен мат
+
                 if self.assistant_name in text:
                     reaction_triggered = False
-
                     if 'выключи комп' in text:
                         logger.info("Выключаю компьютер")
                         shutdown_windows()
@@ -631,29 +642,8 @@ class Assistant(QWidget):
     # "--------------------------------------------------------------------------------------------------"
     # "Основной цикл ассистента(конец)"
 
-    def censored(self):
-        if not self.is_censored:  # Проверяем, включена ли цензура
-            return
-        try:
-            for text in self.get_audio():
-                if any(keyword in text for keyword in ['сук', 'суч', 'пизд', 'еба', 'ёба',
-                                                       'нах', 'хуй', 'бля', 'ебу', 'епт', 'ёпт']):
-                    censored_folder = self.audio_paths.get('censored_folder')
-                    react(censored_folder)
-        except Exception as e:
-            logger.error(f"Ошибка в цикле цензуры ассистента: {e}")
-            logger.error(traceback.format_exc())
-
-            winsound.MessageBeep(winsound.MB_ICONHAND)
-            msg_box = QMessageBox(self)
-            msg_box.setWindowTitle('Ошибка')
-            msg_box.setText(f"Ошибка в цикле цензуры ассистента: {e}")
-            ok_button = msg_box.addButton("ОК", QMessageBox.AcceptRole)
-            ok_button.setStyleSheet("padding: 1px 10px;")
-            msg_box.exec_()
-
-    def get_audio(self):
-        """Преобразование речи с микрофона в текст."""
+    def initialize_audio(self):
+        """Инициализация моделей и аудиопотока."""
         model_path_ru = os.path.join(get_base_directory(), "model_ru")
         model_path_en = os.path.join(get_base_directory(), "model_en")
         logger.info(f"Используются модели:  ru - {model_path_ru}; en - {model_path_en}")
@@ -664,68 +654,66 @@ class Assistant(QWidget):
             model_path_en_utf8 = model_path_en.encode("utf-8").decode("utf-8")
 
             # Пытаемся загрузить модель
-            model_ru = Model(model_path_ru_utf8)
-            model_en = Model(model_path_en_utf8)
+            self.model_ru = Model(model_path_ru_utf8)
+            self.model_en = Model(model_path_en_utf8)
             logger.info("Модели успешно загружены.")  # Логируем успешную загрузку модели
         except Exception as e:
             # Логируем полный стек вызовов при ошибке
             logger.error(f"Ошибка при загрузке модели: {e}. Возможно путь содержит кириллицу.")
-            return
-        rec_ru = KaldiRecognizer(model_ru, 16000)
-        rec_en = KaldiRecognizer(model_en, 16000)
-        p = pyaudio.PyAudio()
+            return False
+
+        # Инициализация распознавателей
+        self.rec_ru = KaldiRecognizer(self.model_ru, 16000)
+        self.rec_en = KaldiRecognizer(self.model_en, 16000)
+
+        # Инициализация аудиопотока
+        self.p = pyaudio.PyAudio()
+        self.stream = self.p.open(format=pyaudio.paInt16, channels=1, rate=16000, input=True, frames_per_buffer=512)
+        self.stream.start_stream()
+
+        return True
+
+    def get_audio(self):
+        """Преобразование речи с микрофона в текст."""
+        combined_result = ""
+
         try:
-            stream = p.open(format=pyaudio.paInt16, channels=1, rate=16000, input=True, frames_per_buffer=512)
-            stream.start_stream()
-            # Переменная для объединенного результата
-            combined_result = ""
-
             while self.is_assistant_running:
-                try:
-                    # Чтение данных из аудиопотока
-                    data = stream.read(256, exception_on_overflow=False)
-                    if len(data) == 0:
-                        break
-
-                    # Распознавание с использованием русской модели
-                    if rec_ru.AcceptWaveform(data):
-                        result_ru = rec_ru.Result()
-                        result_ru = json.loads(result_ru)  # Обрезаем результат для получения только текста
-                        text = result_ru.get("text", "").strip()
-                        if text:
-                            logger.info(f"Распознано: {text}")  # Логируем распознанный текст
-                            combined_result += text + " "  # Добавляем результат в общую переменную
-
-                    # Распознавание с использованием английской модели
-                    if rec_en.AcceptWaveform(data):
-                        result_en = rec_en.Result()
-                        result_en = json.loads(result_en)  # Парсим JSON
-                        text = result_en.get("text", "").strip()  # Извлекаем текст
-                        if text == "huh":
-                            continue  # Игнорируем это распознавание
-                        elif text:  # Проверяем, что текст не пустой
-                            logger.info(f"Распознано: {text}")  # Логируем распознанный текст
-                            combined_result += text + " "  # Добавляем результат в общую переменную
-
-                    yield combined_result.strip().lower()
-                    combined_result = ""
-
-
-                except Exception as e:
-                    logger.error(f"Ошибка при обработке аудиоданных: {e}")  # Логируем ошибку обработки данных
-                    logger.error("Подробная информация об ошибке:")
-                    logger.error(traceback.format_exc())  # Выводим полный стек вызовов
+                data = self.stream.read(256, exception_on_overflow=False)
+                if len(data) == 0:
                     break
 
+                # Распознавание с использованием русской модели
+                if self.rec_ru.AcceptWaveform(data):
+                    result_ru = self.rec_ru.Result()
+                    result_ru = json.loads(result_ru)
+                    text = result_ru.get("text", "").strip()
+                    if text:
+                        logger.info(f"Распознано: {text}")
+                        combined_result += text + " "
+
+                # Распознавание с использованием английской модели
+                if self.rec_en.AcceptWaveform(data):
+                    result_en = self.rec_en.Result()
+                    result_en = json.loads(result_en)
+                    text = result_en.get("text", "").strip()
+                    if text == "huh":
+                        continue
+                    elif text:
+                        logger.info(f"Распознано: {text}")
+                        combined_result += text + " "
+
+                yield combined_result.strip().lower()
+                combined_result = ""  # Очищаем combined_result после использования
+
         except Exception as e:
-            logger.error(f"Ошибка при работе с аудиопотоком: {e}")  # Логируем ошибку работы с потоком
-            logger.error("Подробная информация об ошибке:")
-            logger.error(traceback.format_exc())  # Выводим полный стек вызовов
+            logger.error(f"Ошибка при обработке аудиоданных: {e}")
+            logger.error(traceback.format_exc())
         finally:
-            logger.info("Остановка аудиопотока...")  # Логируем остановку потока
-            stream.stop_stream()
-            stream.close()
-            p.terminate()
+            logger.info("Остановка аудиопотока...")
+            self.stream.stop_stream()
+            self.stream.close()
+            self.p.terminate()
 
     def handle_app_command(self, text, action):
         """Обработка команд для приложений"""
@@ -762,18 +750,6 @@ class Assistant(QWidget):
                 os.startfile(folder_path)  # Открываем папку после создания
             except Exception as e:
                 self.log_area.append(f'Ошибка при создании папки: {e}')
-
-    def check_shortcuts(self):
-        """Обработка нажатия кнопки 'Проверка ярлыков'"""
-        settings_file = os.path.join(get_base_directory(), 'user_settings',
-                                     "settings.json")  # Полный путь к файлу настроек
-        speaker = get_current_speaker(settings_file)
-        audio_paths = get_audio_paths(speaker)
-        check_file = audio_paths['check_file_start']
-        react_detail(check_file)
-        search_links()
-        check_file = audio_paths['check_file']
-        react_detail(check_file)
 
     def open_settings(self):
         """Обработка нажатия кнопки 'Настройки'"""
@@ -842,7 +818,7 @@ class Assistant(QWidget):
         current_directory = get_base_directory()
         write_directory = os.path.dirname(current_directory)
         # Путь к исполняемому файлу и .bat файлу
-        exe_path = os.path.join(write_directory, 'Assistant.exe')  # Замените на имя вашего исполняемого файла
+        exe_path = os.path.join(write_directory, 'Assistant.exe')
         bat_path = os.path.join(write_directory, 'start_assistant.bat')
         task_name = "VirtualAssistant"  # Имя задачи в планировщике
 
@@ -918,7 +894,7 @@ class Assistant(QWidget):
                                     stderr=subprocess.PIPE, creationflags=subprocess.CREATE_NO_WINDOW)
             output = result.stdout.decode('cp866')  # Декодируем вывод
             self.autostart_checkbox.setChecked(True)
-            self.log_area.append("Задача найдена: " + output)
+            self.log_area.append(output)
         except subprocess.CalledProcessError as e:
             error_output = e.stderr.decode('cp866')  # Декодируем ошибку
             self.autostart_checkbox.setChecked(False)
@@ -1002,15 +978,6 @@ class SettingsDialog(QDialog):
         """Включение или отключение реакции на мат"""
         self.parent.is_censored = self.censor_check.isChecked()
 
-        # бокс уведомления
-        winsound.MessageBeep(winsound.MB_ICONASTERISK)
-        msg_box = QMessageBox(self)
-        msg_box.setWindowTitle('Внимание!')
-        msg_box.setText('Для вступления в силу требуется перезагрузка программы')
-        ok_button = msg_box.addButton("ОК", QMessageBox.AcceptRole)
-        ok_button.setStyleSheet("padding: 1px 10px;")
-        msg_box.exec_()
-
     def select_steam_file(self):
         """Открывает диалог для выбора файла steam.exe."""
         try:
@@ -1051,8 +1018,6 @@ class SettingsDialog(QDialog):
             QMessageBox.warning(self, "Ошибка", f"Файл '{new_steam_path}' не найден.\n Укажите путь к файлу steam.exe")
             return
 
-        changes_made = False  # Флаг, указывающий на изменения
-
         # Проверяем, изменилось ли имя ассистента
         if new_assistant_name != self.parent.assistant_name:
             self.parent.assistant_name = new_assistant_name  # Сохраняем новое имя в родительском классе
@@ -1090,10 +1055,10 @@ class AppCommandWindow(QDialog):
         self.get_links()
         self.init_ui()
         self.base_path = get_base_directory()
-        self.commands = self.load_commands(os.path.join(self.base_path, 'user_settings', 'commands.json'))
+        self.commands = self.parent.load_commands(os.path.join(self.base_path, 'user_settings', 'commands.json'))
         self.load_shortcuts()  # Загружаем ярлыки при инициализации
         self.setFixedSize(350, 300)
-        self.setWindowIcon(QIcon(os.path.join(self.base_path, 'assist-min.ico')))
+        self.setWindowIcon(QIcon(os.path.join(self.base_path, 'icon_assist.ico')))
 
     def init_ui(self):
         self.setWindowTitle("Добавить команду")
@@ -1123,33 +1088,6 @@ class AppCommandWindow(QDialog):
 
     def get_links(self):
         search_links()
-
-    def load_commands(self, filename):
-        """Загружает команды из JSON-файла."""
-        file_path = os.path.join(self.base_path, filename)
-        try:
-            with open(file_path, 'r', encoding='utf-8') as file:
-                return json.load(file)
-        except FileNotFoundError:
-            logger.error(f"Файл {filename} не найден по пути: {file_path}")
-            winsound.MessageBeep(winsound.MB_ICONHAND)
-            msg_box = QMessageBox(self)
-            msg_box.setWindowTitle('Ошибка')
-            msg_box.setText(f"Файл {filename} не найден.")
-            ok_button = msg_box.addButton("ОК", QMessageBox.AcceptRole)
-            ok_button.setStyleSheet("padding: 1px 10px;")
-            msg_box.exec_()
-            return {}
-        except json.JSONDecodeError:
-            logger.error(f"Ошибка: файл {filename} содержит некорректный JSON.")
-            winsound.MessageBeep(winsound.MB_ICONHAND)
-            msg_box = QMessageBox(self)
-            msg_box.setWindowTitle('Ошибка')
-            msg_box.setText("Ошибка в формате файла JSON.")
-            ok_button = msg_box.addButton("ОК", QMessageBox.AcceptRole)
-            ok_button.setStyleSheet("padding: 1px 10px;")
-            msg_box.exec_()
-            return {}
 
     def save_commands(self, filename):
         """Сохраняет команды в JSON-файл."""
@@ -1215,11 +1153,13 @@ class AppCommandWindow(QDialog):
             self.commands[key] = selected_shortcut_name
             # Сохраняем обновленный словарь в JSON-файл
             self.save_commands('user_settings/commands.json')
+            self.parent.commands = self.parent.load_commands(
+                os.path.join(self.base_path, 'user_settings', 'commands.json'))
 
             winsound.MessageBeep(winsound.MB_ICONASTERISK)
             msg_box = QMessageBox(self)
             msg_box.setWindowTitle('Информация')
-            msg_box.setText(f"Команда '{key}' успешно добавлена.\nНеобходим перезапуск программы")
+            msg_box.setText(f"Команда '{key}' успешно добавлена")
             ok_button = msg_box.addButton("ОК", QMessageBox.AcceptRole)
             ok_button.setStyleSheet("padding: 1px 10px;")
             msg_box.exec_()
@@ -1236,9 +1176,7 @@ class AppCommandWindow(QDialog):
 
 
 class AddedCommandsWindow(QDialog):
-    """
-        Класс для обработки окна "Добавленные функции"
-    """
+    """ Класс для обработки окна "Добавленные функции" """
 
     def __init__(self, parent):
         super().__init__(parent)
@@ -1312,7 +1250,7 @@ class AddedCommandsWindow(QDialog):
                 logger.error(f"Ошибка при добавлении элемента: {e}")
 
     def delete_command(self):
-        """Удаляет команду по выбранному ключу."""
+        """Удаляет команду по выбранному ключу и соответствующий кортеж из process_names.json."""
         selected_items = self.commands_list.selectedItems()  # Получаем выбранные элементы
 
         if not selected_items:
@@ -1327,12 +1265,32 @@ class AddedCommandsWindow(QDialog):
 
         for item in selected_items:
             key = item.text().split(" : ")[0]  # Получаем ключ команды из текста элемента
-
             if key in self.commands:
+                # Получаем значение (ярлык или путь) удаляемой команды
+                value = self.commands[key]
                 del self.commands[key]  # Удаляем команду из словаря
                 self.commands_list.takeItem(self.commands_list.row(item))  # Удаляем элемент из QListWidget
+                # Удаляем соответствующий кортеж из process_names.json
+                process_names_file = os.path.join(self.base_path, 'user_settings', 'process_names.json')
+                try:
+                    with open(process_names_file, 'r', encoding='utf-8') as file:
+                        process_names = json.load(file)
+                    # Удаляем запись, если её ключ совпадает со значением удаляемой команды
+                    updated_process_names = [entry for entry in process_names if list(entry.keys())[0] != value]
+                    with open(process_names_file, 'w', encoding='utf-8') as file:
+                        json.dump(updated_process_names, file, ensure_ascii=False, indent=4)
 
-        self.save_commands()  # Сохраняем изменения в файл
+                except IOError as e:
+                    logger.error(f"Ошибка при работе с файлом {process_names_file}: {e}")
+                    winsound.MessageBeep(winsound.MB_ICONHAND)
+                    msg_box = QMessageBox(self)
+                    msg_box.setWindowTitle('Ошибка')
+                    msg_box.setText(f"Не удалось обновить process_names.json: {e}")
+                    ok_button = msg_box.addButton("ОК", QMessageBox.AcceptRole)
+                    ok_button.setStyleSheet("padding: 1px 10px;")
+                    msg_box.exec_()
+
+        self.save_commands()  # Сохраняем изменения в commands.json
 
     def save_commands(self):
         """Сохраняет команды в файл commands.json."""
@@ -1362,9 +1320,9 @@ class AddFolderCommand(QDialog):
         self.parent = parent
         self.init_ui()
         self.base_path = get_base_directory()
-        self.commands = self.load_commands(os.path.join(self.base_path, 'user_settings', 'commands.json'))
+        self.commands = self.parent.load_commands(os.path.join(self.base_path, 'user_settings', 'commands.json'))
         self.setFixedSize(350, 250)
-        self.setWindowIcon(QIcon(os.path.join(self.base_path, 'assist-min.ico')))
+        self.setWindowIcon(QIcon(os.path.join(self.base_path, 'icon_assist.ico')))
 
     def init_ui(self):
         """
@@ -1407,37 +1365,6 @@ class AddFolderCommand(QDialog):
             self.folder_path.setText(folder)
         else:
             logger.info("Выбор папки отменен.")
-
-    def load_commands(self, filename):
-        """Загружает команды из JSON-файла."""
-        file_path = os.path.join(self.base_path, filename)
-        try:
-            if os.path.exists(file_path):
-                with open(file_path, 'r', encoding='utf-8') as file:
-                    return json.load(file)
-            else:
-                logger.warning(f"Файл {filename} не найден. Будет создан новый.")
-                return {}
-        except json.JSONDecodeError as e:
-            logger.error(f"Ошибка при чтении файла {filename}: {e}")
-            winsound.MessageBeep(winsound.MB_ICONHAND)
-            msg_box = QMessageBox(self)
-            msg_box.setWindowTitle('Ошибка')
-            msg_box.setText(f"Ошибка в формате файла JSON: {e}")
-            ok_button = msg_box.addButton("ОК", QMessageBox.AcceptRole)
-            ok_button.setStyleSheet("padding: 1px 10px;")
-            msg_box.exec_()
-            return {}
-        except Exception as e:
-            logger.error(f"Ошибка при загрузке команд: {e}")
-            winsound.MessageBeep(winsound.MB_ICONHAND)
-            msg_box = QMessageBox(self)
-            msg_box.setWindowTitle('Ошибка')
-            msg_box.setText(f"Ошибка при загрузке команд: {e}")
-            ok_button = msg_box.addButton("ОК", QMessageBox.AcceptRole)
-            ok_button.setStyleSheet("padding: 1px 10px;")
-            msg_box.exec_()
-            return {}
 
     def save_commands(self, filename):
         """Сохраняет команды в JSON-файл."""
@@ -1487,11 +1414,13 @@ class AddFolderCommand(QDialog):
             self.commands[key] = selected_folder_path
             # Сохраняем обновленный словарь в JSON-файл
             self.save_commands('user_settings/commands.json')
+            self.parent.commands = self.parent.load_commands(
+                os.path.join(self.base_path, 'user_settings', 'commands.json'))
 
             winsound.MessageBeep(winsound.MB_ICONASTERISK)
             msg_box = QMessageBox(self)
             msg_box.setWindowTitle('Информация')
-            msg_box.setText(f"Команда '{key}' успешно добавлена.\nНеобходим перезапуск программы")
+            msg_box.setText(f"Команда '{key}' успешно добавлена")
             ok_button = msg_box.addButton("ОК", QMessageBox.AcceptRole)
             ok_button.setStyleSheet("padding: 1px 10px;")
             msg_box.exec_()
@@ -1537,6 +1466,7 @@ class ColorSettingsWindow(QDialog):
         self.btn_color = ""
         self.text_color = ""
         self.text_edit_color = ""
+        self.border_color = ""
         self.load_color_settings()  # Загружаем текущие цвета
 
     def init_ui(self):
@@ -1549,6 +1479,9 @@ class ColorSettingsWindow(QDialog):
 
         self.btn_button = QPushButton('Выберите цвет кнопок')
         self.btn_button.clicked.connect(self.choose_button_color)
+
+        self.border_button = QPushButton('Выберите цвет обводки')
+        self.border_button.clicked.connect(self.choose_border_color)
 
         self.text_button = QPushButton('Выберите цвет текста')
         self.text_button.clicked.connect(self.choose_text_color)
@@ -1574,6 +1507,7 @@ class ColorSettingsWindow(QDialog):
         layout = QVBoxLayout()
         layout.addWidget(self.bg_button)
         layout.addWidget(self.btn_button)
+        layout.addWidget(self.border_button)
         layout.addWidget(self.text_button)
         layout.addWidget(self.text_edit_button)
         layout.addWidget(self.save_preset_button)
@@ -1586,10 +1520,11 @@ class ColorSettingsWindow(QDialog):
 
     def load_color_settings(self):
         """Загружает текущие цвета из файла настроек."""
-        self.bg_color = self.styles.get("QWidget", {}).get("background-color", "#2E3440")
-        self.btn_color = self.styles.get("QPushButton", {}).get("background-color", "#3858c7")
-        self.text_color = self.styles.get("QWidget", {}).get("color", "#8eaee5")
-        self.text_edit_color = self.styles.get("QTextEdit", {}).get("background-color", "#2E3440")
+        self.bg_color = self.styles.get("QWidget", {}).get("background-color", "#1d2028")
+        self.btn_color = self.styles.get("QPushButton", {}).get("background-color", "#293f85")
+        self.text_color = self.styles.get("QPushButton", {}).get("color", "#8eaee5")
+        self.text_edit_color = self.styles.get("QTextEdit", {}).get("color", "#ffffff")
+        self.border_color = self.styles.get("QPushButton", {}).get("border", "1px solid #293f85")
 
     def choose_background_color(self):
         try:
@@ -1606,6 +1541,15 @@ class ColorSettingsWindow(QDialog):
             color = QColorDialog.getColor(initial_color, self)
             if color.isValid():
                 self.btn_color = color.name()
+        except Exception as e:
+            logger.error(e)
+
+    def choose_border_color(self):
+        try:
+            initial_color = QColor(self.border_color) if hasattr(self, 'border_color') else Qt.white
+            color = QColorDialog.getColor(initial_color, self)
+            if color.isValid():
+                self.border_color = color.name()
         except Exception as e:
             logger.error(e)
 
@@ -1638,8 +1582,9 @@ class ColorSettingsWindow(QDialog):
                 "QPushButton": {
                     "background-color": self.btn_color,
                     "color": self.text_color,
-                    "height": "25px",
-                    "border": f"1px solid {self.btn_color}",
+                    "height": "30px",
+                    "border": f"1px solid {self.border_color}",
+                    "border-radius": "3px",
                     "font-size": "13px"
                 },
                 "QPushButton:hover": {
@@ -1687,8 +1632,21 @@ class ColorSettingsWindow(QDialog):
 
     def save_preset(self):
         """Сохраняет текущие стили как новый пресет."""
-        preset_name, ok = QInputDialog.getText(self, 'Сохранить пресет', 'Введите имя пресета:')
-        if ok and preset_name:
+        dialog = CustomInputDialog('Сохранить пресет', 'Введите имя пресета:', self)
+        result = dialog.exec_()  # Ждем, пока диалог закроется
+
+        if result == QDialog.Accepted:  # Если нажали "Сохранить"
+            preset_name = dialog.get_text()
+            if not preset_name:
+                winsound.MessageBeep(winsound.MB_ICONHAND)
+                msg_box = QMessageBox(self)
+                msg_box.setWindowTitle('Ошибка')
+                msg_box.setText("Имя пресета не может быть пустым.")
+                ok_button = msg_box.addButton("ОК", QMessageBox.AcceptRole)
+                ok_button.setStyleSheet("padding: 1px 10px;")
+                msg_box.exec_()
+                return
+
             preset_path = os.path.join(self.get_base_directory(), 'user_settings', 'presets', f'{preset_name}.json')
             new_styles = {
                 "QWidget": {
@@ -1699,8 +1657,9 @@ class ColorSettingsWindow(QDialog):
                 "QPushButton": {
                     "background-color": self.btn_color,
                     "color": self.text_edit_color,
-                    "height": "25px",
-                    "border": f"1px solid {self.btn_color}",
+                    "height": "30px",
+                    "border": f"1px solid {self.border_color}",
+                    "border-radius": "3px",
                     "font-size": "13px"
                 },
                 "QPushButton:hover": {
@@ -1729,9 +1688,21 @@ class ColorSettingsWindow(QDialog):
                     "font-size": "13px"
                 }
             }
-            with open(preset_path, 'w') as json_file:
-                json.dump(new_styles, json_file, indent=4)
-            self.load_presets()  # Обновляем список пресетов
+            try:
+                with open(preset_path, 'w') as json_file:
+                    json.dump(new_styles, json_file, indent=4)
+                self.load_presets()  # Обновляем список пресетов
+            except Exception as e:
+                winsound.MessageBeep(winsound.MB_ICONHAND)
+                msg_box = QMessageBox(self)
+                msg_box.setWindowTitle('Ошибка')
+                msg_box.setText(f"Не удалось сохранить пресет: {e}")
+                ok_button = msg_box.addButton("ОК", QMessageBox.AcceptRole)
+                ok_button.setStyleSheet("padding: 1px 10px;")
+                msg_box.exec_()
+        else:  # Если нажали "Закрыть" или закрыли диалог
+            logger.info("Пресет не сохранен")
+            return
 
     def load_presets(self):
         """Загружает существующие пресеты в выпадающий список."""
@@ -1763,10 +1734,12 @@ class ColorSettingsWindow(QDialog):
                 with open(preset_path, 'r') as json_file:
                     styles = json.load(json_file)
                     # Загружаем цвета для основных элементов
-                    self.bg_color = styles.get("QWidget", {}).get("background-color", "#2E3440")
-                    self.btn_color = styles.get("QPushButton", {}).get("background-color", "#3858c7")
-                    self.text_color = styles.get("QPushButton", {}).get("color", "#ffffff")
-                    self.text_edit_color = styles.get("QTextEdit", {}).get("color", "#2E3440")
+                    self.bg_color = styles.get("QWidget", {}).get("background-color", "#1d2028")
+                    self.btn_color = styles.get("QPushButton", {}).get("background-color", "#293f85")
+                    self.text_color = styles.get("QPushButton", {}).get("color", "#8eaee5")
+                    self.text_edit_color = styles.get("QTextEdit", {}).get("color", "#ffffff")
+                    self.border_color = styles.get("QPushButton", {}).get("border", "1px solid #293f85").split()[
+                        -1]  # Извлекаем цвет из border
 
                     # Загружаем цвета для меток
                     label_version_color = styles.get("label_version", {}).get("color", self.text_edit_color)
@@ -1901,6 +1874,44 @@ class RelaxWindow(QDialog):
 
         # Воспроизведение аудио
         self.play_obj = sa.play_buffer(audio_data, 1, 2, sample_rate)
+
+
+class CustomInputDialog(QDialog):
+    def __init__(self, title, label, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(title)
+        self.setFixedSize(300, 100)
+
+        # Поле для ввода текста
+        self.input_field = QLineEdit(self)
+        self.input_field.setPlaceholderText(label)
+
+        # Кнопки "ОК" и "Отмена"
+        self.ok_button = QPushButton('Сохранить', self)
+        self.ok_button.clicked.connect(self.accept)
+        self.cancel_button = QPushButton('Закрыть', self)
+        self.cancel_button.clicked.connect(self.reject)  # Закрываем диалог
+
+        # Размещение элементов
+        layout = QVBoxLayout()
+        layout.addWidget(self.input_field)
+        button_layout = QHBoxLayout()
+        button_layout.addWidget(self.ok_button)
+        button_layout.addWidget(self.cancel_button)
+        layout.addLayout(button_layout)
+        self.setLayout(layout)
+
+    def get_text(self):
+        """Возвращает введенный текст."""
+        return self.input_field.text().strip()
+
+    def closeEvent(self, event):
+        """Обрабатывает событие закрытия окна (крестик)."""
+        try:
+            self.reject()  # Закрываем диалог
+            event.accept()  # Подтверждаем закрытие окна
+        except Exception as e:
+            print(f"Ошибка при закрытии диалога: {e}")  # Логируем ошибку
 
 
 # Запуск приложения
