@@ -39,7 +39,61 @@ def open_volume_mixer():
         logger.info("Микшер громкости открыт.")
         audio_paths = get_audio_paths(speaker)
         start_folder = audio_paths.get('start_folder')
-        if start_folder:
-            react(start_folder)
+        react(start_folder)
     except Exception as e:
         logger.error(f"Ошибка при открытии микшера громкости: {e}", exc_info=True)
+
+def open_calc():
+    """ Открывает калькулятор """
+    try:
+        subprocess.Popen(["calc.exe", "/R"])
+        logger.info("Калькулятор открыт")
+        audio_paths = get_audio_paths(speaker)
+        start_folder = audio_paths.get('start_folder')
+        react(start_folder)
+    except Exception as e:
+        logger.error(f"Ошибка при открытии калькулятора {e}", exc_info=True)
+
+def close_calc():
+    """ Закрывает калькулятор """
+    try:
+        subprocess.run(['taskkill', '/IM', 'CalculatorApp.exe', '/F'], check=True)
+        logger.info(f"Процесс успешно завершен.")
+        audio_paths = get_audio_paths(speaker)
+        close_folder = audio_paths['close_folder']
+        react(close_folder)
+    except Exception as e:
+        logger.error(f"Ошибка: {e}")
+
+def open_paint():
+    """ Открывает paint """
+    try:
+        subprocess.Popen("mspaint.exe")
+        logger.info("Paint открыт")
+        audio_paths = get_audio_paths(speaker)
+        start_folder = audio_paths.get('start_folder')
+        react(start_folder)
+    except Exception as e:
+        logger.error(f"Ошибка при открытии paint {e}", exc_info=True)
+
+def close_paint():
+    """ Закрывает paint """
+    try:
+        subprocess.run(['taskkill', '/IM', 'mspaint.exe', '/F'], check=True)
+        logger.info(f"Процесс успешно завершен.")
+        audio_paths = get_audio_paths(speaker)
+        close_folder = audio_paths['close_folder']
+        react(close_folder)
+    except Exception as e:
+        logger.error(f"Ошибка: {e}")
+
+def open_path():
+    try:
+        # Открыть окно "Переменные среды"
+        subprocess.run("rundll32 sysdm.cpl,EditEnvironmentVariables")
+        audio_paths = get_audio_paths(speaker)
+        start_folder = audio_paths.get('start_folder')
+        react(start_folder)
+    except Exception as e:
+        logger.error(f"Ошибка {e}", exc_info=True)
+

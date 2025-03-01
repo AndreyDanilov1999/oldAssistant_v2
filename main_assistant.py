@@ -88,10 +88,12 @@ class Assistant(QWidget):
         self.is_censored = self.load_censored()
         self.censored_thread = None
         self.speaker = self.load_settings()
-        self.assistant_name = self.load_settings_name()
+        self.assistant_name = self.load_settings_name('assistant_name')
+        self.assist_name2 = self.load_settings_name('assist_name2')
+        self.assist_name3 = self.load_settings_name('assist_name3')
         self.audio_paths = get_audio_paths(self.speaker)
         self.MEMORY_LIMIT_MB = 1024
-        self.version = "1.1.3"
+        self.version = "1.1.5"
         self.ps = "Powered by theoldman"
         self.label_version = QLabel(f"Версия: {self.version} {self.ps}", self)
         self.label_message = QLabel('', self)
@@ -377,14 +379,14 @@ class Assistant(QWidget):
 
         return 'johnny'  # Возвращаем значение по умолчанию, если файл не найден или ошибка
 
-    def load_settings_name(self):
+    def load_settings_name(self, assist_name):
         """Загрузка имени ассистента из файла."""
         if os.path.exists(self.settings_file_path):
             try:
                 with open(self.settings_file_path, 'r', encoding='utf-8') as f:
                     settings = json.load(f)
-                    return settings.get('assistant_name',
-                                        'джон')  # Возвращаем значение по умолчанию, если ключ отсутствует
+                    return settings.get(assist_name,
+                                        'джо')  # Возвращаем значение по умолчанию, если ключ отсутствует
             except json.JSONDecodeError:
                 self.logger.error(f"Ошибка: файл {self.settings_file_path} содержит некорректный JSON.")
         else:
@@ -427,6 +429,8 @@ class Assistant(QWidget):
         settings_data = {
             "voice": self.speaker,
             "assistant_name": self.assistant_name,
+            "assist_name2": self.assist_name2,
+            "assist_name3": self.assist_name3,
             "steam_path": self.steam_path,
             "is_censored": self.is_censored
         }
@@ -561,7 +565,7 @@ class Assistant(QWidget):
                     react(censored_folder)
                     continue  # Пропускаем дальнейшую обработку, если обнаружен мат
 
-                if self.assistant_name in text:
+                if self.assistant_name in text or self.assist_name2 in text or self.assist_name3 in text:
                     reaction_triggered = False
                     if 'выключи комп' in text:
                         logger.info("Выключаю компьютер")
@@ -575,6 +579,12 @@ class Assistant(QWidget):
                     elif any(keyword in text for keyword in ['запус', 'откр', 'вкл', 'вруб']):
                         if "микшер" in text:
                             open_volume_mixer()
+                        elif 'калькул' in text:
+                            open_calc()
+                        elif 'pain' in text or 'пэйнт' in text:
+                            open_paint()
+                        elif 'переменные' in text:
+                            open_path()
                         else:
                             app_command_success = self.handle_app_command(text, 'open')
                             folder_command_success = self.handle_folder_command(text, 'open')
@@ -582,12 +592,20 @@ class Assistant(QWidget):
                                 reaction_triggered = True
                     # Обработка команд на закрытие
                     elif any(keyword in text for keyword in ['закр', 'выкл', 'выруб', 'отруб']):
-                        app_command_success = self.handle_app_command(text, 'close')
-                        folder_command_success = self.handle_folder_command(text, 'close')
-                        if not app_command_success and not folder_command_success:
-                            reaction_triggered = True
+                        if 'калькул' in text:
+                            close_calc()
+                        elif 'pain' in text or 'пэйнт' in text:
+                            close_paint()
+                        else:
+                            app_command_success = self.handle_app_command(text, 'close')
+                            folder_command_success = self.handle_folder_command(text, 'close')
+                            if not app_command_success and not folder_command_success:
+                                reaction_triggered = True
                     elif "поищи" in text or 'найди' in text:
-                        query = text.replace("поищи", "").replace("найди", "").replace(self.assistant_name, "").strip()
+                        query = (text.replace("поищи", "").replace("найди", "")
+                                 .replace(self.assistant_name, "")
+                                 .replace(self.assist_name2, "")
+                                 .replace(self.assist_name3, "").strip())
                         approve_folder = self.audio_paths.get('approve_folder')
                         if approve_folder:
                             react(approve_folder)
@@ -613,7 +631,7 @@ class Assistant(QWidget):
                                 react_detail(prorok_sanboy)
 
                 if 'плеер' in text:
-                    if any(keyword in text for keyword in ['пауз', 'вкл', 'вруб', 'отруб', 'выкл']):
+                    if any(keyword in text for keyword in ['пауз', 'пуск', 'пуст', 'вкл', 'вруб', 'отруб', 'выкл']):
                         controller.play_pause()
                         player_folder = self.audio_paths.get('player_folder')
                         react(player_folder)
@@ -754,7 +772,8 @@ class Assistant(QWidget):
     def open_settings(self):
         """Обработка нажатия кнопки 'Настройки'"""
         try:
-            settings_dialog = SettingsDialog(self.speaker, self.assistant_name, self.steam_path,
+            settings_dialog = SettingsDialog(self.speaker, self.assistant_name, self.assist_name2,
+                                             self.assist_name3, self.steam_path,
                                              self)  # Передаем текущий голос и путь к steam.exe
             settings_dialog.voice_changed.connect(self.update_voice)  # Подключаем сигнал
             settings_dialog.exec_()
@@ -905,7 +924,8 @@ class Assistant(QWidget):
 class SettingsDialog(QDialog):
     voice_changed = pyqtSignal(str)  # Сигнал для передачи нового голоса
 
-    def __init__(self, current_voice: str, current_name: str, current_steam_path: str, parent):
+    def __init__(self, current_voice: str, current_name: str, current_name2: str,
+                 current_name3: str, current_steam_path: str, parent):
         """
         Конструктор диалога настроек.
         :param current_voice: Текущий выбранный голос.
@@ -923,12 +943,25 @@ class SettingsDialog(QDialog):
         main_layout.setSpacing(10)
 
         # Поле для ввода имени ассистента
-        name_label = QLabel("Имя ассистента:", self)
+        name_label = QLabel("Основное имя ассистента:", self)
         main_layout.addWidget(name_label, alignment=Qt.AlignLeft)
 
         self.name_input = QLineEdit(self)
         self.name_input.setText(current_name)  # Устанавливаем текущее имя
         main_layout.addWidget(self.name_input)
+
+        # Поле для ввода имени №2
+        name_label = QLabel("Дополнительно:", self)
+        main_layout.addWidget(name_label, alignment=Qt.AlignLeft)
+
+        self.name2_input = QLineEdit(self)
+        self.name2_input.setText(current_name2)  # Устанавливаем текущее имя
+        main_layout.addWidget(self.name2_input)
+
+        # Поле для ввода имени №3
+        self.name3_input = QLineEdit(self)
+        self.name3_input.setText(current_name3)  # Устанавливаем текущее имя
+        main_layout.addWidget(self.name3_input)
 
         label = QLabel("Выберите голос:", self)
         main_layout.addWidget(label, alignment=Qt.AlignLeft)
@@ -1011,6 +1044,9 @@ class SettingsDialog(QDialog):
             QMessageBox.warning(self, "Ошибка", "Имя ассистента не может быть пустым.")
             return
 
+        new_assist_name2 = self.name2_input.text().strip().lower()
+        new_assist_name3 = self.name3_input.text().strip().lower()
+
         new_steam_path = self.steam_path_input.text().strip()  # Убираем лишние пробелы
 
         # Проверяем, существует ли файл steam.exe
@@ -1021,6 +1057,16 @@ class SettingsDialog(QDialog):
         # Проверяем, изменилось ли имя ассистента
         if new_assistant_name != self.parent.assistant_name:
             self.parent.assistant_name = new_assistant_name  # Сохраняем новое имя в родительском классе
+
+        if new_assist_name2 != self.parent.assist_name2:
+            self.parent.assist_name2 = new_assist_name2
+        if new_assist_name2 == '':
+            self.parent.assist_name2 = new_assistant_name
+
+        if new_assist_name3 != self.parent.assist_name3:
+            self.parent.assist_name3 = new_assist_name3
+        if new_assist_name3 == '':
+            self.parent.assist_name3 = new_assistant_name
 
         # Проверяем, изменился ли голос
         if self.current_voice != self.parent.speaker:
