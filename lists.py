@@ -46,6 +46,7 @@ def get_audio_paths(speaker):
     check_file_start = os.path.join(other_folder, 'подожди. проверяю папку с ярлыками.ogg')
     start_rust = os.path.join(other_folder, 'я в раст не пойду.ogg')
     prorok_sanboy = os.path.join(other_folder, 'пророк санбой.ogg')
+    check_volume = os.path.join(approve_folder, 'окей.ogg')
 
     return {
         'what_folder': what_folder,
@@ -69,4 +70,5 @@ def get_audio_paths(speaker):
         'start_rust': start_rust,
         'prorok_sanboy': prorok_sanboy,
         'censored_folder': censored_folder,
+        'check_volume': check_volume,
     }

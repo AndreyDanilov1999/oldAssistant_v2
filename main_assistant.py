@@ -19,18 +19,20 @@ import simpleaudio as sa
 import numpy as np
 import threading
 import pyaudio
-from PyQt5.QtGui import QIcon, QColor
+from PyQt5.QtGui import QIcon, QColor, QDesktopServices
 from PyQt5.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout, \
                              QPushButton, QCheckBox, QSystemTrayIcon, QAction, qApp, QMenu, QMessageBox, \
                              QTextEdit, QDialog, QLabel, QComboBox, QLineEdit, QListWidget, QListWidgetItem, \
                              QFileDialog, QColorDialog, QSlider)
-from PyQt5.QtCore import Qt, QFileSystemWatcher, QTimer, QEvent, pyqtSignal
+from PyQt5.QtCore import Qt, QFileSystemWatcher, QTimer, QEvent, pyqtSignal, QUrl
 import subprocess
 from script_audio import controller
 from speak_functions import react, react_detail
 from logging_config import logger
 from lists import get_audio_paths
 from vosk import Model, KaldiRecognizer
+
+from test_files.test import ClickableLabel
 
 speakers = dict(Пласид='placide', Бестия='rogue', Джонни='johnny', Санбой='sanboy', Тигрица='tigress')
 
@@ -83,6 +85,7 @@ class Assistant(QWidget):
         self.default_preset_style = os.path.join(self.get_base_directory(), 'user_settings', 'presets', 'default.json')
         self.last_position = 0
         self.steam_path = self.load_steam_path()
+        self.volume_assist = self.load_volume_assist()
         self.is_assistant_running = False
         self.assistant_thread = None
         self.is_censored = self.load_censored()
@@ -93,7 +96,7 @@ class Assistant(QWidget):
         self.assist_name3 = self.load_settings_name('assist_name3')
         self.audio_paths = get_audio_paths(self.speaker)
         self.MEMORY_LIMIT_MB = 1024
-        self.version = "1.1.5"
+        self.version = "1.1.6"
         self.ps = "Powered by theoldman"
         self.label_version = QLabel(f"Версия: {self.version} {self.ps}", self)
         self.label_message = QLabel('', self)
@@ -186,6 +189,15 @@ class Assistant(QWidget):
         # Добавляем растяжку, чтобы кнопки были вверху
         left_layout.addStretch()
 
+        # Создаем обычный QLabel
+        url = "https://disk.yandex.ru/d/YG4jcxkh8wjJCA"  # Ваш URL
+        self.url_label = QLabel("Все версии тут", self)
+        self.url_label.setCursor(Qt.PointingHandCursor)  # Меняем курсор на "руку"
+
+        # Подключаем обработчик клика
+        self.url_label.mousePressEvent = lambda event: self.open_url(event, url)
+        left_layout.addWidget(self.url_label)
+
         left_layout.addWidget(self.label_version)
 
         # Правая часть (поле для логов)
@@ -216,6 +228,12 @@ class Assistant(QWidget):
         self.timer = QTimer()
         self.timer.timeout.connect(self.check_for_updates)
         self.timer.start(1000)  # Проверка каждую секунду
+
+    def open_url(self, event, url):
+        # Открываем URL в браузере
+        QDesktopServices.openUrl(QUrl(url))
+        # Вызываем родительский метод, чтобы Qt мог обработать событие
+        QLabel.mousePressEvent(self.url_label, event)
 
     def init_logger(self):
         """Инициализация логгера."""
@@ -327,6 +345,9 @@ class Assistant(QWidget):
         if 'label_message' in self.styles:
             self.label_message.setStyleSheet(self.format_style(self.styles['label_message']))
 
+        if 'url_label' in self.styles:
+            self.url_label.setStyleSheet(self.format_style(self.styles['url_label']))
+
     def format_style(self, style_dict):
         """Форматируем словарь стиля в строку для setStyleSheet"""
         return '; '.join(f"{key}: {value}" for key, value in style_dict.items())
@@ -409,6 +430,19 @@ class Assistant(QWidget):
 
         return ''  # Возвращаем значение по умолчанию, если файл не найден или ошибка
 
+    def load_volume_assist(self):
+        """Загрузка громкости ассистента из файла."""
+        if os.path.exists(self.settings_file_path):
+            try:
+                with open(self.settings_file_path, 'r', encoding='utf-8') as f:
+                    settings = json.load(f)
+                    return settings.get('volume_assist', 0.2)  # Возвращаем значение по умолчанию, если ключ отсутствует
+            except json.JSONDecodeError:
+                self.logger.error(f"Ошибка: файл {self.settings_file_path} содержит некорректный JSON.")
+        else:
+            self.logger.error(f"Файл настроек {self.settings_file_path} не найден.")
+        return 0.2
+
     def load_censored(self):
         """Загрузка состояния цензуры из файла."""
         if os.path.exists(self.settings_file_path):
@@ -432,7 +466,8 @@ class Assistant(QWidget):
             "assist_name2": self.assist_name2,
             "assist_name3": self.assist_name3,
             "steam_path": self.steam_path,
-            "is_censored": self.is_censored
+            "is_censored": self.is_censored,
+            "volume_assist": self.volume_assist
         }
         with open(settings_file, 'w', encoding='utf-8') as file:
             json.dump(settings_data, file, ensure_ascii=False, indent=4)
@@ -631,15 +666,16 @@ class Assistant(QWidget):
                                 react_detail(prorok_sanboy)
 
                 if 'плеер' in text:
-                    if any(keyword in text for keyword in ['пауз', 'пуск', 'пуст', 'вкл', 'вруб', 'отруб', 'выкл']):
+                    if any(keyword in text for keyword in
+                           ['пауз', 'пуск', 'пуст', 'вкл', 'вруб', 'отруб', 'выкл', 'стоп']):
                         controller.play_pause()
                         player_folder = self.audio_paths.get('player_folder')
                         react(player_folder)
-                    elif "след" in text:
+                    elif any(keyword in text for keyword in ['след', 'впер', 'дальш', 'перекл']):
                         controller.next_track()
                         player_folder = self.audio_paths.get('player_folder')
                         react(player_folder)
-                    elif "пред" in text:
+                    elif any(keyword in text for keyword in ['пред', 'назад']):
                         controller.previous_track()
                         player_folder = self.audio_paths.get('player_folder')
                         react(player_folder)
@@ -773,7 +809,7 @@ class Assistant(QWidget):
         """Обработка нажатия кнопки 'Настройки'"""
         try:
             settings_dialog = SettingsDialog(self.speaker, self.assistant_name, self.assist_name2,
-                                             self.assist_name3, self.steam_path,
+                                             self.assist_name3, self.steam_path, self.volume_assist,
                                              self)  # Передаем текущий голос и путь к steam.exe
             settings_dialog.voice_changed.connect(self.update_voice)  # Подключаем сигнал
             settings_dialog.exec_()
@@ -925,7 +961,7 @@ class SettingsDialog(QDialog):
     voice_changed = pyqtSignal(str)  # Сигнал для передачи нового голоса
 
     def __init__(self, current_voice: str, current_name: str, current_name2: str,
-                 current_name3: str, current_steam_path: str, parent):
+                 current_name3: str, current_steam_path: str, current_volume: int, parent):
         """
         Конструктор диалога настроек.
         :param current_voice: Текущий выбранный голос.
@@ -936,7 +972,7 @@ class SettingsDialog(QDialog):
         super().__init__(parent)
         self.parent = parent
         self.setWindowTitle("Настройки")
-        self.setFixedSize(300, 400)
+        self.setFixedSize(300, 500)
 
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(10, 10, 10, 10)
@@ -981,6 +1017,20 @@ class SettingsDialog(QDialog):
         # Подключаем сигнал изменения выбора
         self.voice_combo.currentIndexChanged.connect(self.on_voice_change)
 
+        self.volume_label = QLabel("Громкость ассистента", self)
+        main_layout.addWidget(self.volume_label, alignment=Qt.AlignLeft)
+
+        self.volume = QSlider(Qt.Horizontal, self)
+        self.volume.setMinimum(0)  # Минимальное значение
+        self.volume.setMaximum(100)  # Максимальное значение
+        self.volume.setValue(int(current_volume * 100))
+        self.volume.setTickInterval(10)  # Интервал для отметок
+        self.volume.setSingleStep(5)  # Шаг при перемещении ползунка
+
+        # Подключение сигнала изменения значения ползунка к слоту
+        self.volume.valueChanged.connect(self.update_volume)
+        main_layout.addWidget(self.volume)
+
         # Поле для выбора пути к steam.exe
         self.steam_label = QLabel("Укажите полный путь к файлу steam.exe", self)
         main_layout.addWidget(self.steam_label, alignment=Qt.AlignLeft)
@@ -1006,6 +1056,10 @@ class SettingsDialog(QDialog):
         close_button.clicked.connect(self.apply_settings)
         main_layout.addWidget(close_button)
         main_layout.setAlignment(close_button, Qt.AlignBottom)
+
+    def update_volume(self, value):
+        normalized_value = value / 100.0  # Нормализация значения от 0 до 1
+        self.parent.volume_assist = normalized_value
 
     def toggle_censor(self):
         """Включение или отключение реакции на мат"""
@@ -1654,6 +1708,10 @@ class ColorSettingsWindow(QDialog):
                     "color": self.text_edit_color,
                     "font-size": "10px"
                 },
+                "url_label": {
+                    "color": self.text_edit_color,
+                    "font-size": "12px"
+                },
                 "label_message": {
                     "color": self.text_color,
                     "font-size": "13px"
@@ -1728,6 +1786,10 @@ class ColorSettingsWindow(QDialog):
                 "label_version": {
                     "color": self.text_color,
                     "font-size": "10px"
+                },
+                "url_label": {
+                    "color": self.text_color,
+                    "font-size": "12px"
                 },
                 "label_message": {
                     "color": self.text_edit_color,

@@ -1,3 +1,4 @@
+import json
 import sys
 import os
 import random
@@ -29,13 +30,25 @@ def get_base_directory():
 
 pygame.mixer.init()
 
+def load_volume_assist():
+    settings_file_path = os.path.join(get_base_directory(), 'user_settings', 'settings.json')
+    if os.path.exists(settings_file_path):
+        try:
+            with open(settings_file_path, 'r', encoding='utf-8') as f:
+                settings = json.load(f)
+                return settings.get('volume_assist', 0.2)  # Возвращаем значение по умолчанию, если ключ отсутствует
+        except json.JSONDecodeError:
+            logger.error(f"Ошибка: файл {settings_file_path} содержит некорректный JSON.")
+    else:
+        logger.error(f"Файл настроек {settings_file_path} не найден.")
+    return 0.2
 
-def react(folder_path, volume_reduction_factor=0.2):
+def react(folder_path):
     """
     Воспроизводит случайный аудиофайл из указанной папки.
     :param folder_path: Путь к папке с аудиофайлами.
-    :param volume_reduction_factor: Коэффициент уменьшения громкости (по умолчанию 0.2).
     """
+    volume_reduction_factor = load_volume_assist()  # Загружаем из файла настроек значение громкости
     try:
         # Получение списка файлов в папке
         audio_files = [os.path.join(folder_path, f) for f in os.listdir(folder_path) if f.endswith('.ogg')]
@@ -62,12 +75,12 @@ def react(folder_path, volume_reduction_factor=0.2):
         logger.error(f"Ошибка при воспроизведении аудио: {e}")
 
 
-def react_detail(file_path, volume_reduction_factor=0.2):
+def react_detail(file_path):
     """
     Воспроизводит указанный аудиофайл.
     :param file_path: Путь к аудиофайлу.
-    :param volume_reduction_factor: Коэффициент уменьшения громкости (по умолчанию 0.2).
     """
+    volume_reduction_factor = load_volume_assist()  # Загружаем из файла настроек значение громкости
     try:
         file_name = os.path.basename(file_path)[:-4]
         logger.info(f"Ответ ассистента: {file_name}")

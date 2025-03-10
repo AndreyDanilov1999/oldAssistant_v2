@@ -315,13 +315,13 @@ def open_url_link(game_id_or_url, filename):
             # Проверяем, есть ли уже сохраненные процессы для этой игры
             existing_processes = get_process_names_from_file(filename)
             audio_paths = get_audio_paths(speaker)
-            start_folder = audio_paths['start_folder']
-            react(start_folder)
             logger.info(f"Запуск {filename} через Epic Games Launcher")
             if existing_processes:
                 logger.info(f"Используем существующие процессы для игры '{filename}': {existing_processes}")
                 # Открываем URL через стандартный механизм
                 subprocess.Popen(["start", game_id_or_url], shell=True)
+                start_folder = audio_paths['start_folder']
+                react(start_folder)
             else:
                 audio_paths = get_audio_paths(speaker)
                 wait_load_file = audio_paths['wait_load_file']
@@ -351,8 +351,6 @@ def open_url_link(game_id_or_url, filename):
             # Проверяем, есть ли уже сохраненные процессы для этой игры
             existing_processes = get_process_names_from_file(filename)
             audio_paths = get_audio_paths(speaker)
-            start_folder = audio_paths['start_folder']
-            react(start_folder)
             if existing_processes:
                 logger.info(f"Используем существующие процессы для игры '{filename}': {existing_processes}")
                 if game_id_or_url == '252490' and speaker == 'sanboy':
@@ -360,6 +358,8 @@ def open_url_link(game_id_or_url, filename):
                     react_detail(start_rust)
                 # Запускаем игру через Steam
                 subprocess.Popen([steam_path, '-applaunch', game_id_or_url], shell=True)
+                start_folder = audio_paths['start_folder']
+                react(start_folder)
             else:
                 audio_paths = get_audio_paths(speaker)
                 wait_load_file = audio_paths['wait_load_file']
@@ -369,7 +369,7 @@ def open_url_link(game_id_or_url, filename):
                 # Запускаем игру через Steam
                 subprocess.Popen([steam_path, '-applaunch', game_id_or_url], shell=True)
                 # Ждем несколько секунд, чтобы процесс успел запуститься
-                time.sleep(20)
+                time.sleep(40)
                 # Собираем процессы после запуска
                 after_processes = get_all_processes()
                 # Находим все новые процессы
@@ -420,7 +420,7 @@ def open_link(filename, target_path):
             subprocess.Popen([target_path], shell=True)
 
             # Ждем несколько секунд, чтобы процессы успели запуститься
-            time.sleep(20)
+            time.sleep(40)
 
             # Собираем процессы после запуска
             after_processes = get_all_processes()
