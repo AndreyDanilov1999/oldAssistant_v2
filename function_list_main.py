@@ -1,13 +1,13 @@
 """
 Модуль с основными функциями: поиск в яндекс, выключение компа
 """
+from datetime import datetime
 from lists import get_audio_paths
 from func_list import get_current_speaker, get_base_directory
 import os
 from logging_config import logger
 import subprocess
 import webbrowser
-import pygetwindow as gw
 from speak_functions import react_detail, react
 
 settings_file = os.path.join(get_base_directory(), 'user_settings', "settings.json")  # Полный путь к файлу настроек
@@ -96,4 +96,19 @@ def open_path():
         react(start_folder)
     except Exception as e:
         logger.error(f"Ошибка {e}", exc_info=True)
+
+def greeting():
+    # Получаем текущий час
+    current_hour = datetime.now().hour
+
+    # Получаем пути к аудиофайлам один раз
+    audio_paths = get_audio_paths(speaker)
+
+    # Определяем, какое приветствие воспроизвести
+    if 4 <= current_hour < 11:
+        react_detail(audio_paths['morning_greet'])
+    elif 11 <= current_hour < 18:
+        react(audio_paths['start_greet_folder'])
+    else:
+        react_detail(audio_paths['evening_greet'])
 

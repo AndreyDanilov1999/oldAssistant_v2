@@ -27,7 +27,8 @@ def get_audio_paths(speaker):
     start_folder = os.path.join(base_path_to, 'start')
     approve_folder = os.path.join(base_path_to, 'approve')
     close_folder = os.path.join(base_path_to, 'close')
-    start_greet_folder = os.path.join(base_path_to, 'start_greet')
+    start_greet_folder = os.path.join(base_path_to, 'start_greet', 'other')
+    greet_folder = os.path.join(base_path_to, 'start_greet')
     other_folder = os.path.join(base_path_to, 'other')
     echo_folder = os.path.join(base_path_to, 'echo')
     close_assist_folder = os.path.join(base_path_to, 'close_assist')
@@ -35,6 +36,8 @@ def get_audio_paths(speaker):
     censored_folder = os.path.join(base_path_to, 'censored')
 
     # Пути к файлам
+    morning_greet = os.path.join(greet_folder, 'с добрым утром.ogg')
+    evening_greet = os.path.join(greet_folder, 'добрый вечер.ogg')
     error_file = os.path.join(other_folder, 'произошла ошибка.ogg')
     off_file = os.path.join(other_folder, 'выключаю комп.ogg')
     del_file = os.path.join(other_folder, 'файл удален.ogg')
@@ -46,7 +49,7 @@ def get_audio_paths(speaker):
     check_file_start = os.path.join(other_folder, 'подожди. проверяю папку с ярлыками.ogg')
     start_rust = os.path.join(other_folder, 'я в раст не пойду.ogg')
     prorok_sanboy = os.path.join(other_folder, 'пророк санбой.ogg')
-    check_volume = os.path.join(approve_folder, 'окей.ogg')
+    update_button = os.path.join(other_folder, 'еще не готово.ogg')
 
     return {
         'what_folder': what_folder,
@@ -70,5 +73,7 @@ def get_audio_paths(speaker):
         'start_rust': start_rust,
         'prorok_sanboy': prorok_sanboy,
         'censored_folder': censored_folder,
-        'check_volume': check_volume,
+        'update_button': update_button,
+        'morning_greet': morning_greet,
+        'evening_greet': evening_greet,
     }

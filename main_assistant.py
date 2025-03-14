@@ -9,8 +9,12 @@ import json
 import logging
 import os.path
 import random
+import shutil
 import sys
+import time
 import traceback
+import requests
+from packaging import version
 import psutil
 import winsound
 from func_list import search_links, handler_links, handler_folder
@@ -19,12 +23,12 @@ import simpleaudio as sa
 import numpy as np
 import threading
 import pyaudio
-from PyQt5.QtGui import QIcon, QColor, QDesktopServices
+from PyQt5.QtGui import QIcon, QColor, QDesktopServices, QCursor
 from PyQt5.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout, \
                              QPushButton, QCheckBox, QSystemTrayIcon, QAction, qApp, QMenu, QMessageBox, \
                              QTextEdit, QDialog, QLabel, QComboBox, QLineEdit, QListWidget, QListWidgetItem, \
                              QFileDialog, QColorDialog, QSlider)
-from PyQt5.QtCore import Qt, QFileSystemWatcher, QTimer, QEvent, pyqtSignal, QUrl
+from PyQt5.QtCore import Qt, QFileSystemWatcher, QTimer, QEvent, pyqtSignal, QUrl, QSettings, QThread
 import subprocess
 from script_audio import controller
 from speak_functions import react, react_detail
@@ -32,10 +36,11 @@ from logging_config import logger
 from lists import get_audio_paths
 from vosk import Model, KaldiRecognizer
 
-from test_files.test import ClickableLabel
+speakers = dict(Пласид='placide', Бестия='rogue', Джонни='johnny',
+                Санбой='sanboy', Тигрица='tigress', Стейтем='stathem')
 
-speakers = dict(Пласид='placide', Бестия='rogue', Джонни='johnny', Санбой='sanboy', Тигрица='tigress')
-
+# Сырая ссылка на version.txt в GitHub
+VERSION_FILE_URL = "https://raw.githubusercontent.com/AndreyDanilov1999/oldAssistant_v2/refs/heads/master/version.txt"
 
 class Assistant(QWidget):
     """
@@ -71,6 +76,7 @@ class Assistant(QWidget):
 
     def __init__(self):
         super().__init__()
+        self.latest_version_url = None
         self.relax_button = None
         self.open_folder_button = None
         self.autostart_checkbox = None
@@ -80,23 +86,26 @@ class Assistant(QWidget):
         self.log_file_path = os.path.join(self.get_base_directory(), 'assistant.log')
         self.init_logger()
         self.settings_file_path = os.path.join(self.get_base_directory(), 'user_settings', 'settings.json')
+        self.update_settings(self.settings_file_path)
+        self.settings = self.load_settings()
         self.color_settings_path = os.path.join(self.get_base_directory(), 'user_settings', 'color_settings.json')
         self.commands = self.load_commands(os.path.join(self.get_base_directory(), 'user_settings', 'commands.json'))
         self.default_preset_style = os.path.join(self.get_base_directory(), 'user_settings', 'presets', 'default.json')
         self.last_position = 0
-        self.steam_path = self.load_steam_path()
-        self.volume_assist = self.load_volume_assist()
+        self.steam_path = self.settings.get('steam_path', '')  # значение по умолчанию, если ключ отсутствует
+        self.volume_assist = self.settings.get('volume_assist', 0.2)  # значение по умолчанию, если ключ отсутствует
         self.is_assistant_running = False
+        self.show_upd_msg = self.settings.get("show_upd_msg", False)  # Значение по умолчанию: False
         self.assistant_thread = None
-        self.is_censored = self.load_censored()
+        self.is_censored = self.settings.get('is_censored', False)  # значение по умолчанию, если ключ отсутствует
         self.censored_thread = None
-        self.speaker = self.load_settings()
-        self.assistant_name = self.load_settings_name('assistant_name')
-        self.assist_name2 = self.load_settings_name('assist_name2')
-        self.assist_name3 = self.load_settings_name('assist_name3')
+        self.speaker = self.settings.get("voice", "johnny")
+        self.assistant_name = self.settings.get('assistant_name', "джо")
+        self.assist_name2 = self.settings.get('assist_name2', "джо")
+        self.assist_name3 = self.settings.get('assist_name3', "джо")
         self.audio_paths = get_audio_paths(self.speaker)
         self.MEMORY_LIMIT_MB = 1024
-        self.version = "1.1.6"
+        self.version = "1.2.0"
         self.ps = "Powered by theoldman"
         self.label_version = QLabel(f"Версия: {self.version} {self.ps}", self)
         self.label_message = QLabel('', self)
@@ -108,6 +117,7 @@ class Assistant(QWidget):
         self.check_autostart()
         self.hide()
         self.run_assist()
+        self.check_for_updates_app()
 
     def initui(self):
         """Инициализация пользовательского интерфейса."""
@@ -189,14 +199,15 @@ class Assistant(QWidget):
         # Добавляем растяжку, чтобы кнопки были вверху
         left_layout.addStretch()
 
-        # Создаем обычный QLabel
-        url = "https://disk.yandex.ru/d/YG4jcxkh8wjJCA"  # Ваш URL
-        self.url_label = QLabel("Все версии тут", self)
-        self.url_label.setCursor(Qt.PointingHandCursor)  # Меняем курсор на "руку"
+        # Текст "Доступна новая версия"
+        self.update_label = QLabel("")
+        self.update_label.setCursor(QCursor(Qt.PointingHandCursor))  # Курсор в виде руки
+        self.update_label.mousePressEvent = self.open_download_link  # Обработка клика
+        left_layout.addWidget(self.update_label)
 
-        # Подключаем обработчик клика
-        self.url_label.mousePressEvent = lambda event: self.open_url(event, url)
-        left_layout.addWidget(self.url_label)
+        self.update_button = QPushButton("Установить обновление")
+        self.update_button.clicked.connect(self.update_app)
+        left_layout.addWidget(self.update_button)
 
         left_layout.addWidget(self.label_version)
 
@@ -213,7 +224,7 @@ class Assistant(QWidget):
 
         # Настройки окна
         self.setWindowTitle("Виртуальный помощник")
-        self.setGeometry(600, 300, 800, 500)
+        self.setGeometry(500, 250, 900, 600)
 
         # Установка иконки для окна
         self.setWindowIcon(QIcon(os.path.join(self.get_base_directory(), 'icon_assist.ico')))
@@ -229,11 +240,91 @@ class Assistant(QWidget):
         self.timer.timeout.connect(self.check_for_updates)
         self.timer.start(1000)  # Проверка каждую секунду
 
-    def open_url(self, event, url):
-        # Открываем URL в браузере
-        QDesktopServices.openUrl(QUrl(url))
-        # Вызываем родительский метод, чтобы Qt мог обработать событие
-        QLabel.mousePressEvent(self.url_label, event)
+    def open_download_link(self, event):
+        """Открывает ссылку на скачивание при клике на текст."""
+        if self.update_label.text() == "Установлена последняя версия":
+            audio_paths = self.audio_paths
+            update_button = audio_paths.get('update_button')
+            react_detail(update_button)
+        else:
+            # Проверяем, есть ли ссылка
+            if self.latest_version_url:
+                webbrowser.open(self.latest_version_url)
+
+    def check_for_updates_app(self):
+        try:
+            # Скачиваем файл с версией
+            response = requests.get(VERSION_FILE_URL)
+            response.raise_for_status()  # Проверяем, что запрос успешен
+
+            # Читаем содержимое файла
+            content = response.text.strip()
+            self.logger.info(f"Содержимое version.txt: {content}")
+
+            # Разделяем содержимое на версию и ссылку
+            parts = content.split()
+            if len(parts) != 2:
+                raise ValueError("Некорректный формат version.txt")
+
+            latest_version, latest_version_url = parts
+
+            # Сохраняем ссылку на последнюю версию
+            self.latest_version_url = latest_version_url
+
+            # Проверяем, что полученное значение является валидным номером версии
+            if not version.parse(latest_version):
+                raise ValueError("Invalid version format")
+
+            # Сравниваем текущую версию с последней версией
+            if version.parse(latest_version) > version.parse(self.version):
+                self.update_label.setText("Доступна новая версия")
+                # Проверяем, нужно ли показывать всплывающее окно
+                if self.settings.get("show_upd_msg", True):
+                    # Показываем всплывающее окно с чекбоксом
+                    self.show_popup(latest_version)
+            else:
+                self.update_label.setText("Установлена последняя версия")
+
+        except requests.RequestException as e:
+            self.logger.error(f"Не удалось проверить обновления: {e}")
+        except ValueError as e:
+            self.logger.error(f"Ошибка в формате version.txt: {e}")
+        except Exception as e:
+            self.logger.error(f"Произошла ошибка: {e}")
+
+    def show_popup(self, latest_version):
+        """Показывает всплывающее окно с чекбоксом 'Не показывать снова'."""
+        msg_box = QMessageBox(self)
+        msg_box.setWindowTitle("Доступна новая версия")
+        msg_box.setText(f"Последняя версия: {latest_version}. Установить?")
+
+        # Добавляем чекбокс "Не показывать снова"
+        checkbox = QCheckBox("Не показывать", msg_box)
+        msg_box.setCheckBox(checkbox)
+
+        # Кнопки "Да" и "Нет"
+        msg_box.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+        msg_box.button(QMessageBox.Yes).setText("Да")
+        msg_box.button(QMessageBox.No).setText("Нет")
+
+        # Применяем стили к кнопкам
+        yes_button = msg_box.button(QMessageBox.Yes)
+        no_button = msg_box.button(QMessageBox.No)
+
+        yes_button.setStyleSheet("padding: 1px 10px;")
+        no_button.setStyleSheet("padding: 1px 10px;")
+
+        # Показываем окно и ждём ответа
+        reply = msg_box.exec_()
+
+        # Если пользователь нажал "Скачать", открываем ссылку
+        if reply == QMessageBox.Yes:
+            webbrowser.open(self.latest_version_url)
+
+        # Если чекбокс отмечен, сохраняем настройку в JSON
+        if checkbox.isChecked():
+            self.show_upd_msg = False
+            self.save_settings()
 
     def init_logger(self):
         """Инициализация логгера."""
@@ -345,8 +436,8 @@ class Assistant(QWidget):
         if 'label_message' in self.styles:
             self.label_message.setStyleSheet(self.format_style(self.styles['label_message']))
 
-        if 'url_label' in self.styles:
-            self.url_label.setStyleSheet(self.format_style(self.styles['url_label']))
+        if 'update_label' in self.styles:
+            self.update_label.setStyleSheet(self.format_style(self.styles['update_label']))
 
     def format_style(self, style_dict):
         """Форматируем словарь стиля в строку для setStyleSheet"""
@@ -387,79 +478,15 @@ class Assistant(QWidget):
             return {}  # Возвращаем пустой словарь при других ошибках
 
     def load_settings(self):
-        """Загрузка настроек из файла."""
-        if os.path.exists(self.settings_file_path):
-            try:
-                with open(self.settings_file_path, 'r', encoding='utf-8') as f:
-                    settings = json.load(f)
-                    return settings.get('voice', 'johnny')  # Возвращаем значение по умолчанию, если ключ отсутствует
-            except json.JSONDecodeError:
-                self.logger.error(f"Ошибка: файл {self.settings_file_path} содержит некорректный JSON.")
-        else:
-            self.logger.error(f"Файл настроек {self.settings_file_path} не найден.")
-
-        return 'johnny'  # Возвращаем значение по умолчанию, если файл не найден или ошибка
-
-    def load_settings_name(self, assist_name):
-        """Загрузка имени ассистента из файла."""
-        if os.path.exists(self.settings_file_path):
-            try:
-                with open(self.settings_file_path, 'r', encoding='utf-8') as f:
-                    settings = json.load(f)
-                    return settings.get(assist_name,
-                                        'джо')  # Возвращаем значение по умолчанию, если ключ отсутствует
-            except json.JSONDecodeError:
-                self.logger.error(f"Ошибка: файл {self.settings_file_path} содержит некорректный JSON.")
-        else:
-            self.logger.error(f"Файл настроек {self.settings_file_path} не найден.")
-
-        return 'джо'  # Возвращаем значение по умолчанию, если файл не найден или ошибка
-
-    def load_steam_path(self):
-        """Загрузка пути steam.exe из файла."""
-        if os.path.exists(self.settings_file_path):
-            try:
-                with open(self.settings_file_path, 'r', encoding='utf-8') as f:
-                    settings = json.load(f)
-                    return settings.get('steam_path',
-                                        '')  # Возвращаем значение по умолчанию, если ключ отсутствует
-            except json.JSONDecodeError:
-                self.logger.error(f"Ошибка: файл {self.settings_file_path} содержит некорректный JSON.")
-        else:
-            self.logger.error(f"Файл настроек {self.settings_file_path} не найден.")
-
-        return ''  # Возвращаем значение по умолчанию, если файл не найден или ошибка
-
-    def load_volume_assist(self):
-        """Загрузка громкости ассистента из файла."""
-        if os.path.exists(self.settings_file_path):
-            try:
-                with open(self.settings_file_path, 'r', encoding='utf-8') as f:
-                    settings = json.load(f)
-                    return settings.get('volume_assist', 0.2)  # Возвращаем значение по умолчанию, если ключ отсутствует
-            except json.JSONDecodeError:
-                self.logger.error(f"Ошибка: файл {self.settings_file_path} содержит некорректный JSON.")
-        else:
-            self.logger.error(f"Файл настроек {self.settings_file_path} не найден.")
-        return 0.2
-
-    def load_censored(self):
-        """Загрузка состояния цензуры из файла."""
-        if os.path.exists(self.settings_file_path):
-            try:
-                with open(self.settings_file_path, 'r', encoding='utf-8') as f:
-                    settings = json.load(f)
-                    return settings.get('is_censored', False)  # Возвращаем значение по умолчанию, если ключ отсутствует
-            except json.JSONDecodeError:
-                self.logger.error(f"Ошибка: файл {self.settings_file_path} содержит некорректный JSON.")
-        else:
-            self.logger.error(f"Файл настроек {self.settings_file_path} не найден.")
-
-        return False  # Возвращаем значение по умолчанию, если файл не найден или ошибка
+        """Загружает настройки из settings.json."""
+        try:
+            with open(self.settings_file_path, 'r', encoding='utf-8') as file:
+                return json.load(file)
+        except (FileNotFoundError, json.JSONDecodeError):
+            return {}  # Если файл не найден или повреждён, возвращаем пустой словарь
 
     def save_settings(self):
         """Сохраняет настройки в файл settings.json."""
-        settings_file = os.path.join(self.get_base_directory(), 'user_settings', 'settings.json')
         settings_data = {
             "voice": self.speaker,
             "assistant_name": self.assistant_name,
@@ -467,11 +494,62 @@ class Assistant(QWidget):
             "assist_name3": self.assist_name3,
             "steam_path": self.steam_path,
             "is_censored": self.is_censored,
-            "volume_assist": self.volume_assist
+            "volume_assist": self.volume_assist,
+            "show_upd_msg": self.show_upd_msg
         }
-        with open(settings_file, 'w', encoding='utf-8') as file:
-            json.dump(settings_data, file, ensure_ascii=False, indent=4)
-        logger.info("Настройки сохранены.")
+        try:
+            # Проверяем, существует ли папка user_settings
+            os.makedirs(os.path.dirname(self.settings_file_path), exist_ok=True)
+
+            # Сохраняем настройки в файл
+            with open(self.settings_file_path, 'w', encoding='utf-8') as file:
+                json.dump(settings_data, file, ensure_ascii=False, indent=4)
+
+            logger.info("Настройки сохранены.")
+        except Exception as e:
+            logger.error(f"Ошибка при сохранении настроек: {e}")
+            raise  # Повторно выбрасываем исключение, если нужно
+
+    def update_settings(self, settings_file, default_settings=None):
+        """
+        Проверяет файл настроек на наличие ключей из default_settings.
+        Если ключ отсутствует, добавляет его со значением по умолчанию.
+        """
+        if default_settings is None:
+            default_settings = {
+                "voice": "johnny",
+                "assistant_name": "джо",
+                "assist_name2": "джо",
+                "assist_name3": "джо",
+                "steam_path": "D:/Steam/steam.exe",
+                "is_censored": True,
+                "volume_assist": 0.2,
+                "show_upd_msg": True
+            }
+
+        # Загружаем текущие настройки
+        if os.path.exists(settings_file):
+            with open(settings_file, "r", encoding="utf-8") as file:
+                try:
+                    settings = json.load(file)
+                except json.JSONDecodeError:
+                    settings = {}
+        else:
+            settings = {}
+
+        # Обновляем настройки, если ключи отсутствуют
+        updated = False
+        for key, value in default_settings.items():
+            if key not in settings:
+                settings[key] = value
+                updated = True
+
+        # Сохраняем обновленные настройки, если они изменились
+        if updated:
+            with open(settings_file, "w", encoding="utf-8") as file:
+                json.dump(settings, file, ensure_ascii=False, indent=4)
+
+        return settings
 
     def on_tray_icon_activated(self, reason):
         """Обработка активации иконки в трее."""
@@ -575,9 +653,7 @@ class Assistant(QWidget):
 
     def run_script(self):
         """Основной цикл ассистента"""
-        start_greet_folder = self.audio_paths.get('start_greet_folder')
-        if start_greet_folder:
-            react(start_greet_folder)
+        greeting()
 
         if not self.initialize_audio():
             return  # Если инициализация не удалась, завершаем выполнение
@@ -843,6 +919,11 @@ class Assistant(QWidget):
         dialog = RelaxWindow(self)
         dialog.exec_()
 
+    def update_app(self):
+        """Обработка нажатия кнопки Установить обновление"""
+        dialog = UpdateApp(self)
+        dialog.main()
+
     def update_voice(self, new_voice):
         """Обновление голоса и путей к аудиофайлам"""
         self.speaker = new_voice
@@ -971,6 +1052,7 @@ class SettingsDialog(QDialog):
         """
         super().__init__(parent)
         self.parent = parent
+        self.settings = QSettings("MyCompany", "MyApp")  # Инициализация настроек
         self.setWindowTitle("Настройки")
         self.setFixedSize(300, 500)
 
@@ -1049,6 +1131,12 @@ class SettingsDialog(QDialog):
         self.censor_check.stateChanged.connect(self.toggle_censor)
         main_layout.addWidget(self.censor_check)
 
+        # Чекбокс "Уведомлять о новой версии"
+        self.update_check = QCheckBox("Уведомлять о новой версии")
+        self.update_check.setChecked(self.parent.show_upd_msg)  # Устанавливаем состояние из JSON
+        self.update_check.stateChanged.connect(self.toggle_update)
+        main_layout.addWidget(self.update_check)
+
         main_layout.addStretch()
 
         # Кнопка для закрытия настроек
@@ -1064,6 +1152,10 @@ class SettingsDialog(QDialog):
     def toggle_censor(self):
         """Включение или отключение реакции на мат"""
         self.parent.is_censored = self.censor_check.isChecked()
+
+    def toggle_update(self):
+        """Обработка изменения состояния чекбокса."""
+        self.parent.show_upd_msg = self.update_check.isChecked()
 
     def select_steam_file(self):
         """Открывает диалог для выбора файла steam.exe."""
@@ -1708,13 +1800,13 @@ class ColorSettingsWindow(QDialog):
                     "color": self.text_edit_color,
                     "font-size": "10px"
                 },
-                "url_label": {
-                    "color": self.text_edit_color,
-                    "font-size": "12px"
-                },
                 "label_message": {
                     "color": self.text_color,
                     "font-size": "13px"
+                },
+                "update_label": {
+                    "color": self.text_edit_color,
+                    "font-size": "12px"
                 }
             }
             self.save_color_settings(new_styles)  # Сохранение в файл
@@ -1787,13 +1879,13 @@ class ColorSettingsWindow(QDialog):
                     "color": self.text_color,
                     "font-size": "10px"
                 },
-                "url_label": {
-                    "color": self.text_color,
-                    "font-size": "12px"
-                },
                 "label_message": {
                     "color": self.text_edit_color,
                     "font-size": "13px"
+                },
+                "update_label": {
+                    "color": self.text_color,
+                    "font-size": "12px"
                 }
             }
             try:
@@ -2020,6 +2112,158 @@ class CustomInputDialog(QDialog):
             event.accept()  # Подтверждаем закрытие окна
         except Exception as e:
             print(f"Ошибка при закрытии диалога: {e}")  # Логируем ошибку
+
+
+class UpdateApp(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        # Путь к текущей версии программы (на один уровень выше _internal)
+        self.CURRENT_DIR = self.get_base_directory()
+
+    def get_base_directory(self):
+        """
+        Возвращает базовую директорию для файлов в зависимости от режима выполнения.
+        - Если программа запущена как исполняемый файл, возвращает директорию исполняемого файла.
+        - Если программа запущена как скрипт, возвращает директорию скрипта.
+        """
+        if getattr(sys, 'frozen', False):
+            # Если программа запущена как исполняемый файл
+            if hasattr(sys, '_MEIPASS'):
+                # Если ресурсы упакованы в исполняемый файл (один файл)
+                base_path = sys._MEIPASS
+            else:
+                # Если ресурсы находятся рядом с исполняемым файлом (папка dist)
+                base_path = os.path.dirname(sys.executable)
+        else:
+            # Если программа запущена как скрипт
+            base_path = os.path.dirname(os.path.abspath(__file__))
+
+        # Поднимаемся на один уровень выше, если текущая папка - _internal
+        if os.path.basename(base_path) == "_internal":
+            base_path = os.path.dirname(base_path)
+        return base_path
+
+    def select_new_version_dir(self):
+        """Выбор папки с новой версией программы"""
+        new_version_dir = QFileDialog.getExistingDirectory(
+            self,
+            "Выберите папку с новой версией программы",
+            "",
+            QFileDialog.ShowDirsOnly
+        )
+        if self.validate_new_version_dir(new_version_dir):
+            return new_version_dir
+
+    def validate_new_version_dir(self, new_version_dir):
+        """Проверка, что в папке с новой версией есть _internal и Assistant.exe"""
+        if not os.path.isdir(new_version_dir):
+            QMessageBox.warning(self, "Ошибка", "Выбранная папка не существует.")
+            return False
+
+        # Проверка наличия папки _internal
+        internal_dir = os.path.join(new_version_dir, "_internal")
+        if not os.path.isdir(internal_dir):
+            QMessageBox.warning(self, "Ошибка", "В выбранной папке отсутствует папка _internal.")
+            return False
+
+        # Проверка наличия Assistant.exe
+        assistant_exe = os.path.join(new_version_dir, "Assistant.exe")
+        if not os.path.isfile(assistant_exe):
+            QMessageBox.warning(self, "Ошибка", "В выбранной папке отсутствует файл Assistant.exe.")
+            return False
+
+        return True
+
+    def create_scheduler_task(self, new_version_dir):
+        """Создание задачи в планировщике для обновления"""
+        # Команда для выполнения обновления
+        new_dir_settings = os.path.join(new_version_dir, "_internal", "user_settings")
+        update_script = f"""
+@echo off
+timeout /t 5 /nobreak >nul
+
+:: Удаляем все файлы и папки в старой папке, кроме user_settings
+for /d %%i in ("{self.CURRENT_DIR}\\*") do (
+    if not "%%~nxi"=="_internal" (
+        rmdir /s /q "%%i"
+    )
+)
+for %%i in ("{self.CURRENT_DIR}\\*.*") do (
+    if not "%%~nxi"=="update.bat" (
+        del /q "%%i"
+    )
+)
+
+:: Удаляем содержимое папки _internal, кроме user_settings
+for /d %%i in ("{self.CURRENT_DIR}\\_internal\\*") do (
+    if not "%%~nxi"=="user_settings" (
+        rmdir /s /q "%%i"
+    )
+)
+for %%i in ("{self.CURRENT_DIR}\\_internal\\*.*") do (
+    if not "%%~nxi"=="update.bat" (
+        del /q "%%i"
+    )
+)
+
+set "exclude_folder=_internal\\user_settings"
+
+:: Создаем временный файл exclude.txt
+echo %exclude_folder% > exclude.txt
+
+:: Копируем файлы из новой папки в старую, исключая user_settings
+xcopy "{new_version_dir.replace(os.sep, '/')}" "{self.CURRENT_DIR.replace(os.sep, '/')}" /E /I /H /-Y /EXCLUDE:exclude.txt
+
+:: Удаляем временный файл exclude.txt
+del exclude.txt
+
+:: Удаляем задачу из планировщика
+schtasks /delete /tn AssistantUpdate /f
+
+:: Ждем 2 секунды перед запуском новой версии
+timeout /t 2 /nobreak >nul
+
+:: Запускаем новую версию программы
+start "" "{os.path.join(self.CURRENT_DIR, "Assistant.exe").replace(os.sep, '/')}"
+"""
+
+        # Сохраняем команду в bat-файл
+        with open("update.bat", "w") as f:
+            f.write(update_script)
+
+        # Команда для создания задачи в планировщике
+        command = [
+            "schtasks", "/create", "/tn", "AssistantUpdate", "/tr",
+            f'"{os.path.abspath("update.bat")}"', "/sc", "once", "/st",
+            time.strftime("%H:%M", time.localtime(time.time() + 60)), "/f", "/RL", "HIGHEST"
+        ]
+
+        try:
+            # Выполняем команду с флагом CREATE_NO_WINDOW
+            result = subprocess.run(command, check=True, stdout=subprocess.PIPE,
+                                    stderr=subprocess.PIPE, creationflags=subprocess.CREATE_NO_WINDOW)
+            output = result.stdout.decode('cp866')  # Декодируем вывод
+            QMessageBox.information(self, "Успех", "Задача в планировщике создана.")
+        except subprocess.CalledProcessError as e:
+            error_output = e.stderr.decode('cp866')  # Декодируем ошибку
+            QMessageBox.critical(self, "Ошибка", f"Не удалось создать задачу: {error_output}")
+
+    def main(self):
+        """Основная логика обновления"""
+        # Выбираем папку с новой версией
+        new_version_dir = self.select_new_version_dir()
+        if not new_version_dir:
+            QMessageBox.warning(self, "Ошибка", "Папка с новой версией не выбрана.")
+            return
+
+        # Создаем задачу в планировщике
+        self.create_scheduler_task(new_version_dir)
+
+        try:
+            subprocess.run(['tasklist', '/FI', 'IMAGENAME eq Assistant.exe'], check=True, stdout=subprocess.PIPE)
+            subprocess.run(['taskkill', '/IM', 'Assistant.exe', '/F'], check=True)
+        except subprocess.CalledProcessError:
+            QMessageBox.warning(self, "Предупреждение", "Процесс Assistant.exe не найден.")
 
 
 # Запуск приложения

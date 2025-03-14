@@ -331,7 +331,7 @@ def open_url_link(game_id_or_url, filename):
                 # Открываем URL через стандартный механизм
                 subprocess.Popen(["start", game_id_or_url], shell=True)
                 # Ждем несколько секунд, чтобы процесс успел запуститься
-                time.sleep(20)
+                time.sleep(40)
                 # Собираем процессы после запуска
                 after_processes = get_all_processes()
                 # Находим все новые процессы

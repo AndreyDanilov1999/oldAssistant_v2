@@ -85,6 +85,9 @@ def react_detail(file_path):
         file_name = os.path.basename(file_path)[:-4]
         logger.info(f"Ответ ассистента: {file_name}")
 
+        # Остановить текущее воспроизведение
+        pygame.mixer.music.stop()
+
         # Загрузка и воспроизведение аудиофайла
         pygame.mixer.music.load(file_path)
         pygame.mixer.music.set_volume(volume_reduction_factor)  # Установка громкости
