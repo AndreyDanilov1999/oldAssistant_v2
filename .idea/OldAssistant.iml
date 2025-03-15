@@ -9,6 +9,8 @@
       <excludeFolder url="file://$MODULE_DIR$/build/main_assistant/localpycs" />
       <excludeFolder url="file://$MODULE_DIR$/dist" />
       <excludeFolder url="file://$MODULE_DIR$/build" />
+      <excludeFolder url="file://$MODULE_DIR$/config" />
+      <excludeFolder url="file://$MODULE_DIR$/test_files" />
     </content>
     <orderEntry type="jdk" jdkName="Python 3.9 (oldAssistant_v2)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />

@@ -2,4 +2,6 @@ venv_1/
 .venv/
 /dist/
 /build/
-
+/config/
+/test_files/
+/assistant.log

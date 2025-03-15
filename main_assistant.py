@@ -12,6 +12,8 @@ import random
 import sys
 import time
 import traceback
+import zipfile
+
 import requests
 from packaging import version
 import psutil
@@ -110,7 +112,7 @@ class Assistant(QWidget):
         self.assist_name3 = self.settings.get('assist_name3', "джо")
         self.audio_paths = get_audio_paths(self.speaker)
         self.MEMORY_LIMIT_MB = 1024
-        self.version = "1.2.1"
+        self.version = "1.2.2"
         self.ps = "Powered by theoldman"
         self.label_version = QLabel(f"Версия: {self.version} {self.ps}", self)
         self.label_message = QLabel('', self)
@@ -2160,41 +2162,65 @@ class UpdateApp(QDialog):
             base_path = os.path.dirname(base_path)
         return base_path
 
-    def select_new_version_dir(self):
-        """Выбор папки с новой версией программы"""
-        new_version_dir = QFileDialog.getExistingDirectory(
+    def select_new_version_archive(self):
+        """Выбор ZIP-архива с новой версией программы"""
+        archive_path, _ = QFileDialog.getOpenFileName(
             self,
-            "Выберите папку с новой версией программы",
+            "Выберите архив с новой версией программы",
             "",
-            QFileDialog.ShowDirsOnly
+            "ZIP Files (*.zip)"
         )
-        if self.validate_new_version_dir(new_version_dir):
-            return new_version_dir
+        if archive_path and self.validate_new_version_archive(archive_path):
+            return archive_path
+        return None
 
-    def validate_new_version_dir(self, new_version_dir):
-        """Проверка, что в папке с новой версией есть _internal и Assistant.exe"""
-        if not os.path.isdir(new_version_dir):
-            QMessageBox.warning(self, "Ошибка", "Выбранная папка не существует.")
+    def validate_new_version_archive(self, archive_path):
+        """Проверка, что в архиве есть _internal и Assistant.exe"""
+        try:
+            with zipfile.ZipFile(archive_path, 'r') as zip_ref:
+                file_list = zip_ref.namelist()
+
+            # Проверка наличия папки _internal
+            has_internal = any(file.startswith("_internal/") for file in file_list)
+            if not has_internal:
+                QMessageBox.warning(self, "Ошибка", "В выбранном архиве отсутствует папка _internal.")
+                return False
+
+            # Проверка наличия Assistant.exe
+            has_assistant_exe = "Assistant.exe" in file_list
+            if not has_assistant_exe:
+                QMessageBox.warning(self, "Ошибка", "В выбранном архиве отсутствует файл Assistant.exe.")
+                return False
+
+            return True
+        except Exception as e:
+            QMessageBox.critical(self, "Ошибка", f"Не удалось проверить архив: {str(e)}")
             return False
 
-        # Проверка наличия папки _internal
-        internal_dir = os.path.join(new_version_dir, "_internal")
-        if not os.path.isdir(internal_dir):
-            QMessageBox.warning(self, "Ошибка", "В выбранной папке отсутствует папка _internal.")
+    def extract_archive(self, archive_path, extract_dir):
+        """Распаковка архива с обработкой кодировки имён файлов"""
+        try:
+            with zipfile.ZipFile(archive_path, 'r') as zip_ref:
+                for file_info in zip_ref.infolist():
+                    # Исправляем имя файла
+                    try:
+                        # Пробуем декодировать имя файла из cp437 (или другой кодировки)
+                        file_info.filename = file_info.filename.encode('cp437').decode('utf-8')
+                    except UnicodeDecodeError:
+                        # Если cp437 не подходит, пробуем другую кодировку (например, cp866)
+                        file_info.filename = file_info.filename.encode('cp437').decode('cp866')
+
+                    # Распаковываем файл с исправленным именем
+                    zip_ref.extract(file_info, extract_dir)
+            return True
+        except Exception as e:
+            QMessageBox.critical(self, "Ошибка", f"Не удалось распаковать архив: {str(e)}")
             return False
 
-        # Проверка наличия Assistant.exe
-        assistant_exe = os.path.join(new_version_dir, "Assistant.exe")
-        if not os.path.isfile(assistant_exe):
-            QMessageBox.warning(self, "Ошибка", "В выбранной папке отсутствует файл Assistant.exe.")
-            return False
-
-        return True
-
-    def create_scheduler_task(self, new_version_dir):
+    def create_scheduler_task(self, archive_path, new_version_dir):
         """Создание задачи в планировщике для обновления"""
         # Команда для выполнения обновления
-        new_dir_settings = os.path.join(new_version_dir, "_internal", "user_settings")
+        correct_archive_path = os.path.normpath(archive_path)
         update_script = f"""
 @echo off
 timeout /t 5 /nobreak >nul
@@ -2242,8 +2268,16 @@ timeout /t 2 /nobreak >nul
 
 :: Запускаем новую версию программы
 start "" "{os.path.join(self.CURRENT_DIR, "Assistant.exe").replace(os.sep, '/')}"
-"""
 
+:: Удаляем архив и временную папку с новой версией
+if exist "{new_version_dir.replace(os.sep, '/')}" (
+    rmdir /s /q "{new_version_dir.replace(os.sep, '/')}"
+)
+
+if exist "{correct_archive_path}" (
+    del /q "{correct_archive_path}"
+)
+"""
         # Сохраняем команду в bat-файл
         with open("update.bat", "w") as f:
             f.write(update_script)
@@ -2260,21 +2294,30 @@ start "" "{os.path.join(self.CURRENT_DIR, "Assistant.exe").replace(os.sep, '/')}
             result = subprocess.run(command, check=True, stdout=subprocess.PIPE,
                                     stderr=subprocess.PIPE, creationflags=subprocess.CREATE_NO_WINDOW)
             output = result.stdout.decode('cp866')  # Декодируем вывод
-            QMessageBox.information(self, "Успех", "Задача в планировщике создана.")
+            QMessageBox.information(self, "Успех",
+                                    "Немного подождите, после завершения программы будет установлена новая версия")
         except subprocess.CalledProcessError as e:
             error_output = e.stderr.decode('cp866')  # Декодируем ошибку
             QMessageBox.critical(self, "Ошибка", f"Не удалось создать задачу: {error_output}")
 
     def main(self):
         """Основная логика обновления"""
-        # Выбираем папку с новой версией
-        new_version_dir = self.select_new_version_dir()
-        if not new_version_dir:
-            QMessageBox.warning(self, "Ошибка", "Папка с новой версией не выбрана.")
+        # Выбираем ZIP-архив с новой версией
+        archive_path = self.select_new_version_archive()
+        if not archive_path:
+            QMessageBox.warning(self, "Ошибка", "Архив с новой версией не выбран.")
+            return
+
+        # Создаем временную директорию для распаковки
+        temp_extract_dir = os.path.join(os.path.dirname(archive_path), "temp_extract")
+        os.makedirs(temp_extract_dir, exist_ok=True)
+
+        # Распаковываем архив
+        if not self.extract_archive(archive_path, temp_extract_dir):
             return
 
         # Создаем задачу в планировщике
-        self.create_scheduler_task(new_version_dir)
+        self.create_scheduler_task(archive_path, temp_extract_dir)
 
         try:
             subprocess.run(['tasklist', '/FI', 'IMAGENAME eq Assistant.exe'], check=True, stdout=subprocess.PIPE)

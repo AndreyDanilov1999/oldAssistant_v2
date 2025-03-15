@@ -4,7 +4,7 @@
 a = Analysis(
     ['main_assistant.py'],
     pathex=['G:/PycharmProjects/oldAssistant_v2'],
-    binaries=[(r'G:\PycharmProjects\oldAssistant_v2\venv_1\Lib\site-packages\vosk\libvosk.dll', 'vosk')],
+    binaries=[(r'G:\PycharmProjects\oldAssistant_v2\.venv\Lib\site-packages\vosk\libvosk.dll', 'vosk')],
     datas=[
         ('G:/PycharmProjects/oldAssistant_v2/icon_assist.ico', '.'),
         ('G:/PycharmProjects/oldAssistant_v2/user_settings/settings.json', 'user_settings'),
