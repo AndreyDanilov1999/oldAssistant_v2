@@ -9,7 +9,6 @@ import json
 import logging
 import os.path
 import random
-import shutil
 import sys
 import time
 import traceback
@@ -23,12 +22,12 @@ import simpleaudio as sa
 import numpy as np
 import threading
 import pyaudio
-from PyQt5.QtGui import QIcon, QColor, QDesktopServices, QCursor
+from PyQt5.QtGui import QIcon, QColor, QCursor
 from PyQt5.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout, \
                              QPushButton, QCheckBox, QSystemTrayIcon, QAction, qApp, QMenu, QMessageBox, \
                              QTextEdit, QDialog, QLabel, QComboBox, QLineEdit, QListWidget, QListWidgetItem, \
                              QFileDialog, QColorDialog, QSlider)
-from PyQt5.QtCore import Qt, QFileSystemWatcher, QTimer, QEvent, pyqtSignal, QUrl, QSettings, QThread
+from PyQt5.QtCore import Qt, QFileSystemWatcher, QTimer, QEvent, pyqtSignal, QSettings
 import subprocess
 from script_audio import controller
 from speak_functions import react, react_detail
@@ -41,6 +40,7 @@ speakers = dict(Пласид='placide', Бестия='rogue', Джонни='john
 
 # Сырая ссылка на version.txt в GitHub
 VERSION_FILE_URL = "https://raw.githubusercontent.com/AndreyDanilov1999/oldAssistant_v2/refs/heads/master/version.txt"
+
 
 class Assistant(QWidget):
     """
@@ -67,6 +67,11 @@ class Assistant(QWidget):
         return base_path
 
     def check_memory_usage(self, limit_mb):
+        """
+        Проверка потребления оперативной памяти
+        :param limit_mb:
+        :return:
+        """
         process = psutil.Process(os.getpid())
         memory_usage = process.memory_info().rss / 1024 / 1024  # В МБ
         if memory_usage > limit_mb:
