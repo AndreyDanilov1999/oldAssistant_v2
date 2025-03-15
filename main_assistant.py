@@ -105,7 +105,7 @@ class Assistant(QWidget):
         self.assist_name3 = self.settings.get('assist_name3', "джо")
         self.audio_paths = get_audio_paths(self.speaker)
         self.MEMORY_LIMIT_MB = 1024
-        self.version = "1.2.0"
+        self.version = "1.2.1"
         self.ps = "Powered by theoldman"
         self.label_version = QLabel(f"Версия: {self.version} {self.ps}", self)
         self.label_message = QLabel('', self)
@@ -117,6 +117,7 @@ class Assistant(QWidget):
         self.check_autostart()
         self.hide()
         self.run_assist()
+        self.check_update_label()
         self.check_for_updates_app()
 
     def initui(self):
@@ -251,6 +252,16 @@ class Assistant(QWidget):
             if self.latest_version_url:
                 webbrowser.open(self.latest_version_url)
 
+    def check_update_label(self):
+        """
+        Метод для отображения или скрытия кнопки "Установить обновление"
+        """
+        # Проверяем текст лейбла и управляем видимостью кнопки
+        if self.update_label.text() == "Доступна новая версия":
+            self.update_button.show()
+        else:
+            self.update_button.hide()
+
     def check_for_updates_app(self):
         try:
             # Скачиваем файл с версией
@@ -278,6 +289,7 @@ class Assistant(QWidget):
             # Сравниваем текущую версию с последней версией
             if version.parse(latest_version) > version.parse(self.version):
                 self.update_label.setText("Доступна новая версия")
+                self.check_update_label()
                 # Проверяем, нужно ли показывать всплывающее окно
                 if self.settings.get("show_upd_msg", True):
                     # Показываем всплывающее окно с чекбоксом
@@ -736,7 +748,7 @@ class Assistant(QWidget):
                         what_folder = self.audio_paths.get('what_folder')
                         if what_folder:
                             react(what_folder)
-                        if speaker == "sanboy":
+                        if self.speaker == "sanboy":
                             if random.random() <= 0.7:
                                 prorok_sanboy = self.audio_paths.get('prorok_sanboy')
                                 react_detail(prorok_sanboy)

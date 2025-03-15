@@ -11,7 +11,6 @@ import webbrowser
 from speak_functions import react_detail, react
 
 settings_file = os.path.join(get_base_directory(), 'user_settings', "settings.json")  # Полный путь к файлу настроек
-speaker = get_current_speaker(settings_file)  # Получаем текущий голос
 
 
 def search_yandex(query):
@@ -27,6 +26,7 @@ def shutdown_windows():
     """
     Выключение компа
     """
+    speaker = get_current_speaker(settings_file)  # Получаем текущий голос
     audio_paths = get_audio_paths(speaker)
     off_file = audio_paths['off_file']
     react_detail(off_file)
@@ -37,6 +37,7 @@ def open_volume_mixer():
     try:
         subprocess.Popen(["sndvol.exe", "/R"])
         logger.info("Микшер громкости открыт.")
+        speaker = get_current_speaker(settings_file)  # Получаем текущий голос
         audio_paths = get_audio_paths(speaker)
         start_folder = audio_paths.get('start_folder')
         react(start_folder)
@@ -48,6 +49,7 @@ def open_calc():
     try:
         subprocess.Popen(["calc.exe", "/R"])
         logger.info("Калькулятор открыт")
+        speaker = get_current_speaker(settings_file)  # Получаем текущий голос
         audio_paths = get_audio_paths(speaker)
         start_folder = audio_paths.get('start_folder')
         react(start_folder)
@@ -59,6 +61,7 @@ def close_calc():
     try:
         subprocess.run(['taskkill', '/IM', 'CalculatorApp.exe', '/F'], check=True)
         logger.info(f"Процесс успешно завершен.")
+        speaker = get_current_speaker(settings_file)  # Получаем текущий голос
         audio_paths = get_audio_paths(speaker)
         close_folder = audio_paths['close_folder']
         react(close_folder)
@@ -70,6 +73,7 @@ def open_paint():
     try:
         subprocess.Popen("mspaint.exe")
         logger.info("Paint открыт")
+        speaker = get_current_speaker(settings_file)  # Получаем текущий голос
         audio_paths = get_audio_paths(speaker)
         start_folder = audio_paths.get('start_folder')
         react(start_folder)
@@ -81,6 +85,7 @@ def close_paint():
     try:
         subprocess.run(['taskkill', '/IM', 'mspaint.exe', '/F'], check=True)
         logger.info(f"Процесс успешно завершен.")
+        speaker = get_current_speaker(settings_file)  # Получаем текущий голос
         audio_paths = get_audio_paths(speaker)
         close_folder = audio_paths['close_folder']
         react(close_folder)
@@ -91,6 +96,7 @@ def open_path():
     try:
         # Открыть окно "Переменные среды"
         subprocess.run("rundll32 sysdm.cpl,EditEnvironmentVariables")
+        speaker = get_current_speaker(settings_file)  # Получаем текущий голос
         audio_paths = get_audio_paths(speaker)
         start_folder = audio_paths.get('start_folder')
         react(start_folder)
@@ -101,7 +107,7 @@ def greeting():
     # Получаем текущий час
     current_hour = datetime.now().hour
 
-    # Получаем пути к аудиофайлам один раз
+    speaker = get_current_speaker(settings_file)  # Получаем текущий голос
     audio_paths = get_audio_paths(speaker)
 
     # Определяем, какое приветствие воспроизвести
