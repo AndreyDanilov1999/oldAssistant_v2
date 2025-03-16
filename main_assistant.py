@@ -13,7 +13,6 @@ import sys
 import time
 import traceback
 import zipfile
-
 import requests
 from packaging import version
 import psutil
@@ -28,7 +27,7 @@ from PyQt5.QtGui import QIcon, QColor, QCursor
 from PyQt5.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout, \
                              QPushButton, QCheckBox, QSystemTrayIcon, QAction, qApp, QMenu, QMessageBox, \
                              QTextEdit, QDialog, QLabel, QComboBox, QLineEdit, QListWidget, QListWidgetItem, \
-                             QFileDialog, QColorDialog, QSlider)
+                             QFileDialog, QColorDialog, QSlider, QInputDialog)
 from PyQt5.QtCore import Qt, QFileSystemWatcher, QTimer, QEvent, pyqtSignal, QSettings
 import subprocess
 from script_audio import controller
@@ -37,7 +36,7 @@ from logging_config import logger
 from lists import get_audio_paths
 from vosk import Model, KaldiRecognizer
 
-speakers = dict(Пласид='placide', Бестия='rogue', Джонни='johnny',
+speakers = dict(Пласид='placide', Бестия='rogue', Джонни='johnny', СанСаныч='sanych',
                 Санбой='sanboy', Тигрица='tigress', Стейтем='stathem')
 
 # Сырая ссылка на version.txt в GitHub
@@ -98,6 +97,7 @@ class Assistant(QWidget):
         self.color_settings_path = os.path.join(self.get_base_directory(), 'user_settings', 'color_settings.json')
         self.commands = self.load_commands(os.path.join(self.get_base_directory(), 'user_settings', 'commands.json'))
         self.default_preset_style = os.path.join(self.get_base_directory(), 'user_settings', 'presets', 'default.json')
+        self.process_names = os.path.join(self.get_base_directory(), 'user_settings', 'process_names.json')
         self.last_position = 0
         self.steam_path = self.settings.get('steam_path', '')  # значение по умолчанию, если ключ отсутствует
         self.volume_assist = self.settings.get('volume_assist', 0.2)  # значение по умолчанию, если ключ отсутствует
@@ -131,6 +131,7 @@ class Assistant(QWidget):
         """Инициализация пользовательского интерфейса."""
         main_layout = QHBoxLayout()
         left_layout = QVBoxLayout()
+        right_layout = QVBoxLayout()
 
         # Инициализируем QSystemTrayIcon
         self.tray_icon = QSystemTrayIcon(self)
@@ -165,7 +166,7 @@ class Assistant(QWidget):
         left_layout.addWidget(self.autostart_checkbox)
 
         # Кнопка "Открыть папку с ярлыками"
-        self.open_folder_button = QPushButton("Открыть папку с ярлыками")
+        self.open_folder_button = QPushButton("Ваши ярлыки")
         self.open_folder_button.clicked.connect(self.open_folder)
         left_layout.addWidget(self.open_folder_button)
 
@@ -175,14 +176,9 @@ class Assistant(QWidget):
         left_layout.addWidget(self.settings_button)
 
         # Кнопка "Оформление интерфейса"
-        self.style_settings_button = QPushButton('Оформление интерфейса')
+        self.style_settings_button = QPushButton('Оформление')
         self.style_settings_button.clicked.connect(self.open_color_settings)
         left_layout.addWidget(self.style_settings_button)
-
-        # Кнопка "Очистить логи"
-        self.clear_logs_button = QPushButton("Очистить логи")
-        self.clear_logs_button.clicked.connect(self.clear_logs)
-        left_layout.addWidget(self.clear_logs_button)
 
         # Кнопка "Добавить команду для программы"
         self.add_command_button = QPushButton("Создать команду для программы")
@@ -198,6 +194,11 @@ class Assistant(QWidget):
         self.added_commands_button = QPushButton("Добавленные команды")
         self.added_commands_button.clicked.connect(self.added_commands)
         left_layout.addWidget(self.added_commands_button)
+
+        # Кнопка "Процессы ярлыков"
+        self.link_process_button = QPushButton("Процессы ярлыков")
+        self.link_process_button.clicked.connect(self.link_process)
+        left_layout.addWidget(self.link_process_button)
 
         # Кнопка "Релакс?"
         self.relax_button = QPushButton("Релакс?")
@@ -223,9 +224,17 @@ class Assistant(QWidget):
         self.log_area = QTextEdit()
         self.log_area.setReadOnly(True)  # Запрещаем редактирование
 
+        # Кнопка "Очистить логи"
+        self.clear_logs_button = QPushButton("Очистить логи")
+        self.clear_logs_button.clicked.connect(self.clear_logs)
+
+        right_layout.addWidget(self.log_area)
+        right_layout.addWidget(self.clear_logs_button)
+
         # Добавляем левую и правую части в основной макет
         main_layout.addLayout(left_layout, 1)
-        main_layout.addWidget(self.log_area, 2)
+        main_layout.addLayout(right_layout, 2)
+
 
         # Устанавливаем основной макет для окна
         self.setLayout(main_layout)
@@ -928,6 +937,11 @@ class Assistant(QWidget):
         commands_window = AddedCommandsWindow(self)  # Передаем ссылку на родительский класс
         commands_window.exec_()  # Открываем диалоговое окно
 
+    def link_process(self):
+        """Обработка нажатия кнопки 'Процессы ярлыков'"""
+        link_process_window = LinkProcessWindow(self)
+        link_process_window.exec_()
+
     def add_folder_command(self):
         """Обработка нажатия кнопки 'Добавить команду для папки'"""
         folder_dialog = AddFolderCommand(self)
@@ -956,7 +970,6 @@ class Assistant(QWidget):
             with open(log_file_path, 'w', encoding='utf-8') as file:
                 file.write("")  # Записываем пустую строку
             self.log_area.clear()
-            self.log_area.append("Логи очищены.")
             self.last_position = 0  # Сбрасываем позицию последнего прочитанного байта
         except Exception as e:
             self.log_area.append(f"Ошибка при очистке логов: {e}")
@@ -2321,9 +2334,155 @@ if exist "{correct_archive_path}" (
 
         try:
             subprocess.run(['tasklist', '/FI', 'IMAGENAME eq Assistant.exe'], check=True, stdout=subprocess.PIPE)
+            audio_paths = self.audio_paths
+            restart_file = audio_paths.get('restart_file')
+            react_detail(restart_file)
             subprocess.run(['taskkill', '/IM', 'Assistant.exe', '/F'], check=True)
         except subprocess.CalledProcessError:
             QMessageBox.warning(self, "Предупреждение", "Процесс Assistant.exe не найден.")
+
+
+class LinkProcessWindow(QDialog):
+    """ Класс для обработки окна "Процессы ярлыков" """
+
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.parent = parent
+        self.base_path = get_base_directory()
+        self.process_names_path = self.parent.process_names
+        self.process_names = self.load_process_names()
+        self.init_ui()
+
+    def load_process_names(self):
+        """ Загружает данные о ярлыках и процессах из файла process_names.json """
+        if os.path.exists(self.process_names_path):
+            with open(self.process_names_path, "r", encoding="utf-8") as file:
+                return json.load(file)
+        return []
+
+    def save_process_names(self):
+        """ Сохраняет данные о ярлыках и процессах в файл process_names.json """
+        with open(self.process_names_path, "w", encoding="utf-8") as file:
+            json.dump(self.process_names, file, ensure_ascii=False, indent=4)
+
+    def init_ui(self):
+        """ Инициализация пользовательского интерфейса """
+        self.setWindowTitle("Процессы ярлыков")
+        self.setFixedSize(600, 400)
+
+        # Основной вертикальный макет
+        main_layout = QVBoxLayout()
+
+        # Лейбл в самом верху окна
+        self.description_label = QLabel("Список процессов, которые привязаны к ярлыку (нужны для закрытия)")
+        self.description_label.setAlignment(Qt.AlignCenter)  # Выравнивание текста по центру
+        self.description_label.setStyleSheet("font-size: 16px;")
+        main_layout.addWidget(self.description_label)
+
+        # Горизонтальный макет для левой и правой колонок
+        content_layout = QHBoxLayout()
+
+        # Левая колонка: список ярлыков
+        left_layout = QVBoxLayout()
+        self.processes_label = QLabel("Ярлыки")
+        left_layout.addWidget(self.processes_label)
+        self.links_list = QListWidget()
+        self.links_list.itemClicked.connect(self.on_link_selected)
+        left_layout.addWidget(self.links_list)
+
+        # Правая колонка: список процессов
+        right_layout = QVBoxLayout()
+        self.processes_label = QLabel("Список процессов")
+        right_layout.addWidget(self.processes_label)
+
+        self.processes_list = QListWidget()
+        right_layout.addWidget(self.processes_list)
+
+        # Кнопки для управления процессами
+        self.add_process_button = QPushButton("Добавить процесс")
+        self.add_process_button.clicked.connect(self.add_process)
+        right_layout.addWidget(self.add_process_button)
+
+        self.remove_process_button = QPushButton("Удалить процесс")
+        self.remove_process_button.clicked.connect(self.remove_process)
+        right_layout.addWidget(self.remove_process_button)
+
+        # Добавляем левую и правую части в горизонтальный макет
+        content_layout.addLayout(left_layout, 1)
+        content_layout.addLayout(right_layout, 2)
+
+        # Добавляем горизонтальный макет в основной вертикальный макет
+        main_layout.addLayout(content_layout)
+
+        # Устанавливаем основной макет для окна
+        self.setLayout(main_layout)
+
+        # Заполняем список ярлыков
+        self.update_links_list()
+
+    def update_links_list(self):
+        """ Обновляет список ярлыков """
+        self.links_list.clear()
+        for item in self.process_names:
+            for link_name in item.keys():
+                self.links_list.addItem(link_name)
+
+    def update_processes_list(self, link_name):
+        """ Обновляет список процессов для выбранного ярлыка """
+        self.processes_list.clear()
+        for item in self.process_names:
+            if link_name in item:
+                for process in item[link_name]:
+                    self.processes_list.addItem(process)
+                break
+
+    def on_link_selected(self, item):
+        """ Обработка выбора ярлыка """
+        link_name = item.text()
+        self.update_processes_list(link_name)
+
+    def add_process(self):
+        """ Добавляет процесс к выбранному ярлыку """
+        current_link = self.links_list.currentItem()
+        if not current_link:
+            QMessageBox.warning(self, "Ошибка", "Выберите ярлык для добавления процесса.")
+            return
+
+        link_name = current_link.text()
+        process_name, ok = QInputDialog.getText(self, "Добавить процесс", "Введите название процесса:")
+        if ok and process_name:
+            for item in self.process_names:
+                if link_name in item:
+                    if process_name not in item[link_name]:
+                        item[link_name].append(process_name)
+                        self.update_processes_list(link_name)
+                        self.save_process_names()
+                    else:
+                        QMessageBox.warning(self, "Ошибка", "Процесс с таким именем уже существует.")
+                    break
+
+    def remove_process(self):
+        """ Удаляет процесс из выбранного ярлыка """
+        current_link = self.links_list.currentItem()
+        current_process = self.processes_list.currentItem()
+        if not current_link or not current_process:
+            QMessageBox.warning(self, "Ошибка", "Выберите ярлык и процесс для удаления.")
+            return
+
+        link_name = current_link.text()
+        process_name = current_process.text()
+        for item in self.process_names:
+            if link_name in item:
+                if process_name in item[link_name]:
+                    item[link_name].remove(process_name)
+                    self.update_processes_list(link_name)
+                    self.save_process_names()
+                break
+
+    def closeEvent(self, event):
+        """ Сохраняет данные при закрытии окна """
+        self.save_process_names()
+        super().closeEvent(event)
 
 
 # Запуск приложения
