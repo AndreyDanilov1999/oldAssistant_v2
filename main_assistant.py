@@ -23,18 +23,19 @@ import simpleaudio as sa
 import numpy as np
 import threading
 import pyaudio
-from PyQt5.QtGui import QIcon, QColor, QCursor
-from PyQt5.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout, \
-                             QPushButton, QCheckBox, QSystemTrayIcon, QAction, qApp, QMenu, QMessageBox, \
-                             QTextEdit, QDialog, QLabel, QComboBox, QLineEdit, QListWidget, QListWidgetItem, \
-                             QFileDialog, QColorDialog, QSlider, QInputDialog)
-from PyQt5.QtCore import Qt, QFileSystemWatcher, QTimer, QEvent, pyqtSignal, QSettings
 import subprocess
 from script_audio import controller
 from speak_functions import react, react_detail
 from logging_config import logger
 from lists import get_audio_paths
 from vosk import Model, KaldiRecognizer
+from PyQt5.QtGui import QIcon, QColor, QCursor
+from PyQt5.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout, \
+                             QPushButton, QCheckBox, QSystemTrayIcon, QAction, qApp, QMenu, QMessageBox, \
+                             QTextEdit, QDialog, QLabel, QComboBox, QLineEdit, QListWidget, QListWidgetItem, \
+                             QFileDialog, QColorDialog, QSlider, QInputDialog)
+from PyQt5.QtCore import Qt, QFileSystemWatcher, QTimer, QEvent, pyqtSignal, QSettings
+
 
 speakers = dict(Пласид='placide', Бестия='rogue', Джонни='johnny', СанСаныч='sanych',
                 Санбой='sanboy', Тигрица='tigress', Стейтем='stathem')
@@ -112,7 +113,7 @@ class Assistant(QWidget):
         self.assist_name3 = self.settings.get('assist_name3', "джо")
         self.audio_paths = get_audio_paths(self.speaker)
         self.MEMORY_LIMIT_MB = 1024
-        self.version = "1.2.2"
+        self.version = "1.2.3"
         self.ps = "Powered by theoldman"
         self.label_version = QLabel(f"Версия: {self.version} {self.ps}", self)
         self.label_message = QLabel('', self)
@@ -706,58 +707,101 @@ class Assistant(QWidget):
 
                 if self.assistant_name in text or self.assist_name2 in text or self.assist_name3 in text:
                     reaction_triggered = False
-                    if 'выключи комп' in text:
-                        logger.info("Выключаю компьютер")
-                        shutdown_windows()
-                        """
-                        Поочередная попытка обработки сначала как файл потом как папка
-                        если ничего не удалось, то ассистент переспрашивает 
-                        ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
-                        """
-                    # Обработка команд на запуск
-                    elif any(keyword in text for keyword in ['запус', 'откр', 'вкл', 'вруб']):
-                        if "микшер" in text:
-                            open_volume_mixer()
-                        elif 'калькул' in text:
-                            open_calc()
-                        elif 'pain' in text or 'пэйнт' in text:
-                            open_paint()
-                        elif 'переменные' in text:
-                            open_path()
-                        else:
-                            app_command_success = self.handle_app_command(text, 'open')
-                            folder_command_success = self.handle_folder_command(text, 'open')
-                            if not app_command_success and not folder_command_success:
-                                reaction_triggered = True
-                    # Обработка команд на закрытие
-                    elif any(keyword in text for keyword in ['закр', 'выкл', 'выруб', 'отруб']):
-                        if 'калькул' in text:
-                            close_calc()
-                        elif 'pain' in text or 'пэйнт' in text:
-                            close_paint()
-                        else:
-                            app_command_success = self.handle_app_command(text, 'close')
-                            folder_command_success = self.handle_folder_command(text, 'close')
-                            if not app_command_success and not folder_command_success:
-                                reaction_triggered = True
-                    elif "поищи" in text or 'найди' in text:
-                        query = (text.replace("поищи", "").replace("найди", "")
-                                 .replace(self.assistant_name, "")
-                                 .replace(self.assist_name2, "")
-                                 .replace(self.assist_name3, "").strip())
-                        approve_folder = self.audio_paths.get('approve_folder')
-                        if approve_folder:
-                            react(approve_folder)
-                        search_yandex(query)
-                    elif 'проверь' in text:
-                        approve_folder = self.audio_paths.get('approve_folder')
-                        if approve_folder:
-                            react(approve_folder)
-                        search_links()
+
+                    # Определяем действие (открой/закрой)
+                    action_keywords = ['открой', 'закрой', 'вкл', 'выкл', 'запус',
+                                       'отруб']  # Ключевые слова для действий
+                    action = None
+
+                    # Ищем действие в тексте
+                    for keyword in action_keywords:
+                        if keyword in text:
+                            action = keyword
+                            break
+
+                    # Разделяем текст на команды
+                    commands = []
+                    if " и " in text:
+                        commands = text.split(" и ")
+                    elif " а также " in text:
+                        commands = text.split(" а также ")
+                    elif " потом " in text:
+                        commands = text.split(" потом ")
                     else:
-                        echo_folder = self.audio_paths.get('echo_folder')
-                        if echo_folder:
-                            react(echo_folder)
+                        commands = [text]  # Если разделителей нет, обрабатываем как одну команду
+
+                    # Обрабатываем каждую команду
+                    for command in commands:
+                        command = command.strip()  # Убираем лишние пробелы
+
+                        # Если действие найдено, добавляем его к команде
+                        if action and not any(keyword in command for keyword in action_keywords):
+                            command = f"{action} {command}"
+
+                        if 'выключи комп' in command:
+                            logger.info("Выключаю компьютер")
+                            shutdown_windows()
+                            continue
+
+                        elif 'перезагруз комп' in command:
+                            logger.info("Перезагружаю компьютер")
+                            restart_windows()
+                            continue
+
+                        # Обработка команд на запуск
+                        if any(keyword in command for keyword in ['запус', 'откр', 'вкл', 'вруб']):
+                            if "микшер" in command:
+                                open_volume_mixer()
+                            elif 'калькул' in command:
+                                open_calc()
+                            elif 'pain' in command or 'пэйнт' in command:
+                                open_paint()
+                            elif 'переменные' in command:
+                                open_path()
+                            elif 'диспетчер' in command:
+                                open_taskmgr()
+                            else:
+                                app_command_success = self.handle_app_command(command, 'open')
+                                folder_command_success = self.handle_folder_command(command, 'open')
+                                if not app_command_success and not folder_command_success:
+                                    reaction_triggered = True
+
+                        # Обработка команд на закрытие
+                        elif any(keyword in command for keyword in ['закр', 'выкл', 'выруб', 'отруб']):
+                            if 'калькул' in command:
+                                close_calc()
+                            elif 'pain' in command or 'пэйнт' in command:
+                                close_paint()
+                            elif 'микшер' in command:
+                                close_volume_mixer()
+                            elif 'диспетчер' in command:
+                                close_taskmgr()
+                            else:
+                                app_command_success = self.handle_app_command(command, 'close')
+                                folder_command_success = self.handle_folder_command(command, 'close')
+                                if not app_command_success and not folder_command_success:
+                                    reaction_triggered = True
+
+                        elif "поищи" in command or 'найди' in command:
+                            query = (command.replace("поищи", "").replace("найди", "")
+                                     .replace(self.assistant_name, "")
+                                     .replace(self.assist_name2, "")
+                                     .replace(self.assist_name3, "").strip())
+                            approve_folder = self.audio_paths.get('approve_folder')
+                            if approve_folder:
+                                react(approve_folder)
+                            search_yandex(query)
+
+                        elif 'проверь' in command:
+                            approve_folder = self.audio_paths.get('approve_folder')
+                            if approve_folder:
+                                react(approve_folder)
+                            search_links()
+
+                        else:
+                            echo_folder = self.audio_paths.get('echo_folder')
+                            if echo_folder:
+                                react(echo_folder)
 
                     # Проверка, была ли вызвана реакция
                     if reaction_triggered:
@@ -800,8 +844,29 @@ class Assistant(QWidget):
     # "--------------------------------------------------------------------------------------------------"
     # "Основной цикл ассистента(конец)"
 
+    def check_microphone_available(self):
+        """Проверка наличия микрофона в системе."""
+        p = pyaudio.PyAudio()
+        try:
+            # Получаем информацию об устройстве ввода по умолчанию
+            default_input_device = p.get_default_input_device_info()
+            logger.info(f"Устройство ввода по умолчанию: {default_input_device.get('name')}")
+            return True
+        except IOError:
+            # Если устройство по умолчанию не найдено
+            logger.warning("Микрофон не обнаружен.")
+            return False
+        finally:
+            p.terminate()
+
     def initialize_audio(self):
         """Инициализация моделей и аудиопотока."""
+        # Проверка наличия микрофона
+        if not self.check_microphone_available():
+            QMessageBox.warning(self, "Ошибка",
+                                "Микрофон не обнаружен. Пожалуйста, подключите микрофон и перезагрузите программу.")
+            return False
+
         model_path_ru = os.path.join(get_base_directory(), "model_ru")
         model_path_en = os.path.join(get_base_directory(), "model_en")
         logger.info(f"Используются модели:  ru - {model_path_ru}; en - {model_path_en}")
@@ -2143,7 +2208,7 @@ class CustomInputDialog(QDialog):
             self.reject()  # Закрываем диалог
             event.accept()  # Подтверждаем закрытие окна
         except Exception as e:
-            print(f"Ошибка при закрытии диалога: {e}")  # Логируем ошибку
+            logger.error(f"Ошибка при закрытии диалога: {e}")  # Логируем ошибку
 
 
 class UpdateApp(QDialog):
@@ -2227,6 +2292,7 @@ class UpdateApp(QDialog):
                     zip_ref.extract(file_info, extract_dir)
             return True
         except Exception as e:
+            logger.error(f"Не удалось распаковать архив: {str(e)}")
             QMessageBox.critical(self, "Ошибка", f"Не удалось распаковать архив: {str(e)}")
             return False
 

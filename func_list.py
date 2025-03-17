@@ -230,7 +230,7 @@ def handler_links(filename, action):
     """
     Обработчик ярлыков в зависимости от их расширения
     """
-    global game_id, target_path, process_name, game_id_or_url
+    global game_id, target_path, process_name, game_id_or_url, args_list
     root_folder = os.path.join(get_base_directory(), 'user_settings', "links for assist")
     # Получаем путь к ярлыку
     shortcut_path = os.path.join(root_folder, filename)
@@ -239,6 +239,7 @@ def handler_links(filename, action):
     if filename.endswith(".lnk"):
         try:
             target_path, arguments = get_target_path(shortcut_path)
+            args_list = arguments.split()
             # Исправляем пути
             target_path = fix_path(target_path)
             shortcut_path = fix_path(shortcut_path)
@@ -248,7 +249,7 @@ def handler_links(filename, action):
             logger.info(f"Ошибка при извлечении пути из ярлыка {filename}: {e}")
 
         if action == 'open':
-            open_link(filename, target_path)
+            open_link(filename, target_path, args_list)
         if action == 'close':
             close_link(filename)
 
@@ -389,9 +390,10 @@ def open_url_link(game_id_or_url, filename):
         logger.error(f"Ошибка при открытии игры через Steam: {e}")
 
 
-def open_link(filename, target_path):
+def open_link(filename, target_path, arguments):
     """
     Функция для открытия обычных ярлыков (.lnk)
+    :param arguments: Аргументы из ярлыка
     :param filename: Имя файла
     :param target_path: Путь к исполняемому файлу (берется из ярлыка)
     """
@@ -408,7 +410,7 @@ def open_link(filename, target_path):
         if existing_processes:
             logger.info(f"Используем существующие процессы для игры '{filename}': {existing_processes}")
             # Запускаем программу
-            subprocess.Popen([target_path], shell=True)
+            subprocess.Popen([target_path] + arguments, shell=True)
         else:
             audio_paths = get_audio_paths(speaker)
             wait_load_file = audio_paths['wait_load_file']
@@ -417,7 +419,7 @@ def open_link(filename, target_path):
             before_processes = get_all_processes()
 
             # Запускаем программу
-            subprocess.Popen([target_path], shell=True)
+            subprocess.Popen([target_path] + arguments, shell=True)
 
             # Ждем несколько секунд, чтобы процессы успели запуститься
             time.sleep(40)

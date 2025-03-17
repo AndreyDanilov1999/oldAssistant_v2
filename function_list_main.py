@@ -32,17 +32,39 @@ def shutdown_windows():
     react_detail(off_file)
     subprocess.run(["shutdown", "/s", "/t", "0"])
 
+def restart_windows():
+    """
+    Выключение компа
+    """
+    speaker = get_current_speaker(settings_file)  # Получаем текущий голос
+    audio_paths = get_audio_paths(speaker)
+    off_file = audio_paths['off_file']
+    react_detail(off_file)
+    subprocess.run(["shutdown", "/r", "/t", "0"])
+
 def open_volume_mixer():
     """ Открывает микшер виндовс """
     try:
         subprocess.Popen(["sndvol.exe", "/R"])
-        logger.info("Микшер громкости открыт.")
+        logger.info("Микшер громкости открыт")
         speaker = get_current_speaker(settings_file)  # Получаем текущий голос
         audio_paths = get_audio_paths(speaker)
         start_folder = audio_paths.get('start_folder')
         react(start_folder)
     except Exception as e:
         logger.error(f"Ошибка при открытии микшера громкости: {e}", exc_info=True)
+
+def close_volume_mixer():
+    """ Открывает микшер виндовс """
+    try:
+        subprocess.run(['taskkill', '/IM', 'sndvol.exe', '/F'], check=True)
+        logger.info("Микшер громкости закрыт")
+        speaker = get_current_speaker(settings_file)  # Получаем текущий голос
+        audio_paths = get_audio_paths(speaker)
+        close_folder = audio_paths['close_folder']
+        react(close_folder)
+    except Exception as e:
+        logger.error(f"Ошибка при закрытии микшера громкости: {e}", exc_info=True)
 
 def open_calc():
     """ Открывает калькулятор """
@@ -117,4 +139,28 @@ def greeting():
         react(audio_paths['start_greet_folder'])
     else:
         react_detail(audio_paths['evening_greet'])
+
+def open_taskmgr():
+    """ Открывает Диспетчер задач """
+    try:
+        subprocess.Popen("taskmgr.exe")
+        logger.info("Диспетчер задач открыт")
+        speaker = get_current_speaker(settings_file)  # Получаем текущий голос
+        audio_paths = get_audio_paths(speaker)
+        start_folder = audio_paths.get('start_folder')
+        react(start_folder)
+    except Exception as e:
+        logger.error(f"Ошибка: {e}", exc_info=True)
+
+def close_taskmgr():
+    """ Закрывает Диспетчер задач """
+    try:
+        subprocess.run(['taskkill', '/IM', 'taskmgr.exe', '/F'], check=True)
+        logger.info(f"Процесс успешно завершен.")
+        speaker = get_current_speaker(settings_file)  # Получаем текущий голос
+        audio_paths = get_audio_paths(speaker)
+        close_folder = audio_paths['close_folder']
+        react(close_folder)
+    except Exception as e:
+        logger.error(f"Ошибка: {e}")
 
