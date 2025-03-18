@@ -2717,7 +2717,7 @@ class CensorCounterWidget(QWidget):
 
     def load_data(self):
         # Загружаем данные из CSV-файла
-        file_path = os.path.join("user_settings", "censor_counter.csv")  # Убедитесь, что путь правильный
+        file_path = os.path.join(get_base_directory(), "user_settings", "censor_counter.csv")
         try:
             self.data = pd.read_csv(file_path, parse_dates=["date"])
             self.calculate_scores()
