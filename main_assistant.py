@@ -5,10 +5,13 @@
 запуска и управления ассистентом, включая обработку
 пользовательского ввода и управление интерфейсом.
 """
+import csv
 import json
 import logging
 import os.path
 import random
+from datetime import timedelta
+from pathlib import Path
 import sys
 import time
 import traceback
@@ -17,6 +20,7 @@ import requests
 from packaging import version
 import psutil
 import winsound
+import pandas as pd
 from func_list import search_links, handler_links, handler_folder
 from function_list_main import *
 import simpleaudio as sa
@@ -33,7 +37,7 @@ from PyQt5.QtGui import QIcon, QColor, QCursor
 from PyQt5.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout, \
                              QPushButton, QCheckBox, QSystemTrayIcon, QAction, qApp, QMenu, QMessageBox, \
                              QTextEdit, QDialog, QLabel, QComboBox, QLineEdit, QListWidget, QListWidgetItem, \
-                             QFileDialog, QColorDialog, QSlider, QInputDialog)
+                             QFileDialog, QColorDialog, QSlider, QInputDialog, QStackedWidget, QFrame)
 from PyQt5.QtCore import Qt, QFileSystemWatcher, QTimer, QEvent, pyqtSignal, QSettings
 
 
@@ -42,6 +46,7 @@ speakers = dict(Пласид='placide', Бестия='rogue', Джонни='john
 
 # Сырая ссылка на version.txt в GitHub
 VERSION_FILE_URL = "https://raw.githubusercontent.com/AndreyDanilov1999/oldAssistant_v2/refs/heads/master/version.txt"
+
 
 
 class Assistant(QWidget):
@@ -113,7 +118,7 @@ class Assistant(QWidget):
         self.assist_name3 = self.settings.get('assist_name3', "джо")
         self.audio_paths = get_audio_paths(self.speaker)
         self.MEMORY_LIMIT_MB = 1024
-        self.version = "1.2.3"
+        self.version = "1.2.4"
         self.ps = "Powered by theoldman"
         self.label_version = QLabel(f"Версия: {self.version} {self.ps}", self)
         self.label_message = QLabel('', self)
@@ -206,6 +211,11 @@ class Assistant(QWidget):
         self.relax_button.clicked.connect(self.relax_window)
         left_layout.addWidget(self.relax_button)
 
+        # Кнопка "Прочее"
+        self.other_button = QPushButton("Прочее")
+        self.other_button.clicked.connect(self.other_options)
+        left_layout.addWidget(self.other_button)
+
         # Добавляем растяжку, чтобы кнопки были вверху
         left_layout.addStretch()
 
@@ -235,7 +245,6 @@ class Assistant(QWidget):
         # Добавляем левую и правую части в основной макет
         main_layout.addLayout(left_layout, 1)
         main_layout.addLayout(right_layout, 2)
-
 
         # Устанавливаем основной макет для окна
         self.setLayout(main_layout)
@@ -676,6 +685,61 @@ class Assistant(QWidget):
         if self.assistant_thread and self.assistant_thread.is_alive():
             self.assistant_thread.join()  # Ожидание завершения потока
 
+    def censor_counter(self):
+        # Путь к CSV-файлу
+        CSV_FILE = os.path.join(self.get_base_directory(), 'user_settings', 'censor_counter.csv')
+
+        # Создаем файл, если он не существует
+        if not Path(CSV_FILE).exists():
+            with open(CSV_FILE, mode='w', newline='') as file:
+                writer = csv.writer(file)
+                writer.writerow(['date', 'score', 'total_score'])  # Заголовки столбцов
+
+        # Получаем текущую дату
+        today = datetime.now().strftime('%Y-%m-%d')
+
+        # Читаем данные из CSV
+        rows = []
+        with open(CSV_FILE, mode='r') as file:
+            reader = csv.reader(file)
+            headers = next(reader)  # Пропускаем заголовки
+            for row in reader:
+                # Пропускаем пустые строки
+                if not row:
+                    continue
+                # Проверяем, что строка содержит достаточно данных
+                if len(row) >= 3:
+                    rows.append(row)
+
+        # Ищем запись для текущей даты
+        found = False
+        total_score = 0
+        for row in rows:
+            try:
+                # Преобразуем score и total_score в int
+                row[1] = int(row[1])
+                row[2] = int(row[2])
+                total_score += row[1]  # Считаем общее количество
+
+                if row[0] == today:
+                    # Если запись найдена, увеличиваем score на 1
+                    row[1] += 1
+                    row[2] += 1
+                    found = True
+            except (ValueError, IndexError) as e:
+                print(f"Ошибка при обработке строки {row}: {e}")
+                continue
+
+        # Если запись не найдена, добавляем новую
+        if not found:
+            rows.append([today, 1, total_score + 1])
+
+        # Записываем обновленные данные обратно в CSV
+        with open(CSV_FILE, mode='w', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerow(headers)  # Записываем заголовки
+            writer.writerows(rows)  # Записываем данные
+
 # "Основной цикл ассистента"
 # "--------------------------------------------------------------------------------------------------"
 # "Основной цикл ассистента"
@@ -696,6 +760,12 @@ class Assistant(QWidget):
                 if not self.check_memory_usage(self.MEMORY_LIMIT_MB):
                     logger.error("Превышен лимит памяти. Завершение работы.")
                     break
+
+                    # Проверка на мат, если цензура включена
+                if any(keyword in text for keyword in ['сук', 'суч', 'пизд', 'еба', 'ёба',
+                                                       'нах', 'хуй', 'бля', 'ебу', 'епт',
+                                                       'ёпт']):
+                    self.censor_counter()
 
                 # Проверка на мат, если цензура включена
                 if self.is_censored and any(keyword in text for keyword in ['сук', 'суч', 'пизд', 'еба', 'ёба',
@@ -743,7 +813,7 @@ class Assistant(QWidget):
                             shutdown_windows()
                             continue
 
-                        elif 'перезагруз комп' in command:
+                        elif 'перезагрузить комп' in command:
                             logger.info("Перезагружаю компьютер")
                             restart_windows()
                             continue
@@ -1016,6 +1086,11 @@ class Assistant(QWidget):
         """Обработка нажатия кнопки Релакс"""
         dialog = RelaxWindow(self)
         dialog.exec_()
+
+    def other_options(self):
+        """Открываем окно с настройками"""
+        self.other_window = OtherOptionsWindow(self)
+        self.other_window.show()
 
     def update_app(self):
         """Обработка нажатия кнопки Установить обновление"""
@@ -2549,6 +2624,166 @@ class LinkProcessWindow(QDialog):
         """ Сохраняет данные при закрытии окна """
         self.save_process_names()
         super().closeEvent(event)
+
+
+class OtherOptionsWindow(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.init_ui()
+
+    def init_ui(self):
+        self.setWindowTitle("Прочие опции")
+        self.setFixedSize(400, 450)
+
+        # Основной layout
+        main_layout = QHBoxLayout(self)
+
+        # Левая колонка с кнопками
+        left_column = QVBoxLayout()
+        left_column.setAlignment(Qt.AlignTop)  # Выравниваем кнопки по верху
+        main_layout.addLayout(left_column, 1)
+
+        # Добавляем линию-разделитель
+        separator = QFrame()
+        separator.setFrameShape(QFrame.VLine)  # Вертикальная линия
+        separator.setFrameShadow(QFrame.Sunken)
+        main_layout.addWidget(separator)
+
+        # Правая колонка с содержимым
+        self.right_column = QStackedWidget()
+        main_layout.addWidget(self.right_column, 2)
+
+        # Добавляем кнопки и их содержимое
+        self.add_tab("Счетчик цензуры", CensorCounterWidget(self))
+
+    def add_tab(self, button_name, content_widget):
+        # Создаем кнопку
+        button = QPushButton(button_name, self)
+        button.clicked.connect(lambda: self.right_column.setCurrentIndex(self.right_column.count() - 1))
+
+        # Добавляем кнопку в левую колонку
+        self.layout().itemAt(0).layout().addWidget(button)
+
+        # Добавляем содержимое в правую колонку
+        self.right_column.addWidget(content_widget)
+
+
+class CensorCounterWidget(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.init_ui()
+        self.load_data()
+
+    def init_ui(self):
+        # Основной layout
+        layout = QVBoxLayout(self)
+
+        # Метки для отображения данных
+        self.day_label = QLabel("За день: 0", self)
+        self.week_label = QLabel("За последние 7 дней: 0", self)
+        self.month_label = QLabel("За последние 30 дней: 0", self)
+        self.total_label = QLabel("Всего: 0", self)
+
+        # Добавляем метки в layout
+        layout.addWidget(self.day_label)
+        layout.addWidget(self.week_label)
+        layout.addWidget(self.month_label)
+        layout.addWidget(self.total_label)
+
+        self.reset_button = QPushButton("Сбросить счетчик")
+        self.reset_button.clicked.connect(self.reset_censor_counter)
+        layout.addWidget(self.reset_button)
+
+        layout.addStretch()
+
+    def load_data(self):
+        # Загружаем данные из CSV-файла
+        file_path = os.path.join("user_settings", "censor_counter.csv")  # Убедитесь, что путь правильный
+        try:
+            self.data = pd.read_csv(file_path, parse_dates=["date"])
+            self.calculate_scores()
+        except Exception as e:
+            logger.error(f"Ошибка при загрузке censor_counter.csv: {e}")
+
+    def calculate_scores(self):
+        # Текущая дата
+        today = datetime.now().date()
+
+        # Данные за день
+        day_data = self.data[self.data["date"].dt.date == today]
+        day_score = int(day_data["score"].sum())
+
+        # Данные за неделю (последние 7 дней, включая сегодня)
+        week_start = today - timedelta(days=6)
+        week_data = self.data[self.data["date"].dt.date >= week_start]
+        week_score = int(week_data["score"].sum())
+
+        # Данные за месяц (последние 30 дней, включая сегодня)
+        month_start = today - timedelta(days=29)
+        month_data = self.data[self.data["date"].dt.date >= month_start]
+        month_score = int(month_data["score"].sum())
+
+        # Общий счет
+        total_score = int(self.data["score"].sum())
+
+        # Обновляем метки
+        self.day_label.setText(f"За день: {day_score}")
+        self.week_label.setText(f"За последние 7 дней: {week_score}")
+        self.month_label.setText(f"За последние 30 дней: {month_score}")
+        self.total_label.setText(f"Всего: {total_score}")
+
+    def reset_censor_counter(self):
+        """
+        Сбрасывает счетчик, обнуляя таблицу censor_counter.csv.
+        Оставляет только заголовки.
+        """
+
+        # Диалоговое окно с подтверждением
+        msg_box = QMessageBox(self)
+        msg_box.setWindowTitle('Сброс счетчика')
+        msg_box.setText("Точно сбросить значения?")
+        yes_button = msg_box.addButton("Да", QMessageBox.YesRole)
+        no_button = msg_box.addButton("Нет", QMessageBox.NoRole)
+        yes_button.setStyleSheet("padding: 1px 10px;")
+        no_button.setStyleSheet("padding: 1px 10px;")
+        msg_box.setIcon(QMessageBox.Warning)
+        msg_box.exec_()
+
+        # Если пользователь нажал "Нет", выходим из метода
+        if msg_box.clickedButton() == no_button:
+            logger.info("Сброс счетчика отменен.")
+            return
+
+        # Путь к CSV-файлу
+        CSV_FILE = os.path.join(get_base_directory(), 'user_settings', 'censor_counter.csv')
+
+        # Проверяем, существует ли файл
+        if not Path(CSV_FILE).exists():
+            logger.error("Файл censor_counter.csv не существует. Невозможно сбросить счетчик.")
+            return
+
+        # Открываем файл для записи и оставляем только заголовки
+        with open(CSV_FILE, mode='w', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerow(['date', 'score', 'total_score'])  # Записываем заголовки
+
+        logger.info("Счетчик успешно сброшен.")
+
+        # Обновляем лейблы после сброса
+        self.update_labels()
+
+    def update_labels(self):
+        """
+        Обновляет лейблы после сброса счетчика.
+        """
+        try:
+            # Обновляем значения в лейблах
+            self.day_label.setText("За день: 0")
+            self.week_label.setText("За последние 7 дней: 0")
+            self.month_label.setText("За последние 30 дней: 0")
+            self.total_label.setText("Всего: 0")
+        except Exception as e:
+            logger.error(f"Ошибка при обновлении лейблов: {e}")
 
 
 # Запуск приложения
