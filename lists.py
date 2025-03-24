@@ -47,6 +47,7 @@ def get_audio_paths(speaker):
     start_rust = os.path.join(other_folder, 'я в раст не пойду.ogg')
     prorok_sanboy = os.path.join(other_folder, 'пророк санбой.ogg')
     update_button = os.path.join(other_folder, 'еще не готово.ogg')
+    what_command = os.path.join(other_folder, 'не понял команду.ogg')
 
     return {
         'what_folder': what_folder,
@@ -70,4 +71,5 @@ def get_audio_paths(speaker):
         'update_button': update_button,
         'morning_greet': morning_greet,
         'evening_greet': evening_greet,
+        'what_command': what_command
     }

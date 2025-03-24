@@ -52,6 +52,10 @@ def open_volume_mixer():
         start_folder = audio_paths.get('start_folder')
         react(start_folder)
     except Exception as e:
+        speaker = get_current_speaker(settings_file)  # Получаем текущий голос
+        audio_paths = get_audio_paths(speaker)
+        error_file = audio_paths.get('error_file')
+        react_detail(error_file)
         logger.error(f"Ошибка при открытии микшера громкости: {e}", exc_info=True)
 
 def close_volume_mixer():
@@ -64,6 +68,10 @@ def close_volume_mixer():
         close_folder = audio_paths['close_folder']
         react(close_folder)
     except Exception as e:
+        speaker = get_current_speaker(settings_file)  # Получаем текущий голос
+        audio_paths = get_audio_paths(speaker)
+        error_file = audio_paths.get('error_file')
+        react_detail(error_file)
         logger.error(f"Ошибка при закрытии микшера громкости: {e}", exc_info=True)
 
 def open_calc():
@@ -76,6 +84,10 @@ def open_calc():
         start_folder = audio_paths.get('start_folder')
         react(start_folder)
     except Exception as e:
+        speaker = get_current_speaker(settings_file)  # Получаем текущий голос
+        audio_paths = get_audio_paths(speaker)
+        error_file = audio_paths.get('error_file')
+        react_detail(error_file)
         logger.error(f"Ошибка при открытии калькулятора {e}", exc_info=True)
 
 def close_calc():
@@ -88,6 +100,10 @@ def close_calc():
         close_folder = audio_paths['close_folder']
         react(close_folder)
     except Exception as e:
+        speaker = get_current_speaker(settings_file)  # Получаем текущий голос
+        audio_paths = get_audio_paths(speaker)
+        error_file = audio_paths.get('error_file')
+        react_detail(error_file)
         logger.error(f"Ошибка: {e}")
 
 def open_paint():
@@ -100,6 +116,10 @@ def open_paint():
         start_folder = audio_paths.get('start_folder')
         react(start_folder)
     except Exception as e:
+        speaker = get_current_speaker(settings_file)  # Получаем текущий голос
+        audio_paths = get_audio_paths(speaker)
+        error_file = audio_paths.get('error_file')
+        react_detail(error_file)
         logger.error(f"Ошибка при открытии paint {e}", exc_info=True)
 
 def close_paint():
@@ -112,6 +132,10 @@ def close_paint():
         close_folder = audio_paths['close_folder']
         react(close_folder)
     except Exception as e:
+        speaker = get_current_speaker(settings_file)  # Получаем текущий голос
+        audio_paths = get_audio_paths(speaker)
+        error_file = audio_paths.get('error_file')
+        react_detail(error_file)
         logger.error(f"Ошибка: {e}")
 
 def open_path():
@@ -123,6 +147,10 @@ def open_path():
         start_folder = audio_paths.get('start_folder')
         react(start_folder)
     except Exception as e:
+        speaker = get_current_speaker(settings_file)  # Получаем текущий голос
+        audio_paths = get_audio_paths(speaker)
+        error_file = audio_paths.get('error_file')
+        react_detail(error_file)
         logger.error(f"Ошибка {e}", exc_info=True)
 
 def greeting():
@@ -150,6 +178,10 @@ def open_taskmgr():
         start_folder = audio_paths.get('start_folder')
         react(start_folder)
     except Exception as e:
+        speaker = get_current_speaker(settings_file)  # Получаем текущий голос
+        audio_paths = get_audio_paths(speaker)
+        error_file = audio_paths.get('error_file')
+        react_detail(error_file)
         logger.error(f"Ошибка: {e}", exc_info=True)
 
 def close_taskmgr():
@@ -162,5 +194,9 @@ def close_taskmgr():
         close_folder = audio_paths['close_folder']
         react(close_folder)
     except Exception as e:
+        speaker = get_current_speaker(settings_file)  # Получаем текущий голос
+        audio_paths = get_audio_paths(speaker)
+        error_file = audio_paths.get('error_file')
+        react_detail(error_file)
         logger.error(f"Ошибка: {e}")
 

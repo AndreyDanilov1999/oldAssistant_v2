@@ -10,6 +10,7 @@ import json
 import logging
 import os.path
 import random
+import tempfile
 from datetime import timedelta
 from pathlib import Path
 import sys
@@ -46,6 +47,7 @@ speakers = dict(Пласид='placide', Бестия='rogue', Джонни='john
 
 # Сырая ссылка на version.txt в GitHub
 VERSION_FILE_URL = "https://raw.githubusercontent.com/AndreyDanilov1999/oldAssistant_v2/refs/heads/master/version.txt"
+CHANGELOG_FILE_URL = "https://raw.githubusercontent.com/AndreyDanilov1999/oldAssistant_v2/refs/heads/master/changelog.txt"
 
 
 
@@ -95,6 +97,7 @@ class Assistant(QWidget):
         self.tray_icon = None
         self.start_button = None
         self.styles = None
+        self.changelog_file_path = None
         self.log_file_path = os.path.join(self.get_base_directory(), 'assistant.log')
         self.init_logger()
         self.settings_file_path = os.path.join(self.get_base_directory(), 'user_settings', 'settings.json')
@@ -118,7 +121,7 @@ class Assistant(QWidget):
         self.assist_name3 = self.settings.get('assist_name3', "джо")
         self.audio_paths = get_audio_paths(self.speaker)
         self.MEMORY_LIMIT_MB = 1024
-        self.version = "1.2.4"
+        self.version = "1.2.5"
         self.ps = "Powered by theoldman"
         self.label_version = QLabel(f"Версия: {self.version} {self.ps}", self)
         self.label_message = QLabel('', self)
@@ -229,11 +232,14 @@ class Assistant(QWidget):
         self.update_button.clicked.connect(self.update_app)
         left_layout.addWidget(self.update_button)
 
+        # Лейбл, при нажатии будет открываться changelog
+        self.label_version.setCursor(QCursor(Qt.PointingHandCursor))
+        self.label_version.mousePressEvent = self.changelog_window
         left_layout.addWidget(self.label_version)
 
         # Правая часть (поле для логов)
         self.log_area = QTextEdit()
-        self.log_area.setReadOnly(True)  # Запрещаем редактирование
+        self.log_area.setReadOnly(True)
 
         # Кнопка "Очистить логи"
         self.clear_logs_button = QPushButton("Очистить логи")
@@ -289,80 +295,135 @@ class Assistant(QWidget):
             self.update_button.hide()
 
     def check_for_updates_app(self):
+        """Проверяет обновления, загружая данные из сырых URL-ссылок"""
         try:
-            # Скачиваем файл с версией
-            response = requests.get(VERSION_FILE_URL)
-            response.raise_for_status()  # Проверяем, что запрос успешен
+            # Загружаем файл с версией с таймаутом 10 секунд
+            version_response = requests.get(
+                VERSION_FILE_URL,
+                timeout=10,
+                headers={'Cache-Control': 'no-cache'}
+            )
+            version_response.raise_for_status()
 
-            # Читаем содержимое файла
-            content = response.text.strip()
-            self.logger.info(f"Содержимое version.txt: {content}")
+            # Загружаем changelog с таймаутом 15 секунд (может быть больше)
+            changelog_response = requests.get(
+                CHANGELOG_FILE_URL,
+                timeout=15,
+                headers={'Cache-Control': 'no-cache'}
+            )
+            changelog_response.raise_for_status()
 
-            # Разделяем содержимое на версию и ссылку
-            parts = content.split()
-            if len(parts) != 2:
-                raise ValueError("Некорректный формат version.txt")
+            # Обрабатываем файл версии
+            version_content = version_response.text.strip()
+            self.logger.info(f"Получена информация о версии: {version_content}")
 
-            latest_version, latest_version_url = parts
+            # Сохраняем changelog во временный файл
+            changelog_path = os.path.join(tempfile.gettempdir(), 'changelog.txt')
+            with open(changelog_path, 'w', encoding='utf-8') as f:
+                f.write(changelog_response.text)
 
-            # Сохраняем ссылку на последнюю версию
+            # Обновляем путь к changelog
+            self.changelog_file_path = changelog_path
+
+            # Парсим данные версии
+            version_parts = version_content.split(maxsplit=1)
+            if len(version_parts) < 2:
+                raise ValueError("Файл версии должен содержать номер версии и URL через пробел")
+
+            latest_version, latest_version_url = version_parts[0], version_parts[1].strip()
+
+            # Валидация версии
+            current_ver = version.parse(self.version)
+            latest_ver = version.parse(latest_version)
+
+            self.logger.info(f"Текущая версия: {current_ver}, Доступная версия: {latest_ver}")
+
+            # Сохраняем ссылку для использования в show_popup
             self.latest_version_url = latest_version_url
 
-            # Проверяем, что полученное значение является валидным номером версии
-            if not version.parse(latest_version):
-                raise ValueError("Invalid version format")
-
-            # Сравниваем текущую версию с последней версией
-            if version.parse(latest_version) > version.parse(self.version):
+            # Проверяем обновление
+            if latest_ver > current_ver:
                 self.update_label.setText("Доступна новая версия")
                 self.check_update_label()
-                # Проверяем, нужно ли показывать всплывающее окно
+
                 if self.settings.get("show_upd_msg", True):
-                    # Показываем всплывающее окно с чекбоксом
                     self.show_popup(latest_version)
             else:
                 self.update_label.setText("Установлена последняя версия")
 
+        except requests.Timeout:
+            self.logger.warning("Таймаут при проверке обновлений")
+            self.update_label.setText("Ошибка соединения")
+            self.update_label.setStyleSheet("color: orange;")
+
         except requests.RequestException as e:
-            self.logger.error(f"Не удалось проверить обновления: {e}")
+            self.logger.error(f"Ошибка сети: {str(e)}")
+            self.update_label.setText("Нет соединения")
+            self.update_label.setStyleSheet("color: orange;")
+
         except ValueError as e:
-            self.logger.error(f"Ошибка в формате version.txt: {e}")
+            self.logger.error(f"Ошибка формата данных: {str(e)}")
+            self.update_label.setText("Ошибка данных")
+            self.update_label.setStyleSheet("color: red;")
+
         except Exception as e:
-            self.logger.error(f"Произошла ошибка: {e}")
+            self.logger.error(f"Неожиданная ошибка: {str(e)}", exc_info=True)
+            self.update_label.setText("Ошибка обновления")
+            self.update_label.setStyleSheet("color: red;")
 
     def show_popup(self, latest_version):
-        """Показывает всплывающее окно с чекбоксом 'Не показывать снова'."""
+        """Показывает всплывающее окно обновления, которое не закрывается при просмотре изменений"""
         msg_box = QMessageBox(self)
-        msg_box.setWindowTitle("Доступна новая версия")
-        msg_box.setText(f"Последняя версия: {latest_version}. Установить?")
+        msg_box.setWindowTitle("Доступно обновление")
+        msg_box.setIcon(QMessageBox.Information)
 
-        # Добавляем чекбокс "Не показывать снова"
-        checkbox = QCheckBox("Не показывать", msg_box)
+        # Основной текст
+        msg_box.setText(
+            f"<b>Доступна новая версия: {latest_version}</b>"
+            "<p>Хотите скачать обновление?</p>"
+        )
+
+        # Кастомная кнопка для изменений
+        changes_btn = msg_box.addButton("Список изменений", QMessageBox.ActionRole)
+        changes_btn.setIcon(QIcon.fromTheme("text-x-generic"))
+
+        # Стандартные кнопки
+        msg_box.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+        msg_box.button(QMessageBox.Yes).setText("Установить")
+        msg_box.button(QMessageBox.No).setText("Позже")
+
+        # Чекбокс
+        checkbox = QCheckBox("Больше не показывать")
         msg_box.setCheckBox(checkbox)
 
-        # Кнопки "Да" и "Нет"
-        msg_box.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
-        msg_box.button(QMessageBox.Yes).setText("Да")
-        msg_box.button(QMessageBox.No).setText("Нет")
+        # Стилизация
+        for btn in [changes_btn, msg_box.button(QMessageBox.Yes), msg_box.button(QMessageBox.No)]:
+            btn.setStyleSheet("""
+                QPushButton {
+                    padding: 5px 15px;
+                    min-width: 120px;
+                }
+            """)
 
-        # Применяем стили к кнопкам
-        yes_button = msg_box.button(QMessageBox.Yes)
-        no_button = msg_box.button(QMessageBox.No)
+        # Модифицированная обработка
+        while True:
+            response = msg_box.exec_()
 
-        yes_button.setStyleSheet("padding: 1px 10px;")
-        no_button.setStyleSheet("padding: 1px 10px;")
+            # Если нажали "Список изменений"
+            if msg_box.clickedButton() == changes_btn:
+                self.changelog_window(None)  # Показываем changelog
+                continue  # Продолжаем показ основного окна
 
-        # Показываем окно и ждём ответа
-        reply = msg_box.exec_()
+            # Если нажали другую кнопку
+            if response == QMessageBox.Yes:
+                webbrowser.open(self.latest_version_url)
 
-        # Если пользователь нажал "Скачать", открываем ссылку
-        if reply == QMessageBox.Yes:
-            webbrowser.open(self.latest_version_url)
+            # Сохранение настроек
+            if checkbox.isChecked():
+                self.show_upd_msg = False
+                self.save_settings()
 
-        # Если чекбокс отмечен, сохраняем настройку в JSON
-        if checkbox.isChecked():
-            self.show_upd_msg = False
-            self.save_settings()
+            break  # Выходим из цикла
 
     def init_logger(self):
         """Инициализация логгера."""
@@ -747,49 +808,95 @@ class Assistant(QWidget):
     def run_script(self):
         """Основной цикл ассистента"""
         greeting()
+        last_unrecognized_command = None  # Хранит контекст неудачной команды
+        last_activity_time = time.time()  # Время последней активности
 
         if not self.initialize_audio():
-            return  # Если инициализация не удалась, завершаем выполнение
+            return
 
         try:
             for text in self.get_audio():
-                if not self.is_assistant_running:  # Проверяем флаг is_assistant_running
+                current_time = time.time()
+
+                # Сбрасываем контекст, если прошло более 7 секунд без активности
+                if last_unrecognized_command and (current_time - last_activity_time) > 7:
+                    last_unrecognized_command = None
+                    logger.info("Сброс контекста из-за неактивности (7 секунд)")
+                    continue
+
+                if not self.is_assistant_running:
                     break
 
-                # Проверка использования памяти
+                # Обновляем время последней активности при получении текста
+                last_activity_time = current_time
+
+                # Проверка памяти и цензуры (без изменений)
                 if not self.check_memory_usage(self.MEMORY_LIMIT_MB):
                     logger.error("Превышен лимит памяти. Завершение работы.")
                     break
 
-                    # Проверка на мат, если цензура включена
                 if any(keyword in text for keyword in ['сук', 'суч', 'пизд', 'еба', 'ёба',
-                                                       'нах', 'хуй', 'бля', 'ебу', 'епт',
-                                                       'ёпт']):
+                                                       'нах', 'ху', 'бля', 'ебу', 'еп',
+                                                       'ёп', 'гандон', 'пид']):
                     self.censor_counter()
 
-                # Проверка на мат, если цензура включена
                 if self.is_censored and any(keyword in text for keyword in ['сук', 'суч', 'пизд', 'еба', 'ёба',
-                                                                            'нах', 'хуй', 'бля', 'ебу', 'епт',
-                                                                            'ёпт']):
+                                                                            'нах', 'ху', 'бля', 'ебу', 'еп',
+                                                                            'ёп', 'гандон', 'пид']):
                     censored_folder = self.audio_paths.get('censored_folder')
                     react(censored_folder)
-                    continue  # Пропускаем дальнейшую обработку, если обнаружен мат
+                    continue
+
+                # Режим уточнения команды (если предыдущая попытка не удалась)
+                if last_unrecognized_command:
+                    if text:
+                        # Обновляем время последней активности при обработке команды
+                        last_activity_time = current_time
+                        # Проверяем, содержит ли текст только кириллические символы (исключаем английскую речь)
+                        if any(cyr_char in text.lower() for cyr_char in 'абвгдеёжзийклмнопрстуфхцчшщъыьэюя'):
+                            # Сначала проверяем специальные команды (калькулятор, диспетчер и т.д.)
+                            special_commands = {
+                                'микшер': (open_volume_mixer, close_volume_mixer),
+                                'калькул': (open_calc, close_calc),
+                                'pain': (open_paint, close_paint),
+                                'пэйнт': (open_paint, close_paint),
+                                'переменные': (open_path, None),
+                                'диспетчер': (open_taskmgr, close_taskmgr)
+                            }
+
+                            # Ищем совпадение со специальными командами
+                            matched_special = next((kw for kw in special_commands if kw in text.lower()), None)
+
+                            if matched_special:
+                                if last_unrecognized_command['action_type'] == 'open':
+                                    special_commands[matched_special][0]()
+                                elif last_unrecognized_command['action_type'] == 'close':
+                                    if special_commands[matched_special][1]:
+                                        special_commands[matched_special][1]()
+                                last_unrecognized_command = None
+                                continue
+
+                            # Ищем прямое совпадение с командами из файла
+                            matched_keyword = next((kw for kw in self.commands if kw in text.lower()), None)
+
+                            if matched_keyword:
+                                restored_command = f"{last_unrecognized_command['action']} {matched_keyword}"
+                                text = restored_command
+                                logger.info(f"Восстановленная команда: {restored_command}")
+                            else:
+                                what_folder = self.audio_paths.get('what_folder')
+                                if what_folder:
+                                    react(what_folder)
+                                continue
+
+                            last_unrecognized_command = None
 
                 if self.assistant_name in text or self.assist_name2 in text or self.assist_name3 in text:
                     reaction_triggered = False
+                    action_keywords = ['откр', 'закр', 'вкл', 'выкл', 'запус',
+                                       'отруб', 'выруб']
+                    action = next((kw for kw in action_keywords if kw in text), None)
 
-                    # Определяем действие (открой/закрой)
-                    action_keywords = ['открой', 'закрой', 'вкл', 'выкл', 'запус',
-                                       'отруб']  # Ключевые слова для действий
-                    action = None
-
-                    # Ищем действие в тексте
-                    for keyword in action_keywords:
-                        if keyword in text:
-                            action = keyword
-                            break
-
-                    # Разделяем текст на команды
                     commands = []
                     if " и " in text:
                         commands = text.split(" и ")
@@ -797,92 +904,96 @@ class Assistant(QWidget):
                         commands = text.split(" а также ")
                     elif " потом " in text:
                         commands = text.split(" потом ")
+                    elif " ещё " in text:
+                        commands = text.split(" ещё ")
                     else:
-                        commands = [text]  # Если разделителей нет, обрабатываем как одну команду
+                        commands = [text]
 
-                    # Обрабатываем каждую команду
                     for command in commands:
-                        command = command.strip()  # Убираем лишние пробелы
+                        command = command.strip()
 
-                        # Если действие найдено, добавляем его к команде
-                        if action and not any(keyword in command for keyword in action_keywords):
+                        if action and not any(kw in command for kw in action_keywords):
                             command = f"{action} {command}"
 
+                        # Системные команды (без изменений)
                         if 'выключи комп' in command:
-                            logger.info("Выключаю компьютер")
                             shutdown_windows()
                             continue
-
                         elif 'перезагрузить комп' in command:
-                            logger.info("Перезагружаю компьютер")
                             restart_windows()
                             continue
 
-                        # Обработка команд на запуск
-                        if any(keyword in command for keyword in ['запус', 'откр', 'вкл', 'вруб']):
+                        # Определяем тип действия
+                        action_type = None
+                        if any(kw in command for kw in ['запус', 'откр', 'вкл', 'вруб']):
+                            action_type = 'open'
+                        elif any(kw in command for kw in ['закр', 'выкл', 'выруб', 'отруб']):
+                            action_type = 'close'
+
+                        if action_type:
                             if "микшер" in command:
-                                open_volume_mixer()
+                                if action_type == 'open':
+                                    open_volume_mixer()
+                                else:
+                                    close_volume_mixer()
                             elif 'калькул' in command:
-                                open_calc()
-                            elif 'pain' in command or 'пэйнт' in command:
-                                open_paint()
+                                if action_type == 'open':
+                                    open_calc()
+                                else:
+                                    close_calc()
+                            elif 'pain' in command or 'пэйнт' in command or 'prin' in command:
+                                if action_type == 'open':
+                                    open_paint()
+                                else:
+                                    close_paint()
                             elif 'переменные' in command:
-                                open_path()
+                                if action_type == 'open':
+                                    open_path()
                             elif 'диспетчер' in command:
-                                open_taskmgr()
+                                if action_type == 'open':
+                                    open_taskmgr()
+                                else:
+                                    close_taskmgr()
                             else:
-                                app_command_success = self.handle_app_command(command, 'open')
-                                folder_command_success = self.handle_folder_command(command, 'open')
-                                if not app_command_success and not folder_command_success:
+                                # Пытаемся обработать команду
+                                app_processed = self.handle_app_command(command, action_type)
+                                folder_processed = not app_processed and self.handle_folder_command(command, action_type)
+
+                                if not app_processed and not folder_processed:
+                                    # Сохраняем контекст для уточнения
+                                    last_unrecognized_command = {
+                                        'action': action,
+                                        'action_type': action_type,
+                                        'original_text': text
+                                    }
                                     reaction_triggered = True
-
-                        # Обработка команд на закрытие
-                        elif any(keyword in command for keyword in ['закр', 'выкл', 'выруб', 'отруб']):
-                            if 'калькул' in command:
-                                close_calc()
-                            elif 'pain' in command or 'пэйнт' in command:
-                                close_paint()
-                            elif 'микшер' in command:
-                                close_volume_mixer()
-                            elif 'диспетчер' in command:
-                                close_taskmgr()
-                            else:
-                                app_command_success = self.handle_app_command(command, 'close')
-                                folder_command_success = self.handle_folder_command(command, 'close')
-                                if not app_command_success and not folder_command_success:
-                                    reaction_triggered = True
-
-                        elif "поищи" in command or 'найди' in command:
-                            query = (command.replace("поищи", "").replace("найди", "")
-                                     .replace(self.assistant_name, "")
-                                     .replace(self.assist_name2, "")
-                                     .replace(self.assist_name3, "").strip())
-                            approve_folder = self.audio_paths.get('approve_folder')
-                            if approve_folder:
-                                react(approve_folder)
-                            search_yandex(query)
-
-                        elif 'проверь' in command:
-                            approve_folder = self.audio_paths.get('approve_folder')
-                            if approve_folder:
-                                react(approve_folder)
-                            search_links()
-
                         else:
-                            echo_folder = self.audio_paths.get('echo_folder')
-                            if echo_folder:
-                                react(echo_folder)
+                            # Поиск и другие команды (без изменений)
+                            if "поищи" in command or 'найди' in command:
+                                query = (command.replace("поищи", "").replace("найди", "")
+                                         .replace(self.assistant_name, "")
+                                         .replace(self.assist_name2, "")
+                                         .replace("в интернете", "")
+                                         .replace("в инете", "")
+                                         .replace(self.assist_name3, "").strip())
+                                approve_folder = self.audio_paths.get('approve_folder')
+                                if approve_folder:
+                                    react(approve_folder)
+                                search_yandex(query)
+                            else:
+                                echo_folder = self.audio_paths.get('echo_folder')
+                                if echo_folder:
+                                    react(echo_folder)
 
-                    # Проверка, была ли вызвана реакция
                     if reaction_triggered:
                         what_folder = self.audio_paths.get('what_folder')
                         if what_folder:
                             react(what_folder)
-                        if self.speaker == "sanboy":
-                            if random.random() <= 0.7:
-                                prorok_sanboy = self.audio_paths.get('prorok_sanboy')
-                                react_detail(prorok_sanboy)
+                        if self.speaker == "sanboy" and random.random() <= 0.7:
+                            prorok_sanboy = self.audio_paths.get('prorok_sanboy')
+                            react_detail(prorok_sanboy)
 
+                # Обработка плеера (без изменений)
                 if 'плеер' in text:
                     if any(keyword in text for keyword in
                            ['пауз', 'пуск', 'пуст', 'вкл', 'вруб', 'отруб', 'выкл', 'стоп']):
@@ -901,7 +1012,6 @@ class Assistant(QWidget):
         except Exception as e:
             logger.error(f"Ошибка в основном цикле ассистента: {e}")
             logger.error(traceback.format_exc())
-
             winsound.MessageBeep(winsound.MB_ICONHAND)
             msg_box = QMessageBox(self)
             msg_box.setWindowTitle('Ошибка')
@@ -920,7 +1030,7 @@ class Assistant(QWidget):
         try:
             # Получаем информацию об устройстве ввода по умолчанию
             default_input_device = p.get_default_input_device_info()
-            logger.info(f"Устройство ввода по умолчанию: {default_input_device.get('name')}")
+            logger.info(f"Устройство ввода: {default_input_device.get('name')}")
             return True
         except IOError:
             # Если устройство по умолчанию не найдено
@@ -968,38 +1078,43 @@ class Assistant(QWidget):
 
     def get_audio(self):
         """Преобразование речи с микрофона в текст."""
-        combined_result = ""
-
         try:
             while self.is_assistant_running:
-                data = self.stream.read(256, exception_on_overflow=False)
+                data = self.stream.read(1024, exception_on_overflow=False)
                 if len(data) == 0:
                     break
 
-                # Распознавание с использованием русской модели
+                # Сбрасываем промежуточные результаты
+                ru_text = ""
+                en_text = ""
+
+                # Обрабатываем через русскую модель
                 if self.rec_ru.AcceptWaveform(data):
-                    result_ru = self.rec_ru.Result()
-                    result_ru = json.loads(result_ru)
-                    text = result_ru.get("text", "").strip()
-                    if text:
-                        logger.info(f"Распознано: {text}")
-                        combined_result += text + " "
+                    result = json.loads(self.rec_ru.Result())
+                    ru_text = result.get("text", "").strip().lower()
 
-                # Распознавание с использованием английской модели
+                # Обрабатываем через английскую модель
                 if self.rec_en.AcceptWaveform(data):
-                    result_en = self.rec_en.Result()
-                    result_en = json.loads(result_en)
-                    text = result_en.get("text", "").strip()
-                    if text == "huh":
-                        continue
-                    elif text:
-                        logger.info(f"Распознано: {text}")
-                        combined_result += text + " "
+                    result = json.loads(self.rec_en.Result())
+                    temp_en = result.get("text", "").strip().lower()
+                    if temp_en and temp_en != "huh":
+                        en_text = temp_en
 
-                yield combined_result.strip().lower()
-                combined_result = ""  # Очищаем combined_result после использования
+                # Определяем приоритетный результат
+                final_text = ""
+                if ru_text:  # Русский текст имеет высший приоритет
+                    final_text = ru_text
+                    logger.info(f"Распознано (RU): {ru_text}")
+                elif en_text:  # Если русского нет, используем английский
+                    final_text = en_text
+                    logger.info(f"Распознано (EN): {en_text}")
+
+                if final_text:
+                    yield final_text
 
         except Exception as e:
+            error_file = self.audio_paths.get('error_file')
+            react_detail(error_file)
             logger.error(f"Ошибка при обработке аудиоданных: {e}")
             logger.error(traceback.format_exc())
         finally:
@@ -1091,6 +1206,11 @@ class Assistant(QWidget):
         """Открываем окно с настройками"""
         self.other_window = OtherOptionsWindow(self)
         self.other_window.show()
+
+    def changelog_window(self, event):
+        """Открываем окно с логами изменений"""
+        dialog = ChangelogWindow(self)
+        dialog.exec_()
 
     def update_app(self):
         """Обработка нажатия кнопки Установить обновление"""
@@ -2449,7 +2569,7 @@ if exist "{correct_archive_path}" (
                                     stderr=subprocess.PIPE, creationflags=subprocess.CREATE_NO_WINDOW)
             output = result.stdout.decode('cp866')  # Декодируем вывод
             QMessageBox.information(self, "Успех",
-                                    "Немного подождите, после завершения программы будет установлена новая версия")
+                                    "После завершения программы будет установлена новая версия")
         except subprocess.CalledProcessError as e:
             error_output = e.stderr.decode('cp866')  # Декодируем ошибку
             QMessageBox.critical(self, "Ошибка", f"Не удалось создать задачу: {error_output}")
@@ -2717,7 +2837,7 @@ class CensorCounterWidget(QWidget):
 
     def load_data(self):
         # Загружаем данные из CSV-файла
-        file_path = os.path.join(get_base_directory(), "user_settings", "censor_counter.csv")
+        file_path = os.path.join(self.get_base_directory(), "user_settings", "censor_counter.csv")
         try:
             self.data = pd.read_csv(file_path, parse_dates=["date"])
             self.calculate_scores()
@@ -2803,6 +2923,42 @@ class CensorCounterWidget(QWidget):
             self.total_label.setText("Всего: 0")
         except Exception as e:
             logger.error(f"Ошибка при обновлении лейблов: {e}")
+
+
+class ChangelogWindow(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("История изменений")
+        self.setFixedSize(500, 600)
+
+        # Основной layout
+        layout = QVBoxLayout()
+
+        # Текстовое поле для отображения changelog
+        self.text_edit = QTextEdit()
+        self.text_edit.setReadOnly(True)
+        layout.addWidget(self.text_edit)
+
+        # Кнопка закрытия
+        self.close_button = QPushButton("Закрыть")
+        self.close_button.clicked.connect(self.close)
+        layout.addWidget(self.close_button)
+
+        self.setLayout(layout)
+
+        # Загружаем содержимое файла
+        self.load_changelog()
+
+    def load_changelog(self):
+        try:
+            if os.path.exists(self.parent().changelog_file_path):
+                with open(self.parent().changelog_file_path, 'r', encoding='utf-8') as f:
+                    self.text_edit.setText(f.read())
+            else:
+                logger.error("Файл изменений временно недоступен")
+        except Exception as e:
+            logger.error(f"Ошибка загрузки изменений: {str(e)}")
+
 
 
 # Запуск приложения
