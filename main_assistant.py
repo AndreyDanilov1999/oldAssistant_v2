@@ -121,7 +121,7 @@ class Assistant(QWidget):
         self.assist_name3 = self.settings.get('assist_name3', "джо")
         self.audio_paths = get_audio_paths(self.speaker)
         self.MEMORY_LIMIT_MB = 1024
-        self.version = "1.2.5"
+        self.version = "1.2.6"
         self.ps = "Powered by theoldman"
         self.label_version = QLabel(f"Версия: {self.version} {self.ps}", self)
         self.label_message = QLabel('', self)
@@ -335,8 +335,6 @@ class Assistant(QWidget):
             # Валидация версии
             current_ver = version.parse(self.version)
             latest_ver = version.parse(latest_version)
-
-            self.logger.info(f"Текущая версия: {current_ver}, Доступная версия: {latest_ver}")
 
             # Сохраняем ссылку для использования в show_popup
             self.latest_version_url = latest_version_url
@@ -880,16 +878,28 @@ class Assistant(QWidget):
                             matched_keyword = next((kw for kw in self.commands if kw in text.lower()), None)
 
                             if matched_keyword:
+                                # Восстанавливаем полную команду
                                 restored_command = f"{last_unrecognized_command['action']} {matched_keyword}"
-                                text = restored_command
                                 logger.info(f"Восстановленная команда: {restored_command}")
-                            else:
-                                what_folder = self.audio_paths.get('what_folder')
-                                if what_folder:
-                                    react(what_folder)
-                                continue
 
-                            last_unrecognized_command = None
+                                # Определяем тип действия
+                                action_type = last_unrecognized_command['action_type']
+
+                                # Пытаемся обработать как приложение
+                                app_processed = self.handle_app_command(restored_command, action_type)
+
+                                # Если не получилось, пробуем как папку
+                                if not app_processed:
+                                    folder_processed = self.handle_folder_command(restored_command, action_type)
+
+                                    if not folder_processed:
+                                        logger.warning(f"Не удалось обработать команду: {restored_command}")
+                                        what_folder = self.audio_paths.get('what_folder')
+                                        if what_folder:
+                                            react(what_folder)
+                                        continue
+
+                                last_unrecognized_command = None
 
                 if self.assistant_name in text or self.assist_name2 in text or self.assist_name3 in text:
                     reaction_triggered = False
