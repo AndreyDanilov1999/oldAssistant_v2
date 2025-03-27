@@ -10,6 +10,7 @@ import json
 import logging
 import os.path
 import random
+import shutil
 import tempfile
 from datetime import timedelta
 from pathlib import Path
@@ -105,15 +106,15 @@ class Assistant(QWidget):
         self.settings = self.load_settings()
         self.color_settings_path = os.path.join(self.get_base_directory(), 'user_settings', 'color_settings.json')
         self.commands = self.load_commands(os.path.join(self.get_base_directory(), 'user_settings', 'commands.json'))
-        self.default_preset_style = os.path.join(self.get_base_directory(), 'user_settings', 'presets', 'default.json')
+        self.default_preset_style = os.path.join(self.get_base_directory(), 'bin', 'color_presets', 'default.json')
         self.process_names = os.path.join(self.get_base_directory(), 'user_settings', 'process_names.json')
         self.last_position = 0
-        self.steam_path = self.settings.get('steam_path', '')  # значение по умолчанию, если ключ отсутствует
-        self.volume_assist = self.settings.get('volume_assist', 0.2)  # значение по умолчанию, если ключ отсутствует
+        self.steam_path = self.settings.get('steam_path', '')
+        self.volume_assist = self.settings.get('volume_assist', 0.2)
         self.is_assistant_running = False
-        self.show_upd_msg = self.settings.get("show_upd_msg", False)  # Значение по умолчанию: False
+        self.show_upd_msg = self.settings.get("show_upd_msg", False)
         self.assistant_thread = None
-        self.is_censored = self.settings.get('is_censored', False)  # значение по умолчанию, если ключ отсутствует
+        self.is_censored = self.settings.get('is_censored', False)
         self.censored_thread = None
         self.speaker = self.settings.get("voice", "johnny")
         self.assistant_name = self.settings.get('assistant_name', "джо")
@@ -121,7 +122,7 @@ class Assistant(QWidget):
         self.assist_name3 = self.settings.get('assist_name3', "джо")
         self.audio_paths = get_audio_paths(self.speaker)
         self.MEMORY_LIMIT_MB = 1024
-        self.version = "1.2.6"
+        self.version = "1.2.7"
         self.ps = "Powered by theoldman"
         self.label_version = QLabel(f"Версия: {self.version} {self.ps}", self)
         self.label_message = QLabel('', self)
@@ -180,14 +181,9 @@ class Assistant(QWidget):
         left_layout.addWidget(self.open_folder_button)
 
         # Кнопка "Настройки"
-        self.settings_button = QPushButton("Настройки")
-        self.settings_button.clicked.connect(self.open_settings)
-        left_layout.addWidget(self.settings_button)
-
-        # Кнопка "Оформление интерфейса"
-        self.style_settings_button = QPushButton('Оформление')
-        self.style_settings_button.clicked.connect(self.open_color_settings)
-        left_layout.addWidget(self.style_settings_button)
+        self.newsettings_button = QPushButton("Настройки")
+        self.newsettings_button.clicked.connect(self.open_main_settings)
+        left_layout.addWidget(self.newsettings_button)
 
         # Кнопка "Добавить команду для программы"
         self.add_command_button = QPushButton("Создать команду для программы")
@@ -315,7 +311,7 @@ class Assistant(QWidget):
 
             # Обрабатываем файл версии
             version_content = version_response.text.strip()
-            self.logger.info(f"Получена информация о версии: {version_content}")
+            self.logger.info(f"Последняя версия: {version_content}")
 
             # Сохраняем changelog во временный файл
             changelog_path = os.path.join(tempfile.gettempdir(), 'changelog.txt')
@@ -539,15 +535,6 @@ class Assistant(QWidget):
     def format_style(self, style_dict):
         """Форматируем словарь стиля в строку для setStyleSheet"""
         return '; '.join(f"{key}: {value}" for key, value in style_dict.items())
-
-    def open_color_settings(self):
-        """Открывает диалоговое окно для настройки цветов."""
-        try:
-            color_dialog = ColorSettingsWindow(self.styles, self.color_settings_path, self)
-            color_dialog.colorChanged.connect(self.load_and_apply_styles)
-            color_dialog.exec_()
-        except Exception as e:
-            logger.info(f"Ошибка при открытии окна настроек: {e}")
 
     def close_app(self):
         """Закрытие приложения."""
@@ -786,7 +773,7 @@ class Assistant(QWidget):
                     row[2] += 1
                     found = True
             except (ValueError, IndexError) as e:
-                print(f"Ошибка при обработке строки {row}: {e}")
+                logger.error(f"Ошибка при обработке строки {row}: {e}")
                 continue
 
         # Если запись не найдена, добавляем новую
@@ -830,7 +817,8 @@ class Assistant(QWidget):
 
                 # Проверка памяти и цензуры (без изменений)
                 if not self.check_memory_usage(self.MEMORY_LIMIT_MB):
-                    logger.error("Превышен лимит памяти. Завершение работы.")
+                    logger.error("Превышен лимит памяти")
+                    self.stop_assist()
                     break
 
                 if any(keyword in text for keyword in ['сук', 'суч', 'пизд', 'еба', 'ёба',
@@ -856,7 +844,6 @@ class Assistant(QWidget):
                             special_commands = {
                                 'микшер': (open_volume_mixer, close_volume_mixer),
                                 'калькул': (open_calc, close_calc),
-                                'pain': (open_paint, close_paint),
                                 'пэйнт': (open_paint, close_paint),
                                 'переменные': (open_path, None),
                                 'диспетчер': (open_taskmgr, close_taskmgr)
@@ -887,17 +874,14 @@ class Assistant(QWidget):
 
                                 # Пытаемся обработать как приложение
                                 app_processed = self.handle_app_command(restored_command, action_type)
+                                folder_processed = self.handle_folder_command(restored_command, action_type)
 
-                                # Если не получилось, пробуем как папку
-                                if not app_processed:
-                                    folder_processed = self.handle_folder_command(restored_command, action_type)
-
-                                    if not folder_processed:
-                                        logger.warning(f"Не удалось обработать команду: {restored_command}")
-                                        what_folder = self.audio_paths.get('what_folder')
-                                        if what_folder:
-                                            react(what_folder)
-                                        continue
+                                if not folder_processed and not app_processed:
+                                    logger.warning(f"Не удалось обработать команду: {restored_command}")
+                                    what_folder = self.audio_paths.get('what_folder')
+                                    if what_folder:
+                                        react(what_folder)
+                                    continue
 
                                 last_unrecognized_command = None
 
@@ -967,7 +951,7 @@ class Assistant(QWidget):
                             else:
                                 # Пытаемся обработать команду
                                 app_processed = self.handle_app_command(command, action_type)
-                                folder_processed = not app_processed and self.handle_folder_command(command, action_type)
+                                folder_processed = self.handle_folder_command(command, action_type)
 
                                 if not app_processed and not folder_processed:
                                     # Сохраняем контекст для уточнения
@@ -1057,9 +1041,9 @@ class Assistant(QWidget):
                                 "Микрофон не обнаружен. Пожалуйста, подключите микрофон и перезагрузите программу.")
             return False
 
-        model_path_ru = os.path.join(get_base_directory(), "model_ru")
-        model_path_en = os.path.join(get_base_directory(), "model_en")
-        logger.info(f"Используются модели:  ru - {model_path_ru}; en - {model_path_en}")
+        model_path_ru = os.path.join(get_base_directory(), "bin", "model_ru")
+        model_path_en = os.path.join(get_base_directory(), "bin", "model_en")
+        logger.info(f"Используются модели:\n RU - {model_path_ru};\n EN - {model_path_en}")
 
         try:
             # Преобразуем путь в UTF-8
@@ -1090,7 +1074,7 @@ class Assistant(QWidget):
         """Преобразование речи с микрофона в текст."""
         try:
             while self.is_assistant_running:
-                data = self.stream.read(1024, exception_on_overflow=False)
+                data = self.stream.read(512, exception_on_overflow=False)
                 if len(data) == 0:
                     break
 
@@ -1137,6 +1121,8 @@ class Assistant(QWidget):
         """Обработка команд для приложений"""
         for keyword, filename in self.commands.items():
             if keyword in text:
+                if not filename.endswith('.lnk') and not filename.endswith('.url'):
+                    return False  # Прекращаем обработку, если это папка
                 handler_links(filename, action)  # Вызываем обработчик ярлыков
                 return True  # Возвращаем True, если команда была успешно обработана
         return False  # Возвращаем False, если команда не была найдена
@@ -1169,14 +1155,18 @@ class Assistant(QWidget):
             except Exception as e:
                 self.log_area.append(f'Ошибка при создании папки: {e}')
 
-    def open_settings(self):
+    def open_main_settings(self):
         """Обработка нажатия кнопки 'Настройки'"""
         try:
-            settings_dialog = SettingsDialog(self.speaker, self.assistant_name, self.assist_name2,
-                                             self.assist_name3, self.steam_path, self.volume_assist,
-                                             self)  # Передаем текущий голос и путь к steam.exe
-            settings_dialog.voice_changed.connect(self.update_voice)  # Подключаем сигнал
-            settings_dialog.exec_()
+            settings_window = MainSettingsWindow(self.speaker, self.assistant_name, self.assist_name2,
+                                                 self.assist_name3, self.steam_path, self.volume_assist,
+                                                 self.styles, self.color_settings_path, self)
+            # Получаем виджет настроек и подключаем сигнал
+            settings_widget = settings_window.get_settings_widget()
+            if settings_widget:
+                settings_widget.voice_changed.connect(self.update_voice)
+
+            settings_window.exec_()
         except Exception as e:
             logger.error(f"Ошибка при открытии настроек: {e}")
             winsound.MessageBeep(winsound.MB_ICONHAND)
@@ -1340,192 +1330,142 @@ class Assistant(QWidget):
             self.log_area.append(error_output)
 
 
-class SettingsDialog(QDialog):
-    voice_changed = pyqtSignal(str)  # Сигнал для передачи нового голоса
+
+class SettingsWidget(QWidget):
+    voice_changed = pyqtSignal(str)
 
     def __init__(self, current_voice: str, current_name: str, current_name2: str,
-                 current_name3: str, current_steam_path: str, current_volume: int, parent):
-        """
-        Конструктор диалога настроек.
-        :param current_voice: Текущий выбранный голос.
-        :param current_name: Текущее имя ассистента.
-        :param current_steam_path: Текущий путь к steam.exe.
-        :param parent: Родительский виджет.
-        """
+                 current_name3: str, current_steam_path: str, current_volume: int, parent=None):
         super().__init__(parent)
+        self.current_voice = current_voice
+        self.current_name = current_name
+        self.current_name2 = current_name2
+        self.current_name3 = current_name3
+        self.current_steam_path = current_steam_path
+        self.current_volume = current_volume
         self.parent = parent
-        self.settings = QSettings("MyCompany", "MyApp")  # Инициализация настроек
-        self.setWindowTitle("Настройки")
-        self.setFixedSize(300, 500)
+        self.settings = QSettings("MyCompany", "MyApp")
+        self.init_ui()
 
-        main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(10, 10, 10, 10)
-        main_layout.setSpacing(10)
+    def init_ui(self):
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(10)
 
         # Поле для ввода имени ассистента
         name_label = QLabel("Основное имя ассистента:", self)
-        main_layout.addWidget(name_label, alignment=Qt.AlignLeft)
+        layout.addWidget(name_label, alignment=Qt.AlignLeft)
 
         self.name_input = QLineEdit(self)
-        self.name_input.setText(current_name)  # Устанавливаем текущее имя
-        main_layout.addWidget(self.name_input)
+        self.name_input.setText(self.parent.assistant_name)
+        layout.addWidget(self.name_input)
 
         # Поле для ввода имени №2
-        name_label = QLabel("Дополнительно:", self)
-        main_layout.addWidget(name_label, alignment=Qt.AlignLeft)
+        name2_label = QLabel("Дополнительно:", self)
+        layout.addWidget(name2_label, alignment=Qt.AlignLeft)
 
         self.name2_input = QLineEdit(self)
-        self.name2_input.setText(current_name2)  # Устанавливаем текущее имя
-        main_layout.addWidget(self.name2_input)
+        self.name2_input.setText(self.parent.assist_name2)
+        layout.addWidget(self.name2_input)
 
         # Поле для ввода имени №3
         self.name3_input = QLineEdit(self)
-        self.name3_input.setText(current_name3)  # Устанавливаем текущее имя
-        main_layout.addWidget(self.name3_input)
+        self.name3_input.setText(self.parent.assist_name3)
+        layout.addWidget(self.name3_input)
 
-        label = QLabel("Выберите голос:", self)
-        main_layout.addWidget(label, alignment=Qt.AlignLeft)
+        # Выбор голоса
+        voice_label = QLabel("Выберите голос:", self)
+        layout.addWidget(voice_label, alignment=Qt.AlignLeft)
 
-        # Создаем выпадающий список с вариантами голосов
         self.voice_combo = QComboBox(self)
-        self.voice_combo.addItems(list(speakers.keys()))  # Добавляем ключи в QComboBox
-        main_layout.addWidget(self.voice_combo)
-
-        # Устанавливаем текущий голос (значение)
-        self.current_voice = current_voice  # Текущий установленный голос (значение)
-
-        # Устанавливаем текущий индекс в QComboBox на основе значения
-        current_key = next(key for key, value in speakers.items() if value == self.current_voice)
+        self.voice_combo.addItems(list(speakers.keys()))
+        current_key = next(key for key, value in speakers.items() if value == self.parent.speaker)
         self.voice_combo.setCurrentText(current_key)
-
-        # Подключаем сигнал изменения выбора
         self.voice_combo.currentIndexChanged.connect(self.on_voice_change)
+        layout.addWidget(self.voice_combo)
 
-        self.volume_label = QLabel("Громкость ассистента", self)
-        main_layout.addWidget(self.volume_label, alignment=Qt.AlignLeft)
+        # Громкость
+        volume_label = QLabel("Громкость ассистента", self)
+        layout.addWidget(volume_label, alignment=Qt.AlignLeft)
 
-        self.volume = QSlider(Qt.Horizontal, self)
-        self.volume.setMinimum(0)  # Минимальное значение
-        self.volume.setMaximum(100)  # Максимальное значение
-        self.volume.setValue(int(current_volume * 100))
-        self.volume.setTickInterval(10)  # Интервал для отметок
-        self.volume.setSingleStep(5)  # Шаг при перемещении ползунка
+        self.volume_slider = QSlider(Qt.Horizontal, self)
+        self.volume_slider.setRange(0, 100)
+        self.volume_slider.setValue(int(self.parent.volume_assist * 100))
+        self.volume_slider.valueChanged.connect(self.update_volume)
+        layout.addWidget(self.volume_slider)
 
-        # Подключение сигнала изменения значения ползунка к слоту
-        self.volume.valueChanged.connect(self.update_volume)
-        main_layout.addWidget(self.volume)
-
-        # Поле для выбора пути к steam.exe
-        self.steam_label = QLabel("Укажите полный путь к файлу steam.exe", self)
-        main_layout.addWidget(self.steam_label, alignment=Qt.AlignLeft)
+        # Путь к Steam
+        steam_label = QLabel("Укажите полный путь к файлу steam.exe", self)
+        layout.addWidget(steam_label, alignment=Qt.AlignLeft)
 
         self.steam_path_input = QLineEdit(self)
-        self.steam_path_input.setText(current_steam_path)  # Устанавливаем текущий путь
-        main_layout.addWidget(self.steam_path_input)
+        self.steam_path_input.setText(self.parent.steam_path)
+        layout.addWidget(self.steam_path_input)
 
-        # Кнопка для выбора файла steam.exe
         select_steam_button = QPushButton("Выбрать файл", self)
         select_steam_button.clicked.connect(self.select_steam_file)
-        main_layout.addWidget(select_steam_button)
+        layout.addWidget(select_steam_button)
 
-        self.censor_check = QCheckBox("Реагировать на мат")
-        self.censor_check.setChecked(self.parent.is_censored)  # Устанавливаем состояние галочки
+        # Чекбоксы
+        self.censor_check = QCheckBox("Реагировать на мат", self)
+        self.censor_check.setChecked(self.parent.is_censored)
         self.censor_check.stateChanged.connect(self.toggle_censor)
-        main_layout.addWidget(self.censor_check)
+        layout.addWidget(self.censor_check)
 
-        # Чекбокс "Уведомлять о новой версии"
-        self.update_check = QCheckBox("Уведомлять о новой версии")
-        self.update_check.setChecked(self.parent.show_upd_msg)  # Устанавливаем состояние из JSON
+        self.update_check = QCheckBox("Уведомлять о новой версии", self)
+        self.update_check.setChecked(self.parent.show_upd_msg)
         self.update_check.stateChanged.connect(self.toggle_update)
-        main_layout.addWidget(self.update_check)
+        layout.addWidget(self.update_check)
 
-        main_layout.addStretch()
+        layout.addStretch()
 
-        # Кнопка для закрытия настроек
-        close_button = QPushButton("Применить", self)
-        close_button.clicked.connect(self.apply_settings)
-        main_layout.addWidget(close_button)
-        main_layout.setAlignment(close_button, Qt.AlignBottom)
+        # Кнопка применения
+        apply_button = QPushButton("Применить", self)
+        apply_button.clicked.connect(self.apply_settings)
+        layout.addWidget(apply_button, alignment=Qt.AlignBottom)
 
     def update_volume(self, value):
-        normalized_value = value / 100.0  # Нормализация значения от 0 до 1
-        self.parent.volume_assist = normalized_value
+        self.parent.volume_assist = value / 100.0
 
     def toggle_censor(self):
-        """Включение или отключение реакции на мат"""
         self.parent.is_censored = self.censor_check.isChecked()
 
     def toggle_update(self):
-        """Обработка изменения состояния чекбокса."""
         self.parent.show_upd_msg = self.update_check.isChecked()
 
     def select_steam_file(self):
-        """Открывает диалог для выбора файла steam.exe."""
-        try:
-            file_path, _ = QFileDialog.getOpenFileName(self, "Выберите steam.exe",
-                                                       "", "Executable Files (*.exe);;All Files (*)")
-            if file_path:  # Проверяем, что файл был выбран
-                self.steam_path_input.setText(file_path)  # Устанавливаем выбранный путь в QLineEdit
-        except Exception as e:
-            logger.error(f"Ошибка при выборе файла steam.exe: {e}")
-            QMessageBox.critical(self, "Ошибка", f"Не удалось выбрать файл: {e}")
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "Выберите steam.exe", "", "Executable Files (*.exe);;All Files (*)")
+        if file_path:
+            self.steam_path_input.setText(file_path)
 
     def on_voice_change(self, index):
-        """Обработка изменения голоса."""
-        new_voice_key = self.voice_combo.itemText(index)  # Получаем выбранный ключ
-        if new_voice_key not in speakers:
-            logger.error(f"Ключ голоса '{new_voice_key}' не найден в списке speakers.")
-            return
-
-        new_voice_value = speakers[new_voice_key]  # Извлекаем значение по ключу
-
-        # Обновляем текущий голос (значение)
-        if new_voice_value != self.current_voice:
-            self.current_voice = new_voice_value  # Обновляем текущий голос (значение)
-            self.voice_changed.emit(new_voice_value)  # Отправляем сигнал с новым значением
-            logger.info(f"Выбранный голос: {new_voice_key}")
+        new_voice_key = self.voice_combo.currentText()
+        if new_voice_key in speakers:
+            self.voice_changed.emit(speakers[new_voice_key])
 
     def apply_settings(self):
-        """Применить настройки и сохранить их."""
-        new_assistant_name = self.name_input.text().strip().lower()  # Убираем лишние пробелы
-        if not new_assistant_name:
-            QMessageBox.warning(self, "Ошибка", "Имя ассистента не может быть пустым.")
+        new_name = self.name_input.text().strip().lower()
+        if not new_name:
+            QMessageBox.warning(self, "Ошибка", "Имя ассистента не может быть пустым")
             return
 
-        new_assist_name2 = self.name2_input.text().strip().lower()
-        new_assist_name3 = self.name3_input.text().strip().lower()
+        new_name2 = self.name2_input.text().strip().lower()
+        new_name3 = self.name3_input.text().strip().lower()
+        new_steam_path = self.steam_path_input.text().strip()
 
-        new_steam_path = self.steam_path_input.text().strip()  # Убираем лишние пробелы
-
-        # Проверяем, существует ли файл steam.exe
         if not os.path.isfile(new_steam_path):
-            QMessageBox.warning(self, "Ошибка", f"Файл '{new_steam_path}' не найден.\n Укажите путь к файлу steam.exe")
+            QMessageBox.warning(self, "Ошибка", "Укажите правильный путь к steam.exe")
             return
 
-        # Проверяем, изменилось ли имя ассистента
-        if new_assistant_name != self.parent.assistant_name:
-            self.parent.assistant_name = new_assistant_name  # Сохраняем новое имя в родительском классе
+        # Обновляем параметры в родительском окне
+        self.parent.assistant_name = new_name
+        self.parent.assist_name2 = new_name2 if new_name2 else new_name
+        self.parent.assist_name3 = new_name3 if new_name3 else new_name
+        self.parent.steam_path = new_steam_path
+        self.parent.speaker = speakers[self.voice_combo.currentText()]
 
-        if new_assist_name2 != self.parent.assist_name2:
-            self.parent.assist_name2 = new_assist_name2
-        if new_assist_name2 == '':
-            self.parent.assist_name2 = new_assistant_name
-
-        if new_assist_name3 != self.parent.assist_name3:
-            self.parent.assist_name3 = new_assist_name3
-        if new_assist_name3 == '':
-            self.parent.assist_name3 = new_assistant_name
-
-        # Проверяем, изменился ли голос
-        if self.current_voice != self.parent.speaker:
-            self.parent.speaker = self.current_voice  # Обновляем голос в родительском классе
-
-        # Проверяем, изменился ли путь к steam.exe
-        if new_steam_path != self.parent.steam_path:
-            self.parent.steam_path = new_steam_path  # Обновляем путь к steam.exe в родительском классе
-
-        self.parent.save_settings()  # Сохраняем настройки
-
+        self.parent.save_settings()
         winsound.MessageBeep(winsound.MB_ICONASTERISK)
         msg_box = QMessageBox(self)
         msg_box.setWindowTitle('Информация')
@@ -1533,10 +1473,6 @@ class SettingsDialog(QDialog):
         ok_button = msg_box.addButton("ОК", QMessageBox.AcceptRole)
         ok_button.setStyleSheet("padding: 1px 10px;")
         msg_box.exec_()
-
-        logger.info("Настройки успешно применены.")
-        self.close()
-
 
 class AppCommandWindow(QDialog):
     """
@@ -1923,6 +1859,239 @@ class AddFolderCommand(QDialog):
             QMessageBox.critical(self, "Ошибка", str(e))
             logger.error(f"Ошибка: {e}")
 
+class MainSettingsWindow(QDialog):
+    def __init__(self, current_voice: str, current_name: str, current_name2: str,
+                 current_name3: str, current_steam_path: str, current_volume: int,
+                 current_styles: str, current_color_settings_path: str, parent=None):
+        super().__init__(parent)
+        self.current_voice = current_voice
+        self.current_name = current_name
+        self.current_name2 = current_name2
+        self.current_name3 = current_name3
+        self.current_steam_path = current_steam_path
+        self.current_volume = current_volume
+        self.styles = current_styles
+        self.color_path = current_color_settings_path
+        self.parent = parent  # Сохраняем ссылку на родительский объект
+        self.assistant = parent
+        self.init_ui()
+
+    def init_ui(self):
+        self.setWindowTitle("Настройки")
+        self.setFixedSize(550, 600)
+
+        # Основной layout
+        main_layout = QHBoxLayout(self)
+
+        # Левая колонка с кнопками
+        left_column = QVBoxLayout()
+        left_column.setAlignment(Qt.AlignTop)
+        main_layout.addLayout(left_column, 1)
+
+        # Разделитель
+        separator = QFrame()
+        separator.setFrameShape(QFrame.VLine)
+        separator.setFrameShadow(QFrame.Sunken)
+        main_layout.addWidget(separator)
+
+        # Правая колонка с содержимым
+        self.right_column = QStackedWidget()
+        main_layout.addWidget(self.right_column, 2)
+
+        # Добавляем вкладки, передавая параметры
+        self.add_tab("Общие", SettingsWidget(
+            current_voice=self.current_voice,
+            current_name=self.current_name,
+            current_name2=self.current_name2,
+            current_name3=self.current_name3,
+            current_steam_path=self.current_steam_path,
+            current_volume=self.current_volume,
+            parent=self.parent
+        ))
+        self.add_tab("Интерфейс", InterfaceWidget(self.assistant))
+
+    def add_tab(self, button_name, content_widget):
+        # Создаем кнопку
+        button = QPushButton(button_name, self)
+
+        # Подключаем кнопку к переключению на соответствующий виджет
+        button.clicked.connect(lambda _, w=content_widget: self.right_column.setCurrentWidget(w))
+
+        # Добавляем кнопку в левую колонку
+        self.layout().itemAt(0).layout().addWidget(button)
+
+        # Добавляем содержимое в правую колонку
+        self.right_column.addWidget(content_widget)
+
+    def get_settings_widget(self):
+        """Возвращает виджет настроек из стека"""
+        for i in range(self.right_column.count()):
+            widget = self.right_column.widget(i)
+            if isinstance(widget, SettingsWidget):
+                return widget
+        return None
+
+class InterfaceWidget(QWidget):
+    def __init__(self, assistant, parent=None):
+        super().__init__(parent)
+        self.assistant = assistant
+        self.init_ui()
+
+    style_applied = pyqtSignal(dict)  # Сигнал для передачи стиля
+
+    def init_ui(self):
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(15, 15, 15, 15)
+        layout.setSpacing(20)
+
+        # Заголовок
+        title = QLabel("Выбор стиля интерфейса")
+        title.setAlignment(Qt.AlignCenter)
+        title.setStyleSheet("font-size: 16px; font-weight: bold;")
+        layout.addWidget(title)
+
+        # Контейнер для двух колонок
+        cols = QHBoxLayout()
+        left_col = QVBoxLayout()
+        right_col = QVBoxLayout()
+
+        # Левая колонка (5 кнопок)
+        btn_dark = QPushButton("Оранжевый неон")
+        btn_dark.clicked.connect(lambda: self.apply_style_file("orange_neon.json"))
+        left_col.addWidget(btn_dark)
+
+        btn_blue = QPushButton("Синий неон")
+        btn_blue.clicked.connect(lambda: self.apply_style_file("blue_neon.json"))
+        left_col.addWidget(btn_blue)
+
+        btn_green = QPushButton("Зеленый неон")
+        btn_green.clicked.connect(lambda: self.apply_style_file("green_neon.json"))
+        left_col.addWidget(btn_green)
+
+        btn_purple = QPushButton("Розовый неон")
+        btn_purple.clicked.connect(lambda: self.apply_style_file("pink_neon.json"))
+        left_col.addWidget(btn_purple)
+
+        btn_red = QPushButton("Красный неон")
+        btn_red.clicked.connect(lambda: self.apply_style_file("red_neon.json"))
+        left_col.addWidget(btn_red)
+
+        # Правая колонка (5 кнопок)
+        btn_light = QPushButton("Dark")
+        btn_light.clicked.connect(lambda: self.apply_style_file("dark.json"))
+        right_col.addWidget(btn_light)
+
+        btn_material = QPushButton("Legacy")
+        btn_material.clicked.connect(lambda: self.apply_style_file("legacy.json"))
+        right_col.addWidget(btn_material)
+
+        btn_console = QPushButton("White")
+        btn_console.clicked.connect(lambda: self.apply_style_file("white.json"))
+        right_col.addWidget(btn_console)
+
+        btn_monochrome = QPushButton("Светло-оранжевый")
+        btn_monochrome.clicked.connect(lambda: self.apply_style_file("white_orange.json"))
+        right_col.addWidget(btn_monochrome)
+
+        btn_high_contrast = QPushButton("Светло-фиолетовый")
+        btn_high_contrast.clicked.connect(lambda: self.apply_style_file("white_purple.json"))
+        right_col.addWidget(btn_high_contrast)
+
+        cols.addLayout(left_col)
+        cols.addLayout(right_col)
+        layout.addLayout(cols)
+
+        # Выпадающий список для кастомных стилей
+        self.custom_presets_combo = QComboBox()
+        self.custom_presets_combo.addItem("Выберите пользовательский стиль...")
+        self.load_custom_presets()  # Загружаем пользовательские пресеты
+        self.custom_presets_combo.currentIndexChanged.connect(self.apply_custom_style)
+        layout.addWidget(QLabel("Пользовательские стили:"))
+        layout.addWidget(self.custom_presets_combo)
+
+        layout.addStretch()
+
+        btn_default = QPushButton("Default")
+        btn_default.clicked.connect(lambda: self.apply_style_file("default.json"))
+        layout.addWidget(btn_default)
+
+        # Кнопка создания своего стиля
+        create_btn = QPushButton("Создать свой стиль")
+        create_btn.clicked.connect(self.open_color_settings)
+        layout.addWidget(create_btn)
+
+    def apply_style_file(self, filename):
+        """Применяет стиль из указанного файла, проверяя обе директории."""
+        base_presets = os.path.join(self.assistant.get_base_directory(), 'bin', 'color_presets')
+        custom_presets = os.path.join(self.assistant.get_base_directory(), 'user_settings', 'presets')
+
+        # Проверяем, в какой папке есть файл (приоритет у custom_presets)
+        preset_path = None
+        custom_path = os.path.join(custom_presets, filename)
+        base_path = os.path.join(base_presets, filename)
+
+        if os.path.exists(custom_path):
+            preset_path = custom_path
+        elif os.path.exists(base_path):
+            preset_path = base_path
+        else:
+            logger.error(f"Пресет '{filename}' не найден ни в одной из папок.")
+            return
+
+        try:
+            with open(preset_path, 'r', encoding='utf-8') as json_file:
+                styles = json.load(json_file)
+
+                # Сохраняем стили в основной файл настроек
+                with open(self.assistant.color_settings_path, 'w') as f:
+                    json.dump(styles, f, indent=4)
+
+                # Применяем стили
+                self.assistant.styles = styles
+                self.assistant.load_and_apply_styles()
+
+                logger.info(f"Применён стиль из файла: {filename}")
+
+        except json.JSONDecodeError:
+            logger.error(f"Ошибка: файл пресета повреждён ({preset_path}).")
+        except Exception as e:
+            logger.error(f"Ошибка загрузки пресета: {e}")
+
+    def load_custom_presets(self):
+        """Загружает список пользовательских пресетов в выпадающий список"""
+        self.custom_presets_combo.clear()
+        self.custom_presets_combo.addItem("Тут Ваши созданные стили...")
+
+        custom_presets_dir = os.path.join(self.assistant.get_base_directory(), 'user_settings', 'presets')
+
+        if os.path.exists(custom_presets_dir):
+            for filename in sorted(os.listdir(custom_presets_dir)):
+                if filename.endswith('.json'):
+                    preset_name = filename[:-5]  # Убираем расширение .json
+                    self.custom_presets_combo.addItem(preset_name)
+
+    def apply_custom_style(self, index):
+        """Применяет выбранный пользовательский стиль"""
+        if index == 0:  # Первый элемент - заглушка
+            return
+
+        preset_name = self.custom_presets_combo.currentText()
+        if preset_name:
+            # Добавляем расширение .json, если его нет
+            if not preset_name.endswith('.json'):
+                preset_name += '.json'
+            self.apply_style_file(preset_name)
+
+    def open_color_settings(self):
+        """Открывает диалоговое окно для настройки цветов."""
+        try:
+            color_dialog = ColorSettingsWindow(assistant=self.assistant, parent=self)
+            color_dialog.colorChanged.connect(self.assistant.load_and_apply_styles)
+            color_dialog.exec_()
+        except Exception as e:
+            logger.error(f"Ошибка при открытии окна настроек цветов: {e}")
+            QMessageBox.warning(self, "Ошибка", f"Не удалось открыть настройки цветов: {e}")
+
 
 class ColorSettingsWindow(QDialog):
     """
@@ -1950,10 +2119,14 @@ class ColorSettingsWindow(QDialog):
             base_path = os.path.dirname(os.path.abspath(__file__))
         return base_path
 
-    def __init__(self, current_styles, color_setting_path, parent=None):
+    def __init__(self, assistant, parent=None):
         super().__init__(parent)
-        self.styles = current_styles  # Передаем текущие стили
-        self.color_settings_path = color_setting_path
+        self.assistant = assistant
+        self.styles = self.assistant.styles  # Передаем текущие стили
+        self.color_settings_path = self.assistant.color_settings_path
+        self.base_presets = os.path.join(self.get_base_directory(), 'bin', 'color_presets')
+        self.custom_presets = os.path.join(self.get_base_directory(), 'user_settings', 'presets')
+        os.makedirs(self.custom_presets, exist_ok=True)
         self.init_ui()
         # Инициализация переменных для цветов
         self.bg_color = ""
@@ -1964,23 +2137,23 @@ class ColorSettingsWindow(QDialog):
         self.load_color_settings()  # Загружаем текущие цвета
 
     def init_ui(self):
-        self.setWindowTitle('Настройка цветов интерфейса')
+        self.setWindowTitle('Редактор стилей')
         self.setFixedSize(300, 400)
 
         # Кнопки для выбора цветов
-        self.bg_button = QPushButton('Выберите цвет фона')
+        self.bg_button = QPushButton('Фон')
         self.bg_button.clicked.connect(self.choose_background_color)
 
-        self.btn_button = QPushButton('Выберите цвет кнопок')
+        self.btn_button = QPushButton('Цвет кнопок')
         self.btn_button.clicked.connect(self.choose_button_color)
 
-        self.border_button = QPushButton('Выберите цвет обводки')
+        self.border_button = QPushButton('Обводка кнопок')
         self.border_button.clicked.connect(self.choose_border_color)
 
-        self.text_button = QPushButton('Выберите цвет текста')
+        self.text_button = QPushButton('Цвет текста')
         self.text_button.clicked.connect(self.choose_text_color)
 
-        self.text_edit_button = QPushButton('Выберите цвет текста в логах')
+        self.text_edit_button = QPushButton('Цвет текста в логах и сносках')
         self.text_edit_button.clicked.connect(self.choose_text_edit_color)
 
         # Кнопка для применения изменений
@@ -1988,7 +2161,7 @@ class ColorSettingsWindow(QDialog):
         self.apply_button.clicked.connect(self.apply_changes)
 
         # Кнопка для сохранения пресета
-        self.save_preset_button = QPushButton('Сохранить пресет')
+        self.save_preset_button = QPushButton('Сохранить стиль')
         self.save_preset_button.clicked.connect(self.save_preset)
 
         # Выпадающий список для выбора существующих пресетов
@@ -2005,7 +2178,7 @@ class ColorSettingsWindow(QDialog):
         layout.addWidget(self.text_button)
         layout.addWidget(self.text_edit_button)
         layout.addWidget(self.save_preset_button)
-        layout.addWidget(QLabel('Пресеты:'))
+        layout.addWidget(QLabel('Стили:'))
         layout.addWidget(self.preset_combo_box)
         layout.addStretch()
         layout.addWidget(self.apply_button)
@@ -2065,6 +2238,16 @@ class ColorSettingsWindow(QDialog):
         except Exception as e:
             logger.error(e)
 
+    def show_error_message(self, text, parent_dialog=None):
+        """Показывает сообщение об ошибке, не закрывая родительский диалог."""
+        msg = QMessageBox(parent_dialog if parent_dialog else self)
+        msg.setIcon(QMessageBox.Warning)
+        msg.setText(text)
+        msg.setWindowTitle("Ошибка")
+        ok_btn = msg.addButton("OK", QMessageBox.AcceptRole)
+        ok_btn.setStyleSheet("padding: 1px 10px;")
+        msg.exec_()
+
     def apply_changes(self):
         try:
             new_styles = {
@@ -2111,8 +2294,8 @@ class ColorSettingsWindow(QDialog):
                     "font-size": "12px"
                 }
             }
-            self.save_color_settings(new_styles)  # Сохранение в файл
-            self.colorChanged.emit()  # Излучаем сигнал об изменении цвета
+            self.save_color_settings(new_styles)
+            self.colorChanged.emit()
         except Exception as e:
             logger.info(f"Ошибка при применении изменений: {e}")
             winsound.MessageBeep(winsound.MB_ICONHAND)
@@ -2129,32 +2312,45 @@ class ColorSettingsWindow(QDialog):
             json.dump(new_styles, json_file, indent=4)
 
     def save_preset(self):
-        """Сохраняет текущие стили как новый пресет."""
-        dialog = CustomInputDialog('Сохранить пресет', 'Введите имя пресета:', self)
-        result = dialog.exec_()  # Ждем, пока диалог закроется
+        """Сохраняет текущие стили как новый пресет с валидацией имени."""
+        while True:  # Цикл для повторного ввода при ошибках
+            dialog = CustomInputDialog('Сохранить пресет', 'Введите имя пресета:', self)
+            result = dialog.exec_()
 
-        if result == QDialog.Accepted:  # Если нажали "Сохранить"
-            preset_name = dialog.get_text()
-            if not preset_name:
-                winsound.MessageBeep(winsound.MB_ICONHAND)
-                msg_box = QMessageBox(self)
-                msg_box.setWindowTitle('Ошибка')
-                msg_box.setText("Имя пресета не может быть пустым.")
-                ok_button = msg_box.addButton("ОК", QMessageBox.AcceptRole)
-                ok_button.setStyleSheet("padding: 1px 10px;")
-                msg_box.exec_()
+            if result != QDialog.Accepted:  # Если отмена/закрытие
+                logger.info("Сохранение пресета отменено")
                 return
 
-            preset_path = os.path.join(self.get_base_directory(), 'user_settings', 'presets', f'{preset_name}.json')
+            preset_name = dialog.get_text().strip()
+
+            # Валидация имени
+            if not preset_name:
+                self.show_error_message("Имя пресета не может быть пустым!", dialog)
+                continue  # Повторяем ввод
+
+            # Проверка существующих пресетов
+            conflict_paths = [
+                os.path.join(self.base_presets, f"{preset_name}.json"),
+                os.path.join(self.custom_presets, f"{preset_name}.json")
+            ]
+
+            if any(os.path.exists(path) for path in conflict_paths):
+                self.show_error_message(
+                    f"Пресет '{preset_name}' уже существует!\n"
+                    "Пожалуйста, выберите другое имя.",
+                    dialog
+                )
+                continue
+
             new_styles = {
                 "QWidget": {
                     "background-color": self.bg_color,
-                    "color": self.text_edit_color,
+                    "color": self.text_color,
                     "font-size": "13px"
                 },
                 "QPushButton": {
                     "background-color": self.btn_color,
-                    "color": self.text_edit_color,
+                    "color": self.text_color,
                     "height": "30px",
                     "border": f"1px solid {self.border_color}",
                     "border-radius": "3px",
@@ -2162,7 +2358,7 @@ class ColorSettingsWindow(QDialog):
                 },
                 "QPushButton:hover": {
                     "background-color": self.darken_color(self.btn_color, 10),
-                    "color": self.text_edit_color,
+                    "color": self.text_color,
                     "font-size": "13px"
                 },
                 "QPushButton:pressed": {
@@ -2172,92 +2368,144 @@ class ColorSettingsWindow(QDialog):
                 },
                 "QTextEdit": {
                     "background-color": self.bg_color,
-                    "color": self.text_color,
+                    "color": self.text_edit_color,
                     "border": "1px solid",
                     "border-radius": "4px",
                     "font-size": "12px"
                 },
                 "label_version": {
-                    "color": self.text_color,
+                    "color": self.text_edit_color,
                     "font-size": "10px"
                 },
                 "label_message": {
-                    "color": self.text_edit_color,
+                    "color": self.text_color,
                     "font-size": "13px"
                 },
                 "update_label": {
-                    "color": self.text_color,
+                    "color": self.text_edit_color,
                     "font-size": "12px"
                 }
             }
             try:
-                with open(preset_path, 'w') as json_file:
-                    json.dump(new_styles, json_file, indent=4)
-                self.load_presets()  # Обновляем список пресетов
-            except Exception as e:
-                winsound.MessageBeep(winsound.MB_ICONHAND)
+                os.makedirs(self.custom_presets, exist_ok=True)
+                preset_path = conflict_paths[1]  # custom_presets путь
+
+                with open(preset_path, 'w', encoding='utf-8') as f:
+                    json.dump({
+                        "QWidget": {
+                            "background-color": self.bg_color,
+                            "color": self.text_color,
+                            "font-size": "13px"
+                        },
+                        "QPushButton": {
+                            "background-color": self.btn_color,
+                            "color": self.text_color,
+                            "height": "30px",
+                            "border": f"1px solid {self.border_color}",
+                            "border-radius": "3px",
+                            "font-size": "13px"
+                        },
+                        "QPushButton:hover": {
+                            "background-color": self.darken_color(self.btn_color, 10),
+                            "color": self.text_color,
+                            "font-size": "13px"
+                        },
+                        "QPushButton:pressed": {
+                            "background-color": self.darken_color(self.btn_color, 30),
+                            "padding-left": "3px",
+                            "padding-top": "3px",
+                        },
+                        "QTextEdit": {
+                            "background-color": self.bg_color,
+                            "color": self.text_edit_color,
+                            "border": "1px solid",
+                            "border-radius": "4px",
+                            "font-size": "12px"
+                        },
+                        "label_version": {
+                            "color": self.text_edit_color,
+                            "font-size": "10px"
+                        },
+                        "label_message": {
+                            "color": self.text_color,
+                            "font-size": "13px"
+                        },
+                        "update_label": {
+                            "color": self.text_edit_color,
+                            "font-size": "12px"
+                        }
+                    }, f, indent=4, ensure_ascii=False)
+
+                self.load_presets()
                 msg_box = QMessageBox(self)
-                msg_box.setWindowTitle('Ошибка')
-                msg_box.setText(f"Не удалось сохранить пресет: {e}")
+                msg_box.setWindowTitle('Успех')
+                msg_box.setText(f"Пресет сохранен!")
                 ok_button = msg_box.addButton("ОК", QMessageBox.AcceptRole)
                 ok_button.setStyleSheet("padding: 1px 10px;")
                 msg_box.exec_()
-        else:  # Если нажали "Закрыть" или закрыли диалог
-            logger.info("Пресет не сохранен")
-            return
+                break  # Выход из цикла после успешного сохранения
+
+            except Exception as e:
+                self.show_error_message(
+                    f"Ошибка сохранения:\n{str(e)}",
+                    dialog
+                )
 
     def load_presets(self):
         """Загружает существующие пресеты в выпадающий список."""
         self.preset_combo_box.clear()
         self.preset_combo_box.addItem("Выбрать пресет")
 
-        # Получаем базовую директорию
-        base_dir = self.get_base_directory()
-        presets_dir = os.path.join(base_dir, 'user_settings',
-                                   'presets')  # Объединяем базовую директорию с папкой presets
-
         # Проверяем, существует ли директория, если нет - создаем
-        if not os.path.exists(presets_dir):
-            os.makedirs(presets_dir)
+        if not os.path.exists(self.base_presets):
+            os.makedirs(self.base_presets)
 
         # Загружаем все файлы .json из директории пресетов
-        for filename in os.listdir(presets_dir):
+        for filename in os.listdir(self.base_presets):
+            if filename.endswith('.json'):
+                self.preset_combo_box.addItem(filename[:-5])  # Добавляем имя файла без .json
+
+        for filename in os.listdir(self.custom_presets):
             if filename.endswith('.json'):
                 self.preset_combo_box.addItem(filename[:-5])  # Добавляем имя файла без .json
 
     def load_preset(self):
-        """Загружает выбранный пресет из файла."""
+        """Загружает выбранный пресет из файла, проверяя обе директории."""
         selected_preset = self.preset_combo_box.currentText()
-        if selected_preset and selected_preset != "Выбрать пресет":
-            # Получаем базовую директорию
-            base_dir = self.get_base_directory()
-            preset_path = os.path.join(base_dir, 'user_settings', 'presets', f'{selected_preset}.json')
-            try:
-                with open(preset_path, 'r') as json_file:
-                    styles = json.load(json_file)
-                    # Загружаем цвета для основных элементов
-                    self.bg_color = styles.get("QWidget", {}).get("background-color", "#1d2028")
-                    self.btn_color = styles.get("QPushButton", {}).get("background-color", "#293f85")
-                    self.text_color = styles.get("QPushButton", {}).get("color", "#8eaee5")
-                    self.text_edit_color = styles.get("QTextEdit", {}).get("color", "#ffffff")
-                    self.border_color = styles.get("QPushButton", {}).get("border", "1px solid #293f85").split()[
-                        -1]  # Извлекаем цвет из border
+        if not selected_preset or selected_preset == "Выбрать пресет":
+            return  # Пресет не выбран
 
-                    # Загружаем цвета для меток
-                    label_version_color = styles.get("label_version", {}).get("color", self.text_edit_color)
-                    label_message_color = styles.get("label_message", {}).get("color", self.text_color)
+        # Формируем пути к файлам в обеих папках
+        base_preset_path = os.path.join(self.base_presets, f"{selected_preset}.json")
+        custom_preset_path = os.path.join(self.custom_presets, f"{selected_preset}.json")
 
-                    # Обновляем переменные для меток
-                    self.text_color = label_version_color  # Используем цвет из label_version
-                    self.text_edit_color = label_message_color  # Используем цвет из label_message
+        # Проверяем, в какой папке есть файл (приоритет у custom_presets)
+        preset_path = None
+        if os.path.exists(custom_preset_path):
+            preset_path = custom_preset_path
+        elif os.path.exists(base_preset_path):
+            preset_path = base_preset_path
+        else:
+            logger.error(f"Пресет '{selected_preset}' не найден ни в одной из папок.")
+            return
 
-                    logger.info("Пресет успешно загружен.")
-            except FileNotFoundError:
-                logger.error(f"Файл пресета '{preset_path}' не найден.")
-            except json.JSONDecodeError:
-                logger.error(f"Ошибка: файл пресета '{preset_path}' содержит некорректный JSON.")
-            except Exception as e:
-                logger.error(f"Ошибка при загрузке пресета: {e}")
+        try:
+            with open(preset_path, 'r', encoding='utf-8') as json_file:
+                styles = json.load(json_file)
+
+                # Загружаем цвета
+                self.bg_color = styles.get("QWidget", {}).get("background-color", "#1d2028")
+                self.btn_color = styles.get("QPushButton", {}).get("background-color", "#293f85")
+                self.text_color = styles.get("QWidget", {}).get("color", "#8eaee5")
+                self.text_edit_color = styles.get("QTextEdit", {}).get("color", "#ffffff")
+                self.border_color = styles.get("QPushButton", {}).get("border", "1px solid #293f85").split()[-1]
+
+                logger.info(f"Пресет загружен: {preset_path}")
+
+        except json.JSONDecodeError:
+            logger.error(f"Ошибка: файл пресета повреждён ({preset_path}).")
+        except Exception as e:
+            logger.error(f"Ошибка загрузки пресета: {e}")
 
     def darken_color(self, color_str, amount):
         """Уменьшает яркость цвета на заданное количество (в формате hex)."""
@@ -2578,8 +2826,14 @@ if exist "{correct_archive_path}" (
             result = subprocess.run(command, check=True, stdout=subprocess.PIPE,
                                     stderr=subprocess.PIPE, creationflags=subprocess.CREATE_NO_WINDOW)
             output = result.stdout.decode('cp866')  # Декодируем вывод
-            QMessageBox.information(self, "Успех",
-                                    "После завершения программы будет установлена новая версия")
+            logger.info(output)
+            msg_box = QMessageBox(self)
+            msg_box.setWindowTitle('Уведомление')
+            msg_box.setText(f"После завершения программы будет установлена новая версия")
+            ok_button = msg_box.addButton("ОК", QMessageBox.AcceptRole)
+            ok_button.setStyleSheet("padding: 1px 10px;")
+            QApplication.beep()
+            msg_box.exec_()
         except subprocess.CalledProcessError as e:
             error_output = e.stderr.decode('cp866')  # Декодируем ошибку
             QMessageBox.critical(self, "Ошибка", f"Не удалось создать задачу: {error_output}")

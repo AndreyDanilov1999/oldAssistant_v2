@@ -324,14 +324,16 @@ def open_url_link(game_id_or_url, filename):
                 start_folder = audio_paths['start_folder']
                 react(start_folder)
             else:
-                audio_paths = get_audio_paths(speaker)
-                wait_load_file = audio_paths['wait_load_file']
-                react_detail(wait_load_file)
                 # Если процессов нет, собираем их
                 before_processes = get_all_processes()
                 # Открываем URL через стандартный механизм
                 subprocess.Popen(["start", game_id_or_url], shell=True)
                 # Ждем несколько секунд, чтобы процесс успел запуститься
+
+                audio_paths = get_audio_paths(speaker)
+                wait_load_file = audio_paths['wait_load_file']
+                react_detail(wait_load_file)
+
                 time.sleep(40)
                 # Собираем процессы после запуска
                 after_processes = get_all_processes()
@@ -353,7 +355,7 @@ def open_url_link(game_id_or_url, filename):
             existing_processes = get_process_names_from_file(filename)
             audio_paths = get_audio_paths(speaker)
             if existing_processes:
-                logger.info(f"Используем существующие процессы для игры '{filename}': {existing_processes}")
+                logger.info(f"Нашел процессы '{filename}': {existing_processes}")
                 if game_id_or_url == '252490' and speaker == 'sanboy':
                     start_rust = audio_paths['start_rust']
                     react_detail(start_rust)
@@ -362,14 +364,16 @@ def open_url_link(game_id_or_url, filename):
                 start_folder = audio_paths['start_folder']
                 react(start_folder)
             else:
-                audio_paths = get_audio_paths(speaker)
-                wait_load_file = audio_paths['wait_load_file']
-                react_detail(wait_load_file)
                 # Если процессов нет, собираем их
                 before_processes = get_all_processes()
                 # Запускаем игру через Steam
                 subprocess.Popen([steam_path, '-applaunch', game_id_or_url], shell=True)
                 # Ждем несколько секунд, чтобы процесс успел запуститься
+
+                audio_paths = get_audio_paths(speaker)
+                wait_load_file = audio_paths['wait_load_file']
+                react_detail(wait_load_file)
+
                 time.sleep(40)
                 # Собираем процессы после запуска
                 after_processes = get_all_processes()
@@ -400,26 +404,27 @@ def open_link(filename, target_path, arguments):
     settings_file = os.path.join(get_base_directory(), 'user_settings', "settings.json")  # Полный путь к файлу настроек
     speaker = get_current_speaker(settings_file)  # Получаем текущий голос
     try:
-        audio_paths = get_audio_paths(speaker)
-        start_folder = audio_paths['start_folder']
-        react(start_folder)
-
         # Проверяем, есть ли уже сохраненные процессы для этой игры
         existing_processes = get_process_names_from_file(filename)
 
         if existing_processes:
-            logger.info(f"Используем существующие процессы для игры '{filename}': {existing_processes}")
+            logger.info(f"Нашел процессы '{filename}': {existing_processes}")
             # Запускаем программу
             subprocess.Popen([target_path] + arguments, shell=True)
-        else:
+
             audio_paths = get_audio_paths(speaker)
-            wait_load_file = audio_paths['wait_load_file']
-            react_detail(wait_load_file)
+            start_folder = audio_paths['start_folder']
+            react(start_folder)
+        else:
             # Если процессов нет, собираем их
             before_processes = get_all_processes()
 
             # Запускаем программу
             subprocess.Popen([target_path] + arguments, shell=True)
+
+            audio_paths = get_audio_paths(speaker)
+            wait_load_file = audio_paths['wait_load_file']
+            react_detail(wait_load_file)
 
             # Ждем несколько секунд, чтобы процессы успели запуститься
             time.sleep(40)
