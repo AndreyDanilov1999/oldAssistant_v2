@@ -16,7 +16,6 @@ import sys
 import time
 import traceback
 import zipfile
-import re
 import markdown2
 import requests
 from packaging import version
@@ -106,7 +105,7 @@ class Assistant(QWidget):
         self.assist_name3 = self.settings.get('assist_name3', "джо")
         self.audio_paths = get_audio_paths(self.speaker)
         self.MEMORY_LIMIT_MB = 1024
-        self.version = "1.2.8"
+        self.version = "1.2.9"
         self.ps = "Powered by theoldman"
         self.label_version = QLabel(f"Версия: {self.version} {self.ps}", self)
         self.label_message = QLabel('', self)
@@ -339,7 +338,7 @@ class Assistant(QWidget):
             changelog_path = os.path.join(tempfile.gettempdir(), 'changelog.md')
             with open(changelog_path, 'w', encoding='utf-8') as f:
                 f.write(changelog_response.text)
-            logger.info(f"Changelog сохранен в: {changelog_path}")
+            logger.debug(f"Changelog сохранен в: {changelog_path}")
 
             self.changelog_file_path = changelog_path
             self.latest_version_url = latest_version_url

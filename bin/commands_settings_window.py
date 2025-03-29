@@ -4,6 +4,8 @@ from PyQt5.QtCore import pyqtSignal, Qt
 from PyQt5.QtWidgets import QFileDialog, QPushButton, QLineEdit, QLabel, QComboBox, \
     QVBoxLayout, QWidget, QDialog, QFrame, QStackedWidget, QHBoxLayout, QListWidget, QListWidgetItem, \
     QInputDialog, QSizePolicy
+
+from bin.func_list import search_links
 from logging_config import logger
 from path_builder import get_path
 
@@ -156,6 +158,7 @@ class AppCommandForm(QWidget):
         super().__init__(parent)
         self.assistant = assistant
         self.commands = self.assistant.load_commands()
+        search_links()
         self.init_ui()
 
     def init_ui(self):
@@ -241,6 +244,7 @@ class FolderCommandForm(QWidget):
         super().__init__(parent)
         self.assistant = assistant
         self.commands = self.assistant.load_commands()
+        search_links()
         self.init_ui()
 
     def init_ui(self):
