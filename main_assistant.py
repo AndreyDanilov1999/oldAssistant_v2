@@ -327,19 +327,9 @@ class Assistant(QWidget):
             current_ver = version.parse(self.version)
             latest_ver = version.parse(latest_version)
 
-            # Определяем формат changelog на основе ТЕКУЩЕЙ версии
-            if current_ver > version.parse("1.2.7"):
-                changelog_url = CHANGELOG_MD_URL
-                file_ext = ".md"
-                logger.info("Используется Markdown формат changelog (текущая версия > 1.2.7)")
-            else:
-                changelog_url = CHANGELOG_TXT_URL
-                file_ext = ".txt"
-                logger.info("Используется TXT формат changelog (текущая версия ≤ 1.2.7)")
-
             # Загружаем changelog
             changelog_response = requests.get(
-                changelog_url,
+                CHANGELOG_MD_URL,
                 timeout=15,
                 headers={'Cache-Control': 'no-cache'}
             )
