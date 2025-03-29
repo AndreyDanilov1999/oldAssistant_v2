@@ -5,6 +5,7 @@
     "assist_name3": "сан",
     "steam_path": "D:/Steam/steam.exe",
     "is_censored": true,
-    "volume_assist": 0.3,
-    "show_upd_msg": true
+    "volume_assist": 0.2,
+    "show_upd_msg": true,
+    "minimize_to_tray": true
 }

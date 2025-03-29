@@ -2,16 +2,15 @@
 Модуль с основными функциями: поиск в яндекс, выключение компа
 """
 from datetime import datetime
-from lists import get_audio_paths
-from func_list import get_current_speaker, get_base_directory
-import os
+from bin.lists import get_audio_paths
+from bin.func_list import get_current_speaker
 from logging_config import logger
 import subprocess
 import webbrowser
-from speak_functions import react_detail, react
+from bin.speak_functions import react_detail, react
+from path_builder import get_path
 
-settings_file = os.path.join(get_base_directory(), 'user_settings', "settings.json")  # Полный путь к файлу настроек
-
+settings_file = get_path('user_settings', "settings.json")
 
 def search_yandex(query):
     """

@@ -4,34 +4,14 @@
 import json
 import os
 import subprocess
-import sys
 import time
 import psutil
 import pygetwindow as gw
 from win32com.client import Dispatch
-from lists import get_audio_paths
+from bin.lists import get_audio_paths
 from logging_config import logger
-from speak_functions import react, react_detail
-
-
-def get_base_directory():
-    """
-    Возвращает базовую директорию для файлов в зависимости от режима выполнения.
-    - Если программа запущена как исполняемый файл, возвращает директорию исполняемого файла.
-    - Если программа запущена как скрипт, возвращает директорию скрипта.
-    """
-    if getattr(sys, 'frozen', False):
-        # Если программа запущена как исполняемый файл
-        if hasattr(sys, '_MEIPASS'):
-            # Если ресурсы упакованы в исполняемый файл (один файл)
-            base_path = sys._MEIPASS
-        else:
-            # Если ресурсы находятся рядом с исполняемым файлом (папка dist)
-            base_path = os.path.dirname(sys.executable)
-    else:
-        # Если программа запущена как скрипт
-        base_path = os.path.dirname(os.path.abspath(__file__))
-    return base_path
+from bin.speak_functions import react, react_detail
+from path_builder import get_path
 
 
 def load_settings(settings_file):
@@ -134,8 +114,7 @@ def save_process_names(shortcut_name, process_names):
     """Сохраняет имена процессов в файл, обновляя данные, если они уже существуют."""
     try:
         new_data = {shortcut_name: process_names}
-        process_names_file = os.path.join(get_base_directory(), 'user_settings',
-                                          'process_names.json')  # Полный путь к файлу
+        process_names_file = get_path('user_settings', 'process_names.json')
 
         if os.path.exists(process_names_file):
             with open(process_names_file, 'r', encoding='utf-8') as file:
@@ -169,9 +148,7 @@ def get_process_names_from_file(shortcut_name):
     """Возвращает список имен процессов для указанного ярлыка из файла."""
     try:
         process_names = []
-        process_names_file = os.path.join(get_base_directory(), 'user_settings',
-                                          'process_names.json')  # Полный путь к файлу
-
+        process_names_file = get_path('user_settings', 'process_names.json')
         if os.path.exists(process_names_file):
             with open(process_names_file, 'r', encoding='utf-8') as file:
                 try:
@@ -204,9 +181,8 @@ def search_links():
     Поиск ярлыков по ключевой папке
     Получение и сохранение имени ярлыков в json
     """
-    root_folder = os.path.join(get_base_directory(), 'user_settings',
-                               "links for assist")  # Полный путь к папке с ярлыками
-    root_links = os.path.join(get_base_directory(), 'user_settings', "links.json")
+    root_folder = get_path('user_settings', "links for assist")  # Полный путь к папке с ярлыками
+    root_links = get_path('user_settings', "links.json")
 
     # Очистка файла links.json перед началом поиска
     with open(root_links, 'w', encoding='utf-8') as file:
@@ -231,7 +207,7 @@ def handler_links(filename, action):
     Обработчик ярлыков в зависимости от их расширения
     """
     global game_id, target_path, process_name, game_id_or_url, args_list
-    root_folder = os.path.join(get_base_directory(), 'user_settings', "links for assist")
+    root_folder = get_path('user_settings', "links for assist")
     # Получаем путь к ярлыку
     shortcut_path = os.path.join(root_folder, filename)
 
@@ -274,7 +250,7 @@ def handler_folder(folder_path, action):
     :param folder_path: путь к папке
     :param action: действие(open or close)
     """
-    settings_file = os.path.join(get_base_directory(), 'user_settings', "settings.json")  # Полный путь к файлу настроек
+    settings_file = get_path('user_settings', "settings.json")  # Полный путь к файлу настроек
     speaker = get_current_speaker(settings_file)  # Получаем текущий голос
     if action == 'open':
         os.startfile(folder_path)
@@ -306,7 +282,7 @@ def open_url_link(game_id_or_url, filename):
     :param game_id_or_url: id игры извлекается из ярлыка
     :param filename: Имя файла
     """
-    settings_file = os.path.join(get_base_directory(), 'user_settings', "settings.json")  # Полный путь к файлу настроек
+    settings_file = get_path('user_settings', "settings.json")  # Полный путь к файлу настроек
     speaker = get_current_speaker(settings_file)  # Получаем текущий голос
     steam_path = get_steam_path(settings_file)
 
@@ -401,7 +377,7 @@ def open_link(filename, target_path, arguments):
     :param filename: Имя файла
     :param target_path: Путь к исполняемому файлу (берется из ярлыка)
     """
-    settings_file = os.path.join(get_base_directory(), 'user_settings', "settings.json")  # Полный путь к файлу настроек
+    settings_file = get_path('user_settings', "settings.json")  # Полный путь к файлу настроек
     speaker = get_current_speaker(settings_file)  # Получаем текущий голос
     try:
         # Проверяем, есть ли уже сохраненные процессы для этой игры
@@ -456,7 +432,7 @@ def close_link(filename):
     Функция для закрытия программы
     :param filename: Имя файла
     """
-    settings_file = os.path.join(get_base_directory(), 'user_settings', "settings.json")  # Полный путь к файлу настроек
+    settings_file = get_path('user_settings', "settings.json")  # Полный путь к файлу настроек
     speaker = get_current_speaker(settings_file)  # Получаем текущий голос
     process_names = get_process_names_from_file(filename)  # Читаем имена процессов из файла
     if process_names:
