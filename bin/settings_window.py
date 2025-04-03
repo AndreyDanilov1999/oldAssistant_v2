@@ -1,11 +1,12 @@
 import json
 import os
 from path_builder import get_path
-from logging_config import logger
-from PyQt5.QtCore import QSettings, pyqtSignal, Qt
+from logging_config import logger, debug_logger
+from PyQt5.QtCore import QSettings, pyqtSignal, Qt, QPoint, QPropertyAnimation, QEasingCurve
 from PyQt5.QtGui import QColor
 from PyQt5.QtWidgets import QFileDialog, QMessageBox, QPushButton, QCheckBox, QLineEdit, QLabel, QSlider, QComboBox, \
-    QVBoxLayout, QWidget, QDialog, QColorDialog, QFrame, QStackedWidget, QHBoxLayout
+    QVBoxLayout, QWidget, QDialog, QColorDialog, QFrame, QStackedWidget, QHBoxLayout, QGraphicsDropShadowEffect, \
+    QDialogButtonBox, QButtonGroup
 
 speakers = dict(Пласид='placide', Бестия='rogue', Джонни='johnny', СанСаныч='sanych',
                 Санбой='sanboy', Тигрица='tigress', Стейтем='stathem')
@@ -42,61 +43,163 @@ class CustomInputDialog(QDialog):
 
 
 class MainSettingsWindow(QDialog):
-    """
-    Основное окно настроек
-    """
+    """Окно настроек с анимацией и кнопками вкладок"""
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.assistant = parent
+        self.setWindowFlags(Qt.FramelessWindowHint | Qt.Dialog)
+        self.setFixedSize(450, self.assistant.height())  # Шире для кнопок
+
+        # Анимация движения
+        self.pos_animation = QPropertyAnimation(self, b"pos")
+        self.pos_animation.setDuration(300)
+        self.pos_animation.setEasingCurve(QEasingCurve.OutCubic)
+
+        # Анимация прозрачности
+        self.opacity_animation = QPropertyAnimation(self, b"windowOpacity")
+        self.opacity_animation.setDuration(300)
+
         self.init_ui()
+        self.setup_animation()
 
     def init_ui(self):
-        self.setWindowTitle("Настройки")
-        self.setFixedSize(550, 600)
+        self.setAttribute(Qt.WA_TranslucentBackground)
+        self.container = QWidget(self)
+        self.container.setObjectName("SettingsContainer")
+        self.container.setGeometry(0, 0, self.width(), self.height())
 
-        # Основной layout
-        main_layout = QHBoxLayout(self)
+        # Кастомный заголовок
+        self.title_bar = QWidget(self.container)
+        self.title_bar.setObjectName("TitleBar")
+        self.title_bar.setGeometry(0, 0, self.width(), 40)
 
-        # Левая колонка с кнопками
-        left_column = QVBoxLayout()
-        left_column.setAlignment(Qt.AlignTop)
-        main_layout.addLayout(left_column, 1)
+        self.title_label = QLabel("Настройки", self.title_bar)
+        self.title_label.setGeometry(15, 5, 200, 30)
+
+        self.close_btn = QPushButton("✕", self.title_bar)
+        self.close_btn.setGeometry(self.width() - 40, 5, 30, 30)
+        self.close_btn.setObjectName("CloseButton")
+        self.close_btn.clicked.connect(self.hide_with_animation)
+
+        # Контейнер для кнопок вкладок
+        self.tabs_container = QWidget(self.container)
+        self.tabs_container.setGeometry(0, 40, 120, self.height() - 40)
+        self.tabs_container.setObjectName("TabsContainer")
+
+        # Вертикальный layout с выравниванием по верхнему краю
+        self.tabs_layout = QVBoxLayout(self.tabs_container)
+        self.tabs_layout.setContentsMargins(5, 15, 5, 10)
+        self.tabs_layout.setSpacing(5)
+        self.tabs_layout.setAlignment(Qt.AlignTop)
+
+        # Контейнер для содержимого
+        self.content_stack = QStackedWidget(self.container)
+        self.content_stack.setGeometry(120, 40, self.width() - 120, self.height() - 40)
+        self.content_stack.setObjectName("ContentStack")
 
         # Разделитель
-        separator = QFrame()
-        separator.setFrameShape(QFrame.VLine)
-        separator.setFrameShadow(QFrame.Sunken)
-        main_layout.addWidget(separator)
+        self.separator = QFrame(self.container)
+        self.separator.setGeometry(120, 40, 1, self.height() - 40)
+        self.separator.setFrameShape(QFrame.VLine)
 
-        # Правая колонка с содержимым
-        self.right_column = QStackedWidget()
-        main_layout.addWidget(self.right_column, 2)
-
-        # Добавляем вкладки, передавая параметры
-        self.add_tab("Общие", SettingsWidget(self.assistant))
+        # Добавляем вкладки
+        self.add_tab("Основные", SettingsWidget(self.assistant))
         self.add_tab("Интерфейс", InterfaceWidget(self.assistant))
 
-    def add_tab(self, button_name, content_widget):
-        # Создаем кнопку
-        button = QPushButton(button_name, self)
+    def add_tab(self, name, widget):
+        """Добавляет вкладку с кнопкой"""
+        btn = QPushButton(name)
+        btn.setCheckable(True)
+        btn.setObjectName("TabButton")
+        btn.clicked.connect(lambda: self.switch_tab(widget, btn))
 
-        # Подключаем кнопку к переключению на соответствующий виджет
-        button.clicked.connect(lambda _, w=content_widget: self.right_column.setCurrentWidget(w))
+        if self.content_stack.count() == 0:
+            btn.setChecked(True)
 
-        # Добавляем кнопку в левую колонку
-        self.layout().itemAt(0).layout().addWidget(button)
+        self.tabs_layout.addWidget(btn)  # Кнопки будут прижаты к верху
+        self.content_stack.addWidget(widget)
 
-        # Добавляем содержимое в правую колонку
-        self.right_column.addWidget(content_widget)
+    def switch_tab(self, widget, button):
+        """Переключает вкладку"""
+        for btn in self.tabs_container.findChildren(QPushButton):
+            btn.setChecked(False)
+        button.setChecked(True)
+        self.content_stack.setCurrentWidget(widget)
+
+    def setup_animation(self):
+        # Начальная позиция - слева за границей основного окна
+        self.move(self.assistant.x() - self.width(),
+                  self.assistant.y())
+
+        # Конечная позиция - прижата к левому краю родителя
+        self.final_position = QPoint(
+            self.assistant.x() - self.width(),
+            self.assistant.y()
+        )
+
+    def hide_with_animation(self):
+        """Плавное исчезание: движение + прозрачность"""
+        # 1. Поднимаем основное окно на передний план
+        self.assistant.raise_()
+
+        # 2. Настраиваем обратную анимацию прозрачности
+        self.opacity_animation.stop()
+        self.opacity_animation.setStartValue(1.0)  # От непрозрачного
+        self.opacity_animation.setEndValue(0.0)  # К прозрачному
+        self.opacity_animation.finished.connect(self.hide)
+
+        # 3. Настраиваем обратное движение
+        self.pos_animation.stop()
+        self.pos_animation.setStartValue(self.pos())
+        self.pos_animation.setEndValue(QPoint(
+            self.assistant.x(),
+            self.assistant.y()
+        ))
+
+        # 4. Запускаем анимации
+        self.pos_animation.start()
+        self.opacity_animation.start()
+
+    def hideEvent(self, event):
+        """Сброс состояния при скрытии"""
+        self.move(self.assistant.x(),
+                  self.assistant.y())
+        self.setWindowOpacity(0.0)  # Сбрасываем к прозрачному
+        self.opacity_animation.finished.disconnect(self.hide)
+        super().hideEvent(event)
+
+    def showEvent(self, event):
+        """Плавное появление: движение + прозрачность"""
+        # 1. Устанавливаем начальную прозрачность
+        self.setWindowOpacity(0.0)
+
+        # 2. Настраиваем анимацию прозрачности
+        self.opacity_animation.stop()
+        self.opacity_animation.setStartValue(0.0)  # Начинаем с прозрачного
+        self.opacity_animation.setEndValue(1.0)  # Заканчиваем непрозрачным
+
+        # 3. Настраиваем анимацию движения
+        self.pos_animation.stop()
+        self.pos_animation.setStartValue(QPoint(
+            self.assistant.x(),
+            self.assistant.y()
+        ))
+        self.pos_animation.setEndValue(self.final_position)
+
+        # 4. Запускаем обе анимации
+        self.pos_animation.start()
+        self.opacity_animation.start()
+
+        super().showEvent(event)
 
     def get_settings_widget(self):
-        """Возвращает виджет настроек из стека"""
-        for i in range(self.right_column.count()):
-            widget = self.right_column.widget(i)
+        for i in range(self.content_stack.count()):
+            widget = self.content_stack.widget(i)
             if isinstance(widget, SettingsWidget):
                 return widget
         return None
+
 
 class InterfaceWidget(QWidget):
     """
@@ -127,46 +230,54 @@ class InterfaceWidget(QWidget):
         right_col = QVBoxLayout()
 
         # Левая колонка (5 кнопок)
-        btn_dark = QPushButton("Оранжевый неон")
-        btn_dark.clicked.connect(lambda: self.apply_style_file("orange_neon.json"))
-        left_col.addWidget(btn_dark)
+        btn_dark_orange = QPushButton("Оранжевый неон")
+        btn_dark_orange.clicked.connect(lambda: self.apply_style_file("orange_neon.json"))
+        left_col.addWidget(btn_dark_orange)
 
-        btn_blue = QPushButton("Синий неон")
-        btn_blue.clicked.connect(lambda: self.apply_style_file("blue_neon.json"))
-        left_col.addWidget(btn_blue)
+        btn_dark_blue = QPushButton("Синий неон")
+        btn_dark_blue.clicked.connect(lambda: self.apply_style_file("blue_neon.json"))
+        left_col.addWidget(btn_dark_blue)
 
-        btn_green = QPushButton("Зеленый неон")
-        btn_green.clicked.connect(lambda: self.apply_style_file("green_neon.json"))
-        left_col.addWidget(btn_green)
+        btn_dark_green = QPushButton("Зеленый неон")
+        btn_dark_green.clicked.connect(lambda: self.apply_style_file("green_neon.json"))
+        left_col.addWidget(btn_dark_green)
 
-        btn_purple = QPushButton("Розовый неон")
-        btn_purple.clicked.connect(lambda: self.apply_style_file("pink_neon.json"))
-        left_col.addWidget(btn_purple)
+        btn_dark_purple = QPushButton("Розовый неон")
+        btn_dark_purple.clicked.connect(lambda: self.apply_style_file("pink_neon.json"))
+        left_col.addWidget(btn_dark_purple)
 
-        btn_red = QPushButton("Красный неон")
-        btn_red.clicked.connect(lambda: self.apply_style_file("red_neon.json"))
-        left_col.addWidget(btn_red)
+        btn_dark_red = QPushButton("Красный неон")
+        btn_dark_red.clicked.connect(lambda: self.apply_style_file("red_neon.json"))
+        left_col.addWidget(btn_dark_red)
+
+        btn_dark_blue = QPushButton("Голубой неон")
+        btn_dark_blue.clicked.connect(lambda: self.apply_style_file("dark_blue.json"))
+        left_col.addWidget(btn_dark_blue)
 
         # Правая колонка (5 кнопок)
-        btn_light = QPushButton("Dark")
-        btn_light.clicked.connect(lambda: self.apply_style_file("dark.json"))
-        right_col.addWidget(btn_light)
+        btn_dark = QPushButton("Dark")
+        btn_dark.clicked.connect(lambda: self.apply_style_file("dark.json"))
+        right_col.addWidget(btn_dark)
 
-        btn_material = QPushButton("Legacy")
-        btn_material.clicked.connect(lambda: self.apply_style_file("legacy.json"))
-        right_col.addWidget(btn_material)
+        btn_legacy = QPushButton("Legacy")
+        btn_legacy.clicked.connect(lambda: self.apply_style_file("legacy.json"))
+        right_col.addWidget(btn_legacy)
 
-        btn_console = QPushButton("White")
-        btn_console.clicked.connect(lambda: self.apply_style_file("white.json"))
-        right_col.addWidget(btn_console)
+        btn_white = QPushButton("White")
+        btn_white.clicked.connect(lambda: self.apply_style_file("white.json"))
+        right_col.addWidget(btn_white)
 
-        btn_monochrome = QPushButton("Светло-оранжевый")
-        btn_monochrome.clicked.connect(lambda: self.apply_style_file("white_orange.json"))
-        right_col.addWidget(btn_monochrome)
+        btn_white_orange = QPushButton("Светло-оранжевый")
+        btn_white_orange.clicked.connect(lambda: self.apply_style_file("white_orange.json"))
+        right_col.addWidget(btn_white_orange)
 
-        btn_high_contrast = QPushButton("Светло-фиолетовый")
-        btn_high_contrast.clicked.connect(lambda: self.apply_style_file("white_purple.json"))
-        right_col.addWidget(btn_high_contrast)
+        btn_purple = QPushButton("Светло-фиолетовый")
+        btn_purple.clicked.connect(lambda: self.apply_style_file("white_purple.json"))
+        right_col.addWidget(btn_purple)
+
+        btn_white_blue = QPushButton("Светло-голубой")
+        btn_white_blue.clicked.connect(lambda: self.apply_style_file("white_blue.json"))
+        right_col.addWidget(btn_white_blue)
 
         cols.addLayout(left_col)
         cols.addLayout(right_col)
@@ -207,6 +318,7 @@ class InterfaceWidget(QWidget):
             preset_path = base_path
         else:
             logger.error(f"Пресет '{filename}' не найден ни в одной из папок.")
+            debug_logger.error(f"Пресет '{filename}' не найден ни в одной из папок.")
             return
 
         try:
@@ -222,11 +334,14 @@ class InterfaceWidget(QWidget):
                 self.assistant.load_and_apply_styles()
 
                 logger.info(f"Применён стиль из файла: {filename}")
+                debug_logger.info(f"Применён стиль из файла: {filename}")
 
         except json.JSONDecodeError:
             logger.error(f"Ошибка: файл пресета повреждён ({preset_path}).")
+            debug_logger.error(f"Ошибка: файл пресета повреждён ({preset_path}).")
         except Exception as e:
             logger.error(f"Ошибка загрузки пресета: {e}")
+            debug_logger.error(f"Ошибка загрузки пресета: {e}")
             self.assistant.show_message(f"Ошибка загрузки пресета: {e}", "Ошибка", "error")
 
     def load_custom_presets(self):
@@ -262,6 +377,7 @@ class InterfaceWidget(QWidget):
             color_dialog.exec_()
         except Exception as e:
             logger.error(f"Ошибка при открытии окна настроек цветов: {e}")
+            debug_logger.error(f"Ошибка при открытии окна настроек цветов: {e}")
             self.assistant.show_message(f"Не удалось открыть настройки цветов: {e}", "Ошибка", "error")
 
 
@@ -357,6 +473,7 @@ class ColorSettingsWindow(QDialog):
                 self.bg_color = color.name()
         except Exception as e:
             logger.error(e)
+            debug_logger.error(f"Метод choose_background_color: {e}")
 
     def choose_button_color(self):
         try:
@@ -366,6 +483,7 @@ class ColorSettingsWindow(QDialog):
                 self.btn_color = color.name()
         except Exception as e:
             logger.error(e)
+            debug_logger.error(f"Метод choose_button_color: {e}")
 
     def choose_border_color(self):
         try:
@@ -375,6 +493,7 @@ class ColorSettingsWindow(QDialog):
                 self.border_color = color.name()
         except Exception as e:
             logger.error(e)
+            debug_logger.error(f"Метод choose_border_color: {e}")
 
     def choose_text_color(self):
         try:
@@ -384,6 +503,7 @@ class ColorSettingsWindow(QDialog):
                 self.text_color = color.name()
         except Exception as e:
             logger.error(e)
+            debug_logger.error(f"Метод choose_text_color: {e}")
 
     def choose_text_edit_color(self):
         try:
@@ -393,6 +513,7 @@ class ColorSettingsWindow(QDialog):
                 self.text_edit_color = color.name()
         except Exception as e:
             logger.error(e)
+            debug_logger.error(f"Метод choose_text_edit_color: {e}")
 
     def show_error_message(self, text, parent_dialog=None):
         """Показывает сообщение об ошибке, не закрывая родительский диалог."""
@@ -435,7 +556,7 @@ class ColorSettingsWindow(QDialog):
                     "color": self.text_edit_color,
                     "border": "1px solid",
                     "border-radius": "4px",
-                    "font-size": "12px"
+                    "font-size": "15px"
                 },
                 "label_version": {
                     "color": self.text_edit_color,
@@ -448,12 +569,29 @@ class ColorSettingsWindow(QDialog):
                 "update_label": {
                     "color": self.text_edit_color,
                     "font-size": "12px"
+                },
+                "TitleBar": {
+                    "border-bottom": f"1px solid {self.border_color}"
+                },
+                "CloseButton": {
+                    "background-color": self.btn_color,
+                    "color": self.text_color,
+                    "height": "30px",
+                    "border": f"1px solid {self.border_color}",
+                    "border-radius": "3px",
+                    "font-size": "13px"
+                },
+                "CloseButton:hover": {
+                    "color": "#ffffff",
+                    "background-color": "#E04F4F",
+                    "border": "1px solid #E04F4F"
                 }
             }
             self.save_color_settings(new_styles)
             self.colorChanged.emit()
         except Exception as e:
             logger.info(f"Ошибка при применении изменений: {e}")
+            debug_logger.info(f"Ошибка при применении изменений: {e}")
             self.assistant.show_message(f"Не удалось применить изменения: {e}", "Ошибка", "error")
 
     def save_color_settings(self, new_styles):
@@ -469,6 +607,7 @@ class ColorSettingsWindow(QDialog):
 
             if result != QDialog.Accepted:  # Если отмена/закрытие
                 logger.info("Сохранение пресета отменено")
+                debug_logger.info("Сохранение пресета отменено")
                 return
 
             preset_name = dialog.get_text().strip()
@@ -487,13 +626,7 @@ class ColorSettingsWindow(QDialog):
             if any(os.path.exists(path) for path in conflict_paths):
                 self.assistant.show_message(f"Пресет '{preset_name}' уже существует!\n"
                                             "Пожалуйста, выберите другое имя.", "Предупреждение", "warning")
-                # self.show_error_message(
-                #     f"Пресет '{preset_name}' уже существует!\n"
-                #     "Пожалуйста, выберите другое имя.",
-                #     dialog
-                # )
                 continue
-
             try:
                 os.makedirs(self.custom_presets, exist_ok=True)
                 preset_path = conflict_paths[1]  # custom_presets путь
@@ -528,7 +661,7 @@ class ColorSettingsWindow(QDialog):
                             "color": self.text_edit_color,
                             "border": "1px solid",
                             "border-radius": "4px",
-                            "font-size": "12px"
+                            "font-size": "15px"
                         },
                         "label_version": {
                             "color": self.text_edit_color,
@@ -541,6 +674,22 @@ class ColorSettingsWindow(QDialog):
                         "update_label": {
                             "color": self.text_edit_color,
                             "font-size": "12px"
+                        },
+                        "TitleBar": {
+                            "border-bottom": f"1px solid {self.border_color}"
+                        },
+                        "CloseButton": {
+                            "background-color": self.btn_color,
+                            "color": self.text_color,
+                            "height": "30px",
+                            "border": f"1px solid {self.border_color}",
+                            "border-radius": "3px",
+                            "font-size": "13px"
+                        },
+                        "CloseButton:hover": {
+                            "color": "#ffffff",
+                            "background-color": "#E04F4F",
+                            "border": "1px solid #E04F4F"
                         }
                     }, f, indent=4, ensure_ascii=False)
 
@@ -595,6 +744,7 @@ class ColorSettingsWindow(QDialog):
             preset_path = base_preset_path
         else:
             logger.error(f"Пресет '{selected_preset}' не найден ни в одной из папок.")
+            debug_logger.error(f"Пресет '{selected_preset}' не найден ни в одной из папок.")
             self.assistant.show_message(f"Пресет '{selected_preset}' не найден ни в одной из папок.", "Ошибка", "error")
             return
 
@@ -610,11 +760,14 @@ class ColorSettingsWindow(QDialog):
                 self.border_color = styles.get("QPushButton", {}).get("border", "1px solid #293f85").split()[-1]
 
                 logger.info(f"Пресет загружен: {preset_path}")
+                debug_logger.info(f"Пресет загружен: {preset_path}")
 
         except json.JSONDecodeError:
             logger.error(f"Ошибка: файл пресета повреждён ({preset_path}).")
+            debug_logger.error(f"Ошибка: файл пресета повреждён ({preset_path}).")
         except Exception as e:
             logger.error(f"Ошибка загрузки пресета: {e}")
+            debug_logger.error(f"Ошибка загрузки пресета: {e}")
 
     def darken_color(self, color_str, amount):
         """Уменьшает яркость цвета на заданное количество (в формате hex)."""

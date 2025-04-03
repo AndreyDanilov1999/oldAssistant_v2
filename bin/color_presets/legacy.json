@@ -8,7 +8,7 @@
         "background-color": "#2e3450",
         "color": "#6cc0bc",
         "height": "30px",
-        "border": "1px solid 1px solid #477f7c",
+        "border": "1px solid #477f7c",
         "border-radius": "3px",
         "font-size": "13px"
     },
@@ -27,7 +27,7 @@
         "color": "#6cc0bc",
         "border": "1px solid",
         "border-radius": "4px",
-        "font-size": "12px"
+        "font-size": "15px"
     },
     "label_version": {
         "color": "#6cc0bc",
@@ -40,5 +40,21 @@
     "update_label": {
         "color": "#6cc0bc",
         "font-size": "12px"
+    },
+    "TitleBar": {
+        "border-bottom": "1px solid #477f7c"
+    },
+    "CloseButton": {
+        "background-color": "#2e3450",
+        "color": "#6cc0bc",
+        "height": "30px",
+        "border": "1px solid #477f7c",
+        "border-radius": "3px",
+        "font-size": "13px"
+    },
+    "CloseButton:hover": {
+        "color": "#ffffff",
+        "background-color": "#E04F4F",
+        "border": "1px solid #E04F4F"
     }
 }

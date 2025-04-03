@@ -19,22 +19,28 @@ else:
 
 # Определяем путь к файлу логов
 log_file_path = os.path.join(internal_dir, 'assistant.log')
+debug_file_path = os.path.join(internal_dir, "log", "debug_assist.log")
 
-# Настройка логгера
 logger = logging.getLogger("assistant")
 logger.setLevel(logging.INFO)  # Уровень логирования (INFO, DEBUG, ERROR и т.д.)
-
-# Настройка обработчика с ротацией файлов
 handler = RotatingFileHandler(
     log_file_path,
     maxBytes=5 * 1024 * 1024,  # Максимальный размер файла (5 МБ)
     backupCount=5,  # Количество резервных файлов
     encoding='utf-8'
 )
-
-# Формат сообщений
-formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+formatter = logging.Formatter("%(message)s")
 handler.setFormatter(formatter)
-
-# Добавление обработчика к логгеру
 logger.addHandler(handler)
+
+debug_logger = logging.getLogger("debug_assist")
+debug_logger.setLevel(logging.DEBUG)
+debug_handler = RotatingFileHandler(
+    debug_file_path,
+    maxBytes=5 * 1024 * 1024,  # Максимальный размер файла (5 МБ)
+    backupCount=5,  # Количество резервных файлов
+    encoding='utf-8'
+)
+debug_formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+debug_handler.setFormatter(debug_formatter)
+debug_logger.addHandler(debug_handler)

@@ -29,6 +29,7 @@ a = Analysis(
         ('G:/PycharmProjects/oldAssistant_v2/user_settings/presets', 'user_settings/presets'),
         ('G:/PycharmProjects/oldAssistant_v2/bin/color_presets', 'bin/color_presets'),
         ('G:/PycharmProjects/oldAssistant_v2/path_builder.py', '.'),
+        ('G:/PycharmProjects/oldAssistant_v2/log', 'log'),
     ],
     hiddenimports=['vosk', 'pyaudio'],
     hookspath=[],

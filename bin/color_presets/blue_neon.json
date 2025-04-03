@@ -27,7 +27,7 @@
         "color": "#c2caff",
         "border": "1px solid",
         "border-radius": "4px",
-        "font-size": "12px"
+        "font-size": "15px"
     },
     "label_version": {
         "color": "#c2caff",
@@ -40,5 +40,21 @@
     "update_label": {
         "color": "#c2caff",
         "font-size": "12px"
+    },
+    "TitleBar": {
+        "border-bottom": "1px solid #4577ff"
+    },
+    "CloseButton": {
+        "background-color": "#0c0a26",
+        "color": "#ffffff",
+        "height": "30px",
+        "border": "1px solid #4577ff",
+        "border-radius": "3px",
+        "font-size": "13px"
+    },
+    "CloseButton:hover": {
+        "color": "#ffffff",
+        "background-color": "#E04F4F",
+        "border": "1px solid #E04F4F"
     }
 }

@@ -48,3 +48,4 @@ vosk==0.3.45
 websockets==14.2
 zipp==3.21.0
 pandas==2.2.3
+markdown2==2.5.3

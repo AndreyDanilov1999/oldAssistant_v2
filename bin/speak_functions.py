@@ -1,7 +1,7 @@
 import json
 import os
 import random
-from logging_config import logger
+from logging_config import logger, debug_logger
 from path_builder import get_path
 
 os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "1"  # Скрываем приветствие pygame
@@ -18,8 +18,10 @@ def load_volume_assist():
                 return settings.get('volume_assist', 0.2)  # Возвращаем значение по умолчанию, если ключ отсутствует
         except json.JSONDecodeError:
             logger.error(f"Ошибка: файл {settings_file_path} содержит некорректный JSON.")
+            debug_logger.error(f"Ошибка: файл {settings_file_path} содержит некорректный JSON.")
     else:
         logger.error(f"Файл настроек {settings_file_path} не найден.")
+        debug_logger.error(f"Файл настроек {settings_file_path} не найден.")
     return 0.2
 
 def react(folder_path):
@@ -34,12 +36,14 @@ def react(folder_path):
 
         if not audio_files:
             logger.info(f"В папке {folder_path} нет аудиофайлов.")
+            debug_logger.info(f"В папке {folder_path} нет аудиофайлов.")
             return
 
         # Выбор случайного файла
         random_audio_file = random.choice(audio_files)
         random_filename = os.path.basename(random_audio_file)[:-4]
         logger.info(f"Ответ ассистента: {random_filename}")
+        debug_logger.info(f"Ответ ассистента: {random_filename}")
 
         # Загрузка и воспроизведение аудиофайла
         pygame.mixer.music.load(random_audio_file)
@@ -52,6 +56,7 @@ def react(folder_path):
 
     except Exception as e:
         logger.error(f"Ошибка при воспроизведении аудио: {e}")
+        debug_logger.error(f"Ошибка при воспроизведении аудио: {e}")
 
 
 def react_detail(file_path):
@@ -63,6 +68,7 @@ def react_detail(file_path):
     try:
         file_name = os.path.basename(file_path)[:-4]
         logger.info(f"Ответ ассистента: {file_name}")
+        debug_logger.info(f"Ответ ассистента: {file_name}")
 
         # Остановить текущее воспроизведение
         pygame.mixer.music.stop()
@@ -78,3 +84,4 @@ def react_detail(file_path):
 
     except Exception as e:
         logger.error(f"Ошибка при воспроизведении аудио: {e}")
+        debug_logger.error(f"Ошибка при воспроизведении аудио: {e}")
