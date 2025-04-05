@@ -6,40 +6,131 @@ from PyQt5.QtCore import QSettings, pyqtSignal, Qt, QPoint, QPropertyAnimation, 
 from PyQt5.QtGui import QColor
 from PyQt5.QtWidgets import QFileDialog, QMessageBox, QPushButton, QCheckBox, QLineEdit, QLabel, QSlider, QComboBox, \
     QVBoxLayout, QWidget, QDialog, QColorDialog, QFrame, QStackedWidget, QHBoxLayout, QGraphicsDropShadowEffect, \
-    QDialogButtonBox, QButtonGroup
+    QDialogButtonBox, QButtonGroup, QApplication
 
 speakers = dict(Пласид='placide', Бестия='rogue', Джонни='johnny', СанСаныч='sanych',
                 Санбой='sanboy', Тигрица='tigress', Стейтем='stathem')
 
 
-
 class CustomInputDialog(QDialog):
+    """Кастомное диалоговое окно ввода с собственной рамкой"""
+
     def __init__(self, title, label, parent=None):
         super().__init__(parent)
-        self.setWindowTitle(title)
-        self.setFixedSize(300, 100)
+        self.setWindowFlags(Qt.FramelessWindowHint | Qt.Dialog)
+        self.setFixedSize(300, 150)
+        self.setAttribute(Qt.WA_TranslucentBackground)
+        self.init_ui(title, label)
 
-        # Поле для ввода текста
-        self.input_field = QLineEdit(self)
+    def init_ui(self, title, label):
+        # Основной контейнер
+        self.container = QWidget(self)
+        self.container.setObjectName("MessageContainer")
+        self.container.setGeometry(0, 0, self.width(), self.height())
+
+        # Кастомный заголовок
+        self.title_bar = QWidget(self.container)
+        self.title_bar.setObjectName("TitleBar")
+        self.title_bar.setGeometry(1, 1, self.width() - 2, 35)
+        self.title_layout = QHBoxLayout(self.title_bar)
+        self.title_layout.setContentsMargins(10, 5, 10, 5)
+        self.title_layout.setSpacing(5)
+
+        self.title_label = QLabel(title, self.title_bar)
+        self.title_label.setGeometry(10, 5, 200, 20)
+        self.title_layout.addWidget(self.title_label)
+
+        self.close_btn = QPushButton("✕", self.title_bar)
+        self.close_btn.setFixedSize(25, 25)
+        self.close_btn.setObjectName("CloseButton")
+        self.close_btn.clicked.connect(self.reject)
+        self.title_layout.addWidget(self.close_btn)
+
+        # Основное содержимое
+        self.content_widget = QWidget(self.container)
+        self.content_widget.setGeometry(1, 36, self.width() - 2, self.height() - 37)
+        self.content_widget.setObjectName("ContentWidget")
+
+        # Поле ввода
+        self.input_field = QLineEdit(self.content_widget)
         self.input_field.setPlaceholderText(label)
 
-        # Кнопки "ОК" и "Отмена"
-        self.ok_button = QPushButton('Сохранить', self)
+        # Кнопки
+        self.ok_button = QPushButton('Сохранить', self.content_widget)
+        self.ok_button.setStyleSheet("padding: 1px 10px;")
+        self.ok_button.setObjectName("AcceptButton")
         self.ok_button.clicked.connect(self.accept)
-        self.cancel_button = QPushButton('Закрыть', self)
-        self.cancel_button.clicked.connect(self.reject)  # Закрываем диалог
+
+        self.cancel_button = QPushButton('Закрыть', self.content_widget)
+        self.cancel_button.setStyleSheet("padding: 1px 10px;")
+        self.cancel_button.setObjectName("RejectButton")
+        self.cancel_button.clicked.connect(self.reject)
 
         # Размещение элементов
-        layout = QVBoxLayout()
-        layout.addWidget(self.input_field)
+        main_layout = QVBoxLayout(self.content_widget)
+        main_layout.setContentsMargins(15, 15, 15, 15)
+        main_layout.setSpacing(15)
+
+        main_layout.addWidget(self.input_field)
+
         button_layout = QHBoxLayout()
+        button_layout.addStretch()
         button_layout.addWidget(self.ok_button)
         button_layout.addWidget(self.cancel_button)
-        layout.addLayout(button_layout)
-        self.setLayout(layout)
+        main_layout.addLayout(button_layout)
+
+        # Установка стратегии позиционирования
+        self.set_position_strategy()
+
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key_Escape:
+            self.close()  # Закрываем только это окно
+        else:
+            super().keyPressEvent(event)
+
+    def set_position_strategy(self):
+        """Выбирает стратегию позиционирования окна"""
+        self.position_strategy = self.center_to_parent()
+
+    def ensure_on_screen(self):
+        screen_geometry = QApplication.desktop().availableGeometry()
+        if not screen_geometry.contains(self.geometry()):
+            self.move(
+                min(screen_geometry.right() - self.width(), max(screen_geometry.left(), self.x())),
+                min(screen_geometry.bottom() - self.height(), max(screen_geometry.top(), self.y())))
+
+    def center_to_parent(self):
+        """Центрирует по горизонтали и позиционирует чуть ниже заголовка родителя"""
+        if not self.parent():
+            return
+
+        parent_rect = self.parent().geometry()
+        title_bar_height = 20  # Высота заголовка родительского окна (может потребоваться подстройка)
+
+        # Центрируем по горизонтали и позиционируем вертикально чуть ниже заголовка
+        new_x = parent_rect.x() + (parent_rect.width() - self.width()) // 2
+        new_y = parent_rect.y() + title_bar_height + 15  # +10 для небольшого отступа
+
+        self.move(new_x, new_y)
+
+        # Проверяем, чтобы окно не выходило за пределы экрана
+        self.ensure_on_screen()
 
     def get_text(self):
+        """Возвращает введенный текст"""
         return self.input_field.text()
+
+    def mousePressEvent(self, event):
+        """Перетаскивание окна за заголовок"""
+        if event.button() == Qt.LeftButton and event.y() < 30:
+            self.drag_position = event.globalPos() - self.frameGeometry().topLeft()
+            event.accept()
+
+    def mouseMoveEvent(self, event):
+        """Перетаскивание окна за заголовок"""
+        if hasattr(self, 'drag_position') and event.buttons() == Qt.LeftButton:
+            self.move(event.globalPos() - self.drag_position)
+            event.accept()
 
 
 class MainSettingsWindow(QDialog):
@@ -72,15 +163,19 @@ class MainSettingsWindow(QDialog):
         # Кастомный заголовок
         self.title_bar = QWidget(self.container)
         self.title_bar.setObjectName("TitleBar")
-        self.title_bar.setGeometry(0, 0, self.width(), 40)
+        self.title_bar.setGeometry(0, 0, self.width(), 35)
+        self.title_layout = QHBoxLayout(self.title_bar)
+        self.title_layout.setContentsMargins(10, 5, 10, 5)
+        self.title_layout.setSpacing(5)
 
         self.title_label = QLabel("Настройки", self.title_bar)
         self.title_label.setGeometry(15, 5, 200, 30)
-
+        self.title_layout.addWidget(self.title_label)
         self.close_btn = QPushButton("✕", self.title_bar)
-        self.close_btn.setGeometry(self.width() - 40, 5, 30, 30)
+        self.close_btn.setFixedSize(25, 25)
         self.close_btn.setObjectName("CloseButton")
         self.close_btn.clicked.connect(self.hide_with_animation)
+        self.title_layout.addWidget(self.close_btn)
 
         # Контейнер для кнопок вкладок
         self.tabs_container = QWidget(self.container)
@@ -106,6 +201,14 @@ class MainSettingsWindow(QDialog):
         # Добавляем вкладки
         self.add_tab("Основные", SettingsWidget(self.assistant))
         self.add_tab("Интерфейс", InterfaceWidget(self.assistant))
+
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key_Escape:
+            if self.opacity_animation.state() != QPropertyAnimation.Running:
+                self.hide_with_animation()
+            event.accept()
+        else:
+            super().keyPressEvent(event)
 
     def add_tab(self, name, widget):
         """Добавляет вкладку с кнопкой"""
@@ -382,65 +485,97 @@ class InterfaceWidget(QWidget):
 
 
 class ColorSettingsWindow(QDialog):
-    """
-    Класс обрабатывающий окно изменения оформления интерфейса
-    (изменение цветовой палитры, сохранение и выбор пресетов)
-    """
-    colorChanged = pyqtSignal()  # Определяем сигнал
+    """Окно изменения оформления интерфейса (цветовая палитра, пресеты)"""
+
+    colorChanged = pyqtSignal()  # Сигнал изменения цвета
 
     def __init__(self, assistant, parent=None):
         super().__init__(parent)
         self.assistant = assistant
-        self.styles = self.assistant.styles  # Передаем текущие стили
+        self.styles = self.assistant.styles
         self.color_settings_path = self.assistant.color_settings_path
         self.base_presets = get_path('bin', 'color_presets')
         self.custom_presets = get_path('user_settings', 'presets')
         os.makedirs(self.custom_presets, exist_ok=True)
-        self.init_ui()
+
+        # Настройка окна без рамки
+        self.setWindowFlags(Qt.FramelessWindowHint | Qt.Dialog)
+        self.setFixedSize(300, 400)
+        self.setAttribute(Qt.WA_TranslucentBackground)
+
         # Инициализация переменных для цветов
         self.bg_color = ""
         self.btn_color = ""
         self.text_color = ""
         self.text_edit_color = ""
         self.border_color = ""
-        self.load_color_settings()  # Загружаем текущие цвета
+
+        self.init_ui()
+        self.load_color_settings()
 
     def init_ui(self):
-        self.setWindowTitle('Редактор стилей')
-        self.setFixedSize(300, 400)
+        # Основной контейнер
+        self.container = QWidget(self)
+        self.container.setObjectName("MessageContainer")
+        self.container.setGeometry(0, 0, self.width(), self.height())
+
+        # Кастомный заголовок
+        self.title_bar = QWidget(self.container)
+        self.title_bar.setObjectName("TitleBar")
+        self.title_bar.setGeometry(1, 1, self.width() - 2, 35)
+        self.title_layout = QHBoxLayout(self.title_bar)
+        self.title_layout.setContentsMargins(10, 5, 10, 5)
+        self.title_layout.setSpacing(5)
+
+        self.title_label = QLabel("Редактор стилей", self.title_bar)
+        self.title_label.setGeometry(10, 5, 200, 20)
+        self.title_layout.addWidget(self.title_label)
+
+        self.close_btn = QPushButton("✕", self.title_bar)
+        self.close_btn.setFixedSize(25, 25)
+        self.close_btn.setObjectName("CloseButton")
+        self.close_btn.clicked.connect(self.close)
+        self.title_layout.addWidget(self.close_btn)
+
+        # Основной контент
+        self.content_widget = QWidget(self.container)
+        self.content_widget.setGeometry(1, 36, self.width() - 2, self.height() - 37)
+        self.content_widget.setObjectName("ContentWidget")
 
         # Кнопки для выбора цветов
-        self.bg_button = QPushButton('Фон')
+        self.bg_button = QPushButton('Фон', self.content_widget)
         self.bg_button.clicked.connect(self.choose_background_color)
 
-        self.btn_button = QPushButton('Цвет кнопок')
+        self.btn_button = QPushButton('Цвет кнопок', self.content_widget)
         self.btn_button.clicked.connect(self.choose_button_color)
 
-        self.border_button = QPushButton('Обводка кнопок')
+        self.border_button = QPushButton('Обводка кнопок', self.content_widget)
         self.border_button.clicked.connect(self.choose_border_color)
 
-        self.text_button = QPushButton('Цвет текста')
+        self.text_button = QPushButton('Цвет текста', self.content_widget)
         self.text_button.clicked.connect(self.choose_text_color)
 
-        self.text_edit_button = QPushButton('Цвет текста в логах и сносках')
+        self.text_edit_button = QPushButton('Цвет текста в логах', self.content_widget)
         self.text_edit_button.clicked.connect(self.choose_text_edit_color)
 
         # Кнопка для применения изменений
-        self.apply_button = QPushButton('Применить')
+        self.apply_button = QPushButton('Применить', self.content_widget)
         self.apply_button.clicked.connect(self.apply_changes)
 
         # Кнопка для сохранения пресета
-        self.save_preset_button = QPushButton('Сохранить стиль')
+        self.save_preset_button = QPushButton('Сохранить стиль', self.content_widget)
         self.save_preset_button.clicked.connect(self.save_preset)
 
-        # Выпадающий список для выбора существующих пресетов
-        self.preset_combo_box = QComboBox()
-        self.load_presets()  # Загружаем существующие пресеты
+        # Выпадающий список для пресетов
+        self.preset_combo_box = QComboBox(self.content_widget)
+        self.load_presets()
         self.preset_combo_box.setCurrentIndex(0)
         self.preset_combo_box.currentIndexChanged.connect(self.load_preset)
 
         # Размещение элементов
-        layout = QVBoxLayout()
+        layout = QVBoxLayout(self.content_widget)
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(8)
         layout.addWidget(self.bg_button)
         layout.addWidget(self.btn_button)
         layout.addWidget(self.border_button)
@@ -451,8 +586,6 @@ class ColorSettingsWindow(QDialog):
         layout.addWidget(self.preset_combo_box)
         layout.addStretch()
         layout.addWidget(self.apply_button)
-
-        self.setLayout(layout)
 
     def load_color_settings(self):
         """Загружает текущие цвета из файла настроек."""
@@ -465,55 +598,430 @@ class ColorSettingsWindow(QDialog):
         border_parts = border_style.split()
         self.border_color = border_parts[-1] if len(border_parts) > 2 else "#293f85"
 
+    # def choose_background_color(self):
+    #     try:
+    #         initial_color = QColor(self.bg_color) if hasattr(self, 'bg_color') else Qt.white
+    #         color = QColorDialog.getColor(initial_color, self)
+    #         if color.isValid():
+    #             self.bg_color = color.name()
+    #     except Exception as e:
+    #         logger.error(e)
+    #         debug_logger.error(f"Метод choose_background_color: {e}")
+
     def choose_background_color(self):
         try:
-            initial_color = QColor(self.bg_color) if hasattr(self, 'bg_color') else Qt.white
-            color = QColorDialog.getColor(initial_color, self)
-            if color.isValid():
-                self.bg_color = color.name()
+            # Создаем кастомное окно
+            dialog = QDialog(self)
+            dialog.setWindowFlags(Qt.FramelessWindowHint | Qt.Dialog)
+            dialog.setFixedSize(520, 500)
+            dialog.setAttribute(Qt.WA_TranslucentBackground)
+
+            # Основной контейнер с рамкой 1px
+            container = QWidget(dialog)
+            container.setObjectName("MessageContainer")
+            container.setGeometry(0, 0, dialog.width(), dialog.height())
+
+            # Заголовок (35px высота)
+            title_bar = QWidget(container)
+            title_bar.setObjectName("TitleBar")
+            title_bar.setGeometry(1, 1, dialog.width() - 2, 35)
+
+            # Layout заголовка
+            title_layout = QHBoxLayout(title_bar)
+            title_layout.setContentsMargins(10, 5, 10, 5)
+            title_layout.setSpacing(5)
+
+            # Надпись заголовка
+            title_label = QLabel("Выбор цвета фона")
+            title_layout.addWidget(title_label)
+            title_layout.addStretch()
+
+            # Кнопка закрытия 25x25
+            close_btn = QPushButton("✕")
+            close_btn.setFixedSize(25, 25)
+            close_btn.setObjectName("CloseButton")
+            close_btn.clicked.connect(dialog.reject)
+            title_layout.addWidget(close_btn)
+
+            # Встраиваем стандартный QColorDialog
+            color_widget = QColorDialog()
+            color_widget.setOptions(QColorDialog.NoButtons | QColorDialog.DontUseNativeDialog)
+
+            # Начальный цвет
+            if hasattr(self, 'bg_color'):
+                color_widget.setCurrentColor(QColor(self.bg_color))
+
+            # Layout содержимого
+            content_widget = QWidget(container)
+            content_widget.setGeometry(1, 36, dialog.width() - 2, dialog.height() - 37)
+
+            layout = QVBoxLayout(content_widget)
+            layout.setContentsMargins(5, 5, 5, 5)
+            layout.addWidget(color_widget)
+
+            # Кнопки
+            self.ok_button = QPushButton('Применить', self.content_widget)
+            self.ok_button.setStyleSheet("padding: 1px 10px;")
+            self.ok_button.setObjectName("AcceptButton")
+            self.ok_button.clicked.connect(dialog.accept)
+
+            self.cancel_button = QPushButton('Закрыть', self.content_widget)
+            self.cancel_button.setStyleSheet("padding: 1px 10px;")
+            self.cancel_button.setObjectName("RejectButton")
+            self.cancel_button.clicked.connect(dialog.reject)
+            button_layout = QHBoxLayout()
+            button_layout.addStretch()
+            button_layout.addWidget(self.ok_button)
+            button_layout.addWidget(self.cancel_button)
+            layout.addLayout(button_layout)
+
+            if dialog.exec_() == QDialog.Accepted:
+                self.bg_color = color_widget.currentColor().name()
+                self.apply_changes()
+
         except Exception as e:
-            logger.error(e)
-            debug_logger.error(f"Метод choose_background_color: {e}")
+            logger.error(f"Ошибка в choose_background_color: {e}")
+            debug_logger.exception(e)
+
+    # def choose_button_color(self):
+    #     try:
+    #         initial_color = QColor(self.btn_color) if hasattr(self, 'btn_color') else Qt.white
+    #         color = QColorDialog.getColor(initial_color, self)
+    #         if color.isValid():
+    #             self.btn_color = color.name()
+    #     except Exception as e:
+    #         logger.error(e)
+    #         debug_logger.error(f"Метод choose_button_color: {e}")
 
     def choose_button_color(self):
         try:
-            initial_color = QColor(self.btn_color) if hasattr(self, 'btn_color') else Qt.white
-            color = QColorDialog.getColor(initial_color, self)
-            if color.isValid():
-                self.btn_color = color.name()
+            # Создаем кастомное окно
+            dialog = QDialog(self)
+            dialog.setWindowFlags(Qt.FramelessWindowHint | Qt.Dialog)
+            dialog.setFixedSize(520, 500)
+            dialog.setAttribute(Qt.WA_TranslucentBackground)
+
+            # Основной контейнер с рамкой 1px
+            container = QWidget(dialog)
+            container.setObjectName("MessageContainer")
+            container.setGeometry(0, 0, dialog.width(), dialog.height())
+
+            # Заголовок (35px высота)
+            title_bar = QWidget(container)
+            title_bar.setObjectName("TitleBar")
+            title_bar.setGeometry(1, 1, dialog.width() - 2, 35)
+
+            # Layout заголовка
+            title_layout = QHBoxLayout(title_bar)
+            title_layout.setContentsMargins(10, 5, 10, 5)
+            title_layout.setSpacing(5)
+
+            # Надпись заголовка
+            title_label = QLabel("Выбор цвета")
+            title_layout.addWidget(title_label)
+            title_layout.addStretch()
+
+            # Кнопка закрытия 25x25
+            close_btn = QPushButton("✕")
+            close_btn.setFixedSize(25, 25)
+            close_btn.setObjectName("CloseButton")
+            close_btn.clicked.connect(dialog.reject)
+            title_layout.addWidget(close_btn)
+
+            # Встраиваем стандартный QColorDialog
+            color_widget = QColorDialog()
+            color_widget.setOptions(QColorDialog.NoButtons | QColorDialog.DontUseNativeDialog)
+
+            # Начальный цвет
+            if hasattr(self, 'btn_color'):
+                color_widget.setCurrentColor(QColor(self.btn_color))
+
+            # Layout содержимого
+            content_widget = QWidget(container)
+            content_widget.setGeometry(1, 36, dialog.width() - 2, dialog.height() - 37)
+
+            layout = QVBoxLayout(content_widget)
+            layout.setContentsMargins(5, 5, 5, 5)
+            layout.addWidget(color_widget)
+
+            # Кнопки
+            self.ok_button = QPushButton('Применить', self.content_widget)
+            self.ok_button.setStyleSheet("padding: 1px 10px;")
+            self.ok_button.setObjectName("AcceptButton")
+            self.ok_button.clicked.connect(dialog.accept)
+
+            self.cancel_button = QPushButton('Закрыть', self.content_widget)
+            self.cancel_button.setStyleSheet("padding: 1px 10px;")
+            self.cancel_button.setObjectName("RejectButton")
+            self.cancel_button.clicked.connect(dialog.reject)
+            button_layout = QHBoxLayout()
+            button_layout.addStretch()
+            button_layout.addWidget(self.ok_button)
+            button_layout.addWidget(self.cancel_button)
+            layout.addLayout(button_layout)
+
+            if dialog.exec_() == QDialog.Accepted:
+                self.btn_color = color_widget.currentColor().name()
+                self.apply_changes()
+
         except Exception as e:
-            logger.error(e)
-            debug_logger.error(f"Метод choose_button_color: {e}")
+            logger.error(f"Ошибка в choose_background_color: {e}")
+            debug_logger.exception(e)
+
+    # def choose_border_color(self):
+    #     try:
+    #         initial_color = QColor(self.border_color) if hasattr(self, 'border_color') else Qt.white
+    #         color = QColorDialog.getColor(initial_color, self)
+    #         if color.isValid():
+    #             self.border_color = color.name()
+    #     except Exception as e:
+    #         logger.error(e)
+    #         debug_logger.error(f"Метод choose_border_color: {e}")
 
     def choose_border_color(self):
         try:
-            initial_color = QColor(self.border_color) if hasattr(self, 'border_color') else Qt.white
-            color = QColorDialog.getColor(initial_color, self)
-            if color.isValid():
-                self.border_color = color.name()
+            # Создаем кастомное окно
+            dialog = QDialog(self)
+            dialog.setWindowFlags(Qt.FramelessWindowHint | Qt.Dialog)
+            dialog.setFixedSize(520, 500)
+            dialog.setAttribute(Qt.WA_TranslucentBackground)
+
+            # Основной контейнер с рамкой 1px
+            container = QWidget(dialog)
+            container.setObjectName("MessageContainer")
+            container.setGeometry(0, 0, dialog.width(), dialog.height())
+
+            # Заголовок (35px высота)
+            title_bar = QWidget(container)
+            title_bar.setObjectName("TitleBar")
+            title_bar.setGeometry(1, 1, dialog.width() - 2, 35)
+
+            # Layout заголовка
+            title_layout = QHBoxLayout(title_bar)
+            title_layout.setContentsMargins(10, 5, 10, 5)
+            title_layout.setSpacing(5)
+
+            # Надпись заголовка
+            title_label = QLabel("Выбор цвета")
+            title_layout.addWidget(title_label)
+            title_layout.addStretch()
+
+            # Кнопка закрытия 25x25
+            close_btn = QPushButton("✕")
+            close_btn.setFixedSize(25, 25)
+            close_btn.setObjectName("CloseButton")
+            close_btn.clicked.connect(dialog.reject)
+            title_layout.addWidget(close_btn)
+
+            # Встраиваем стандартный QColorDialog
+            color_widget = QColorDialog()
+            color_widget.setOptions(QColorDialog.NoButtons | QColorDialog.DontUseNativeDialog)
+
+            # Начальный цвет
+            if hasattr(self, 'border_color'):
+                color_widget.setCurrentColor(QColor(self.border_color))
+
+            # Layout содержимого
+            content_widget = QWidget(container)
+            content_widget.setGeometry(1, 36, dialog.width() - 2, dialog.height() - 37)
+
+            layout = QVBoxLayout(content_widget)
+            layout.setContentsMargins(5, 5, 5, 5)
+            layout.addWidget(color_widget)
+
+            # Кнопки
+            self.ok_button = QPushButton('Применить', self.content_widget)
+            self.ok_button.setStyleSheet("padding: 1px 10px;")
+            self.ok_button.setObjectName("AcceptButton")
+            self.ok_button.clicked.connect(dialog.accept)
+
+            self.cancel_button = QPushButton('Закрыть', self.content_widget)
+            self.cancel_button.setStyleSheet("padding: 1px 10px;")
+            self.cancel_button.setObjectName("RejectButton")
+            self.cancel_button.clicked.connect(dialog.reject)
+            button_layout = QHBoxLayout()
+            button_layout.addStretch()
+            button_layout.addWidget(self.ok_button)
+            button_layout.addWidget(self.cancel_button)
+            layout.addLayout(button_layout)
+
+            if dialog.exec_() == QDialog.Accepted:
+                self.border_color = color_widget.currentColor().name()
+                self.apply_changes()
+
         except Exception as e:
-            logger.error(e)
-            debug_logger.error(f"Метод choose_border_color: {e}")
+            logger.error(f"Ошибка в choose_background_color: {e}")
+            debug_logger.exception(e)
+
+    # def choose_text_color(self):
+    #     try:
+    #         initial_color = QColor(self.text_color) if hasattr(self, 'text_color') else Qt.white
+    #         color = QColorDialog.getColor(initial_color, self)
+    #         if color.isValid():
+    #             self.text_color = color.name()
+    #     except Exception as e:
+    #         logger.error(e)
+    #         debug_logger.error(f"Метод choose_text_color: {e}")
 
     def choose_text_color(self):
         try:
-            initial_color = QColor(self.text_color) if hasattr(self, 'text_color') else Qt.white
-            color = QColorDialog.getColor(initial_color, self)
-            if color.isValid():
-                self.text_color = color.name()
+            # Создаем кастомное окно
+            dialog = QDialog(self)
+            dialog.setWindowFlags(Qt.FramelessWindowHint | Qt.Dialog)
+            dialog.setFixedSize(520, 500)
+            dialog.setAttribute(Qt.WA_TranslucentBackground)
+
+            # Основной контейнер с рамкой 1px
+            container = QWidget(dialog)
+            container.setObjectName("MessageContainer")
+            container.setGeometry(0, 0, dialog.width(), dialog.height())
+
+            # Заголовок (35px высота)
+            title_bar = QWidget(container)
+            title_bar.setObjectName("TitleBar")
+            title_bar.setGeometry(1, 1, dialog.width() - 2, 35)
+
+            # Layout заголовка
+            title_layout = QHBoxLayout(title_bar)
+            title_layout.setContentsMargins(10, 5, 10, 5)
+            title_layout.setSpacing(5)
+
+            # Надпись заголовка
+            title_label = QLabel("Выбор цвета")
+            title_layout.addWidget(title_label)
+            title_layout.addStretch()
+
+            # Кнопка закрытия 25x25
+            close_btn = QPushButton("✕")
+            close_btn.setFixedSize(25, 25)
+            close_btn.setObjectName("CloseButton")
+            close_btn.clicked.connect(dialog.reject)
+            title_layout.addWidget(close_btn)
+
+            # Встраиваем стандартный QColorDialog
+            color_widget = QColorDialog()
+            color_widget.setOptions(QColorDialog.NoButtons | QColorDialog.DontUseNativeDialog)
+
+            # Начальный цвет
+            if hasattr(self, 'text_color'):
+                color_widget.setCurrentColor(QColor(self.text_color))
+
+            # Layout содержимого
+            content_widget = QWidget(container)
+            content_widget.setGeometry(1, 36, dialog.width() - 2, dialog.height() - 37)
+
+            layout = QVBoxLayout(content_widget)
+            layout.setContentsMargins(5, 5, 5, 5)
+            layout.addWidget(color_widget)
+
+            # Кнопки
+            self.ok_button = QPushButton('Применить', self.content_widget)
+            self.ok_button.setStyleSheet("padding: 1px 10px;")
+            self.ok_button.setObjectName("AcceptButton")
+            self.ok_button.clicked.connect(dialog.accept)
+
+            self.cancel_button = QPushButton('Закрыть', self.content_widget)
+            self.cancel_button.setStyleSheet("padding: 1px 10px;")
+            self.cancel_button.setObjectName("RejectButton")
+            self.cancel_button.clicked.connect(dialog.reject)
+            button_layout = QHBoxLayout()
+            button_layout.addStretch()
+            button_layout.addWidget(self.ok_button)
+            button_layout.addWidget(self.cancel_button)
+            layout.addLayout(button_layout)
+
+            if dialog.exec_() == QDialog.Accepted:
+                self.text_color = color_widget.currentColor().name()
+                self.apply_changes()
+
         except Exception as e:
-            logger.error(e)
-            debug_logger.error(f"Метод choose_text_color: {e}")
+            logger.error(f"Ошибка в choose_background_color: {e}")
+            debug_logger.exception(e)
+
+    # def choose_text_edit_color(self):
+    #     try:
+    #         initial_color = QColor(self.text_edit_color) if hasattr(self, 'text_edit_color') else Qt.white
+    #         color = QColorDialog.getColor(initial_color, self)
+    #         if color.isValid():
+    #             self.text_edit_color = color.name()
+    #     except Exception as e:
+    #         logger.error(e)
+    #         debug_logger.error(f"Метод choose_text_edit_color: {e}")
 
     def choose_text_edit_color(self):
         try:
-            initial_color = QColor(self.text_edit_color) if hasattr(self, 'text_edit_color') else Qt.white
-            color = QColorDialog.getColor(initial_color, self)
-            if color.isValid():
-                self.text_edit_color = color.name()
+            # Создаем кастомное окно
+            dialog = QDialog(self)
+            dialog.setWindowFlags(Qt.FramelessWindowHint | Qt.Dialog)
+            dialog.setFixedSize(520, 500)
+            dialog.setAttribute(Qt.WA_TranslucentBackground)
+
+            # Основной контейнер с рамкой 1px
+            container = QWidget(dialog)
+            container.setObjectName("MessageContainer")
+            container.setGeometry(0, 0, dialog.width(), dialog.height())
+
+            # Заголовок (35px высота)
+            title_bar = QWidget(container)
+            title_bar.setObjectName("TitleBar")
+            title_bar.setGeometry(1, 1, dialog.width() - 2, 35)
+
+            # Layout заголовка
+            title_layout = QHBoxLayout(title_bar)
+            title_layout.setContentsMargins(10, 5, 10, 5)
+            title_layout.setSpacing(5)
+
+            # Надпись заголовка
+            title_label = QLabel("Выбор цвета")
+            title_layout.addWidget(title_label)
+            title_layout.addStretch()
+
+            # Кнопка закрытия 25x25
+            close_btn = QPushButton("✕")
+            close_btn.setFixedSize(25, 25)
+            close_btn.setObjectName("CloseButton")
+            close_btn.clicked.connect(dialog.reject)
+            title_layout.addWidget(close_btn)
+
+            # Встраиваем стандартный QColorDialog
+            color_widget = QColorDialog()
+            color_widget.setOptions(QColorDialog.NoButtons | QColorDialog.DontUseNativeDialog)
+
+            # Начальный цвет
+            if hasattr(self, 'text_edit_color'):
+                color_widget.setCurrentColor(QColor(self.text_edit_color))
+
+            # Layout содержимого
+            content_widget = QWidget(container)
+            content_widget.setGeometry(1, 36, dialog.width() - 2, dialog.height() - 37)
+
+            layout = QVBoxLayout(content_widget)
+            layout.setContentsMargins(5, 5, 5, 5)
+            layout.addWidget(color_widget)
+
+            # Кнопки
+            self.ok_button = QPushButton('Применить', self.content_widget)
+            self.ok_button.setStyleSheet("padding: 1px 10px;")
+            self.ok_button.setObjectName("AcceptButton")
+            self.ok_button.clicked.connect(dialog.accept)
+
+            self.cancel_button = QPushButton('Закрыть', self.content_widget)
+            self.cancel_button.setStyleSheet("padding: 1px 10px;")
+            self.cancel_button.setObjectName("RejectButton")
+            self.cancel_button.clicked.connect(dialog.reject)
+            button_layout = QHBoxLayout()
+            button_layout.addStretch()
+            button_layout.addWidget(self.ok_button)
+            button_layout.addWidget(self.cancel_button)
+            layout.addLayout(button_layout)
+
+            if dialog.exec_() == QDialog.Accepted:
+                self.text_edit_color = color_widget.currentColor().name()
+                self.apply_changes()
+
         except Exception as e:
-            logger.error(e)
-            debug_logger.error(f"Метод choose_text_edit_color: {e}")
+            logger.error(f"Ошибка в choose_background_color: {e}")
+            debug_logger.exception(e)
 
     def show_error_message(self, text, parent_dialog=None):
         """Показывает сообщение об ошибке, не закрывая родительский диалог."""
@@ -573,6 +1081,19 @@ class ColorSettingsWindow(QDialog):
                 "TitleBar": {
                     "border-bottom": f"1px solid {self.border_color}"
                 },
+                "TrayButton": {
+                    "background-color": self.btn_color,
+                    "color": self.text_color,
+                    "height": "30px",
+                    "border": f"1px solid {self.border_color}",
+                    "border-radius": "3px",
+                    "font-size": "13px"
+                },
+                "TrayButton:hover": {
+                    "color": "#ffffff",
+                    "background-color": "#0790EC",
+                    "border": "1px solid #0790EC"
+                },
                 "CloseButton": {
                     "background-color": self.btn_color,
                     "color": self.text_color,
@@ -585,6 +1106,9 @@ class ColorSettingsWindow(QDialog):
                     "color": "#ffffff",
                     "background-color": "#E04F4F",
                     "border": "1px solid #E04F4F"
+                },
+                "MessageContainer": {
+                    "border": f"1px solid {self.border_color}"
                 }
             }
             self.save_color_settings(new_styles)
@@ -678,6 +1202,19 @@ class ColorSettingsWindow(QDialog):
                         "TitleBar": {
                             "border-bottom": f"1px solid {self.border_color}"
                         },
+                        "TrayButton": {
+                            "background-color": self.btn_color,
+                            "color": self.text_color,
+                            "height": "30px",
+                            "border": f"1px solid {self.border_color}",
+                            "border-radius": "3px",
+                            "font-size": "13px"
+                        },
+                        "TrayButton:hover": {
+                            "color": "#ffffff",
+                            "background-color": "#0790EC",
+                            "border": "1px solid #0790EC"
+                        },
                         "CloseButton": {
                             "background-color": self.btn_color,
                             "color": self.text_color,
@@ -690,6 +1227,9 @@ class ColorSettingsWindow(QDialog):
                             "color": "#ffffff",
                             "background-color": "#E04F4F",
                             "border": "1px solid #E04F4F"
+                        },
+                        "MessageContainer": {
+                            "border": f"1px solid {self.border_color}"
                         }
                     }, f, indent=4, ensure_ascii=False)
 

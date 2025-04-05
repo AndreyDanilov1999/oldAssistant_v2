@@ -493,7 +493,8 @@ def open_link(filename, target_path, arguments):
         # 6. Обработка разных сценариев
         if existing_processes:
             debug_logger.info(f"Найдены процессы для '{filename}': {existing_processes}")
-            react_detail(audio_paths['start_folder'])
+            start_folder = audio_paths['start_folder']
+            react(start_folder)
         else:
             react_detail(audio_paths['wait_load_file'])
             before_processes = get_all_processes()
@@ -543,100 +544,6 @@ def open_link(filename, target_path, arguments):
         debug_logger.error(error_msg, exc_info=True)
         react_detail(audio_paths['error_file'])
         return False
-
-# def open_link(filename, target_path, arguments):
-#     """
-#     Функция для открытия обычных ярлыков (.lnk)
-#     :param arguments: Аргументы из ярлыка
-#     :param filename: Имя файла
-#     :param target_path: Путь к исполняемому файлу (берется из ярлыка)
-#     """
-#     settings_file = get_path('user_settings', "settings.json")  # Полный путь к файлу настроек
-#     speaker = get_current_speaker(settings_file)  # Получаем текущий голос
-#     try:
-#         # Проверяем, есть ли уже сохраненные процессы для этой игры
-#         existing_processes = get_process_names_from_file(filename)
-#
-#         if existing_processes:
-#             debug_logger.info(f"Нашел процессы '{filename}': {existing_processes}")
-#             # Запускаем программу
-#             process = subprocess.Popen(
-#                 [target_path] + arguments,
-#                 stdout=subprocess.PIPE,
-#                 stderr=subprocess.PIPE,
-#                 shell=True
-#             )
-#
-#             # Запускаем логирование в отдельных потоках
-#             threading.Thread(
-#                 target=log_stream,
-#                 args=(process.stdout, debug_logger),
-#                 daemon=True
-#             ).start()
-#
-#             threading.Thread(
-#                 target=log_stream,
-#                 args=(process.stderr, debug_logger),
-#                 daemon=True
-#             ).start()
-#
-#             audio_paths = get_audio_paths(speaker)
-#             start_folder = audio_paths['start_folder']
-#             react(start_folder)
-#         else:
-#             # Если процессов нет, собираем их
-#             before_processes = get_all_processes()
-#
-#             # Запускаем программу
-#             process = subprocess.Popen(
-#                 [target_path] + arguments,
-#                 stdout=subprocess.PIPE,
-#                 stderr=subprocess.PIPE,
-#                 shell=True
-#             )
-#
-#             # Запускаем логирование в отдельных потоках
-#             threading.Thread(
-#                 target=log_stream,
-#                 args=(process.stdout, debug_logger),
-#                 daemon=True
-#             ).start()
-#
-#             threading.Thread(
-#                 target=log_stream,
-#                 args=(process.stderr, debug_logger),
-#                 daemon=True
-#             ).start()
-#
-#             audio_paths = get_audio_paths(speaker)
-#             wait_load_file = audio_paths['wait_load_file']
-#             react_detail(wait_load_file)
-#
-#             # Ждем несколько секунд, чтобы процессы успели запуститься
-#             time.sleep(40)
-#
-#             # Собираем процессы после запуска
-#             after_processes = get_all_processes()
-#
-#             # Находим все новые процессы
-#             new_processes = find_new_processes(before_processes, after_processes)
-#
-#             if new_processes:
-#                 debug_logger.info(f"Новые процессы: {new_processes}")
-#                 save_process_names(filename, new_processes)  # Сохраняем все новые процессы
-#                 audio_paths = get_audio_paths(speaker)
-#                 done_load_file = audio_paths['done_load_file']
-#                 react_detail(done_load_file)
-#             else:
-#                 logger.error("Не удалось определить новые процессы.")
-#                 debug_logger.error("Не удалось определить новые процессы.")
-#
-#     except Exception as e:
-#         audio_paths = get_audio_paths(speaker)
-#         error_file = audio_paths['error_file']
-#         react_detail(error_file)
-#         logger.error(f"Ошибка при открытии программы: {e}")
-#         debug_logger.error(f"Ошибка при открытии программы: {e}")
 
 def close_link(filename):
     """

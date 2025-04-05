@@ -96,15 +96,20 @@ class OtherOptionsWindow(QDialog):
         # Кастомный заголовок
         self.title_bar = QWidget(self.container)
         self.title_bar.setObjectName("TitleBar")
-        self.title_bar.setGeometry(0, 0, self.width(), 40)
+        self.title_bar.setGeometry(0, 0, self.width(), 35)
+        self.title_bar_layout = QHBoxLayout(self.title_bar)
+        self.title_bar_layout.setContentsMargins(10, 5, 10, 5)
 
         self.title_label = QLabel("Прочие опции", self.title_bar)
-        self.title_label.setGeometry(15, 5, 200, 30)
+        # self.title_label.setGeometry(15, 5, 200, 30)
+        self.title_bar_layout.addWidget(self.title_label)
+        self.title_bar_layout.addStretch()
 
         self.close_btn = QPushButton("✕", self.title_bar)
-        self.close_btn.setGeometry(self.width() - 40, 5, 30, 30)
+        self.close_btn.setFixedSize(25, 25)
         self.close_btn.setObjectName("CloseButton")
         self.close_btn.clicked.connect(self.hide_with_animation)
+        self.title_bar_layout.addWidget(self.close_btn)
 
         # Основной layout под заголовком
         main_layout = QHBoxLayout()
@@ -140,6 +145,14 @@ class OtherOptionsWindow(QDialog):
         self.add_tab("Обновления", CheckUpdateWidget(self.assistant))
         self.add_tab("Подробные логи", DebugLoggerWidget(self))
         self.add_tab("Релакс?", RelaxWidget(self))
+
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key_Escape:
+            if self.opacity_animation.state() != QPropertyAnimation.Running:
+                self.hide_with_animation()
+            event.accept()
+        else:
+            super().keyPressEvent(event)
 
     def add_tab(self, name, widget):
         """Добавляет вкладку с кнопкой"""

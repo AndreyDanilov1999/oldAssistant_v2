@@ -44,6 +44,19 @@
     "TitleBar": {
         "border-bottom": "1px solid #01ff01"
     },
+    "TrayButton": {
+        "background-color": "#6fcf6a",
+        "color": "#000000",
+        "height": "30px",
+        "border": "1px solid #01ff01",
+        "border-radius": "3px",
+        "font-size": "13px"
+    },
+    "TrayButton:hover": {
+        "color": "#ffffff",
+        "background-color": "#0790EC",
+        "border": "1px solid #0790EC"
+    },
     "CloseButton": {
         "background-color": "#6fcf6a",
         "color": "#000000",
@@ -56,5 +69,8 @@
         "color": "#ffffff",
         "background-color": "#E04F4F",
         "border": "1px solid #E04F4F"
+    },
+    "MessageContainer": {
+        "border": "1px solid #01ff01"
     }
 }
