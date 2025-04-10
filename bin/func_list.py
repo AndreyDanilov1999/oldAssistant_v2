@@ -3,6 +3,7 @@
 """
 import json
 import os
+import shlex
 import shutil
 import subprocess
 import threading
@@ -57,11 +58,11 @@ def get_target_path(shortcut_path):
     try:
         shell = Dispatch("WScript.Shell")
         shortcut = shell.CreateShortCut(shortcut_path)
-        return shortcut.Targetpath, shortcut.Arguments
+        return shortcut.Targetpath, shortcut.Arguments, shortcut.WorkingDirectory
     except Exception as e:
-        logger.error(f"Ошибка при извлечении пути из ярлыка {shortcut_path}: {e}")
-        debug_logger.error(f"Ошибка при извлечении пути из ярлыка {shortcut_path}: {e}")
-        return None, None
+        logger.error(f"Ошибка при извлечении данных из ярлыка {shortcut_path}: {e}")
+        debug_logger.error(f"Ошибка при извлечении данных из ярлыка {shortcut_path}: {e}")
+        return None, None, None
 
 
 def fix_path(path):
@@ -226,7 +227,7 @@ def handler_links(filename, action):
     """
     Обработчик ярлыков в зависимости от их расширения
     """
-    global game_id, target_path, process_name, game_id_or_url, args_list
+    global game_id, target_path, process_name, game_id_or_url, args_list, workdir
     root_folder = get_path('user_settings', "links for assist")
     # Получаем путь к ярлыку
     shortcut_path = os.path.join(root_folder, filename)
@@ -234,21 +235,21 @@ def handler_links(filename, action):
     # Обработка .lnk файлов
     if filename.endswith(".lnk"):
         try:
-            target_path, arguments = get_target_path(shortcut_path)
-            args_list = arguments.split()
-            # Исправляем пути
+            target_path, arguments, workdir = get_target_path(shortcut_path)
             target_path = fix_path(target_path)
-            shortcut_path = fix_path(shortcut_path)
-            # Извлекаем имя процесса
+
+            # Правильное разбиение аргументов (учитывает кавычки)
+            args_list = shlex.split(arguments) if arguments else []
+
             process_name = get_process_name(target_path)
+
+            if action == 'open':
+                open_link(filename, target_path, args_list, workdir)
+            elif action == 'close':
+                close_link(filename)
         except Exception as e:
             logger.info(f"Ошибка при извлечении пути из ярлыка {filename}: {e}")
             debug_logger.info(f"Ошибка при извлечении пути из ярлыка {filename}: {e}")
-
-        if action == 'open':
-            open_link(filename, target_path, args_list)
-        if action == 'close':
-            close_link(filename)
 
     # Обработка .url файлов (Steam и Epic Games)
     if filename.endswith(".url"):
@@ -437,9 +438,10 @@ def open_url_link(game_id_or_url, filename):
         debug_logger.error(f"Ошибка при открытии игры через Steam: {e}")
 
 
-def open_link(filename, target_path, arguments):
+def open_link(filename, target_path, arguments, workdir):
     """
     Улучшенная функция для открытия ярлыков (.lnk) с проверкой целевого файла
+    :param workdir: Рабочая директория из ярлыка
     :param filename: Имя файла ярлыка
     :param target_path: Путь к исполняемому файлу (из ярлыка)
     :param arguments: Аргументы командной строки (из ярлыка)
@@ -465,19 +467,20 @@ def open_link(filename, target_path, arguments):
             react_detail(audio_paths['error_file'])
             return False
 
+            # Формируем команду
+        command = [target_path] + arguments
+
         # 3. Проверка существующих процессов
         existing_processes = get_process_names_from_file(filename)
-
         # 4. Запуск процесса
         process = subprocess.Popen(
-            [target_path] + arguments,
+            command,
+            cwd=workdir,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            shell=True,
-            creationflags=subprocess.CREATE_NO_WINDOW  # Для фонового запуска
+            shell=True
         )
 
-        # 5. Логирование вывода
         threading.Thread(
             target=log_stream,
             args=(process.stdout, debug_logger),
