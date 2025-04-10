@@ -467,6 +467,9 @@ def open_link(filename, target_path, arguments, workdir):
             react_detail(audio_paths['error_file'])
             return False
 
+        if not workdir:
+            workdir = os.path.dirname(target_path)
+
             # Формируем команду
         command = [target_path] + arguments
 
