@@ -1,6 +1,5 @@
 # -*- mode: python ; coding: utf-8 -*-
 
-
 a = Analysis(
     ['main_assistant.py'],
     pathex=['G:/PycharmProjects/oldAssistant_v2'],
@@ -16,7 +15,7 @@ a = Analysis(
         ('G:/PycharmProjects/oldAssistant_v2/bin/function_list_main.py', 'bin'),
         ('G:/PycharmProjects/oldAssistant_v2/bin/lists.py', 'bin'),
         ('G:/PycharmProjects/oldAssistant_v2/logging_config.py', '.'),
-        ('G:/PycharmProjects/oldAssistant_v2/run_script.py', '.'),
+        ('G:/PycharmProjects/oldAssistant_v2/owl.svg', '.'),
         ('G:/PycharmProjects/oldAssistant_v2/bin/audio_control.py', 'bin'),
         ('G:/PycharmProjects/oldAssistant_v2/bin/speak_functions.py', 'bin'),
         ('G:/PycharmProjects/oldAssistant_v2/bin/speak_voice', 'bin/speak_voice'),
@@ -58,7 +57,7 @@ exe = EXE(
     codesign_identity=None,
     entitlements_file=None,
     icon=['icon_assist.ico'],
-    manifest='app.manifest',
+    manifest="G:/PycharmProjects/oldAssistant_v2/app.manifest",
 )
 coll = COLLECT(
     exe,

@@ -18,6 +18,11 @@ import traceback
 import zipfile
 import markdown2
 import requests
+import win32api
+import win32con
+import win32event
+import win32gui
+from PyQt5.QtSvg import QSvgWidget
 from packaging import version
 import psutil
 import winsound
@@ -39,17 +44,42 @@ from PyQt5.QtGui import QIcon, QCursor, QFont, QColor, QPainterPath, QRegion, QP
 from PyQt5.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout, \
                              QPushButton, QCheckBox, QSystemTrayIcon, QAction, qApp, QMenu, QMessageBox, \
                              QTextEdit, QDialog, QLabel, QLineEdit, QFileDialog, QSlider, QTextBrowser,
-                             QGraphicsDropShadowEffect, QMainWindow, QDialogButtonBox, QStyle, QSizePolicy)
+                             QGraphicsDropShadowEffect, QMainWindow, QDialogButtonBox, QStyle, QSizePolicy,
+                             QGraphicsColorizeEffect)
 from PyQt5.QtCore import Qt, QFileSystemWatcher, QTimer, QEvent
 
-# speakers = dict(Пласид='placide', Бестия='rogue', Джонни='johnny', СанСаныч='sanych',
-#                 Санбой='sanboy', Тигрица='tigress', Стейтем='stathem')
-
+short_name = "https://raw.githubusercontent.com/AndreyDanilov1999/oldAssistant_v2/refs/heads/master/"
 # Сырая ссылка на version.txt в GitHub
-EXP_VERSION_FILE_URL = "https://raw.githubusercontent.com/AndreyDanilov1999/oldAssistant_v2/refs/heads/master/exp-verison.txt"
-VERSION_FILE_URL = "https://raw.githubusercontent.com/AndreyDanilov1999/oldAssistant_v2/refs/heads/master/version.txt"
-CHANGELOG_TXT_URL = "https://raw.githubusercontent.com/AndreyDanilov1999/oldAssistant_v2/refs/heads/master/changelog.txt"
-CHANGELOG_MD_URL = "https://raw.githubusercontent.com/AndreyDanilov1999/oldAssistant_v2/refs/heads/master/changelog.md"
+EXP_VERSION_FILE_URL = f"{short_name}exp-verison.txt"
+VERSION_FILE_URL = f"{short_name}version.txt"
+CHANGELOG_TXT_URL = f"{short_name}changelog.txt"
+CHANGELOG_MD_URL = f"{short_name}changelog.md"
+MUTEX_NAME = "Assistant_123456789ABC"
+
+def activate_existing_window():
+    hwnd = win32gui.FindWindow(None, "Ассистент")
+    if not hwnd:
+        return False
+
+    # Получаем информацию об окне
+    placement = win32gui.GetWindowPlacement(hwnd)
+
+    # Если окно свёрнуто в трей (SW_SHOWMINIMIZED)
+    if placement[1] == win32con.SW_SHOWMINIMIZED:
+        # Восстанавливаем и активируем
+        win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
+        win32gui.SetForegroundWindow(hwnd)
+    else:
+        # Если окно просто неактивно - активируем
+        win32gui.SetForegroundWindow(hwnd)
+
+    # Дополнительные меры для надёжности
+    win32gui.BringWindowToTop(hwnd)
+    win32gui.SetWindowPos(hwnd, win32con.HWND_TOPMOST, 0, 0, 0, 0,
+                          win32con.SWP_NOMOVE | win32con.SWP_NOSIZE)
+    win32gui.SetWindowPos(hwnd, win32con.HWND_NOTOPMOST, 0, 0, 0, 0,
+                          win32con.SWP_NOMOVE | win32con.SWP_NOSIZE)
+    return True
 
 
 class Assistant(QMainWindow):
@@ -72,7 +102,7 @@ class Assistant(QMainWindow):
 
     def __init__(self):
         super().__init__()
-        self.version = "1.2.12"
+        self.version = "1.2.13"
         self.ps = "Powered by theoldman"
         self.label_version = QLabel(f"Версия: {self.version} {self.ps}", self)
         self.label_message = QLabel('', self)
@@ -93,6 +123,7 @@ class Assistant(QMainWindow):
         self.MEMORY_LIMIT_MB = 1024
         self.log_file_path = get_path('assistant.log')
         self.init_logger()
+        self.svg_file_path = get_path("owl.svg")
         self.process_names = get_path('user_settings', 'process_names.json')
         self.color_settings_path = get_path('user_settings', 'color_settings.json')
         self.default_preset_style = get_path('bin', 'color_presets', 'default.json')
@@ -113,7 +144,6 @@ class Assistant(QMainWindow):
         self.initui()
         self.check_or_create_folder()
         self.load_and_apply_styles()
-        self.apply_styles()
         # Проверка автозапуска при старте программы
         self.check_autostart()
 
@@ -140,6 +170,7 @@ class Assistant(QMainWindow):
     def initui(self):
         """Инициализация пользовательского интерфейса."""
         self.setWindowIcon(QIcon(get_path('icon_assist.ico')))
+        self.setWindowTitle("Ассистент")
         # Убираем стандартную рамку окна
         self.setWindowFlags(Qt.FramelessWindowHint)
 
@@ -148,9 +179,8 @@ class Assistant(QMainWindow):
         self.central_widget.setObjectName("CentralWidget")
         self.setCentralWidget(self.central_widget)
 
-        # # Настройки окна
-        # self.setGeometry(500, 250, 950, 600)
-        self.resize(850, 600)
+        # Настройки окна
+        self.resize(900, 650)
         # Центрирование окна (современный способ)
         screen_geometry = self.screen().availableGeometry()
         self.move(
@@ -235,6 +265,17 @@ class Assistant(QMainWindow):
 
         left_layout.addStretch()
 
+        self.svg_image = QSvgWidget()
+        self.svg_image.load(self.svg_file_path)
+        self.svg_image.setStyleSheet("""
+            background: transparent;
+            border: none;
+            outline: none;
+        """)
+        self.color_svg = QGraphicsColorizeEffect()
+        self.svg_image.setGraphicsEffect(self.color_svg)
+        left_layout.addWidget(self.svg_image)
+
         # Текст "Доступна новая версия"
         self.update_label = QLabel("")
         self.update_label.setCursor(QCursor(Qt.PointingHandCursor))  # Курсор в виде руки
@@ -294,10 +335,10 @@ class Assistant(QMainWindow):
         # Загрузка предыдущих записей из файла логов
         self.load_existing_logs()
 
-        # Таймер для проверки обновлений
+        # Таймер для проверки файла логов
         self.timer = QTimer()
         self.timer.timeout.connect(self.check_for_updates)
-        self.timer.start(1000)
+        self.timer.start(2000)
 
     def keyPressEvent(self, event):
         if event.key() == Qt.Key_Escape:
@@ -307,7 +348,7 @@ class Assistant(QMainWindow):
 
     def show_message(self, text, title="Уведомление", message_type="info", buttons=QMessageBox.Ok):
         """
-        Кастомное окно сообщений с собственной рамкой
+        Кастомное окно сообщений
         """
         # Звуковое сопровождение (оставляем как было)
         sound = {
@@ -711,6 +752,7 @@ class Assistant(QMainWindow):
 
         # Применяем загруженные или значения по умолчанию
         self.apply_styles()
+        self.apply_color_svg(self.color_settings_path, self.svg_image)
 
     def apply_styles(self):
         # Устанавливаем objectName для виджетов
@@ -749,6 +791,21 @@ class Assistant(QMainWindow):
     def format_style(self, style_dict):
         """Форматируем словарь стиля в строку для setStyleSheet"""
         return '; '.join(f"{key}: {value}" for key, value in style_dict.items())
+
+    def apply_color_svg(self, style_file: str, svg_widget: QSvgWidget, strength: float = 0.93) -> None:
+        """Читает цвет из JSON-файла стилей"""
+        with open(style_file) as f:
+            styles = json.load(f)
+
+        if "TitleBar" in styles and "border-bottom" in styles["TitleBar"]:
+            border_parts = styles["TitleBar"]["border-bottom"].split()
+            for part in border_parts:
+                if part.startswith('#'):
+                    color_effect = QGraphicsColorizeEffect()
+                    color_effect.setColor(QColor(part))
+                    svg_widget.setGraphicsEffect(color_effect)
+                    color_effect.setStrength(strength)
+                    break
 
     def close_app(self):
         """Закрытие приложения."""
@@ -1088,12 +1145,12 @@ class Assistant(QMainWindow):
                     break
 
                 if any(keyword in text for keyword in ['сук', 'суч', 'пизд', 'еба', 'ёба',
-                                                       'нах', 'ху', 'бля', 'ебу', 'епт',
+                                                       'нах', 'хуй', 'бля', 'ебу', 'епт',
                                                        'ёпт', 'гандон', 'пид']):
                     self.censor_counter()
 
                 if self.is_censored and any(keyword in text for keyword in ['сук', 'суч', 'пизд', 'еба', 'ёба',
-                                                                            'нах', 'ху', 'бля', 'ебу', 'епт',
+                                                                            'нах', 'хуй', 'бля', 'ебу', 'епт',
                                                                             'ёпт', 'гандон', 'пид']):
                     censored_folder = self.audio_paths.get('censored_folder')
                     react(censored_folder)
@@ -1977,6 +2034,8 @@ class ChangelogWindow(QDialog):
 
 if __name__ == '__main__':
     try:
+        if activate_existing_window():
+            sys.exit(0)
         app = QApplication([])
         app.setWindowIcon(QIcon(get_path('icon_assist.ico')))
         window = Assistant()

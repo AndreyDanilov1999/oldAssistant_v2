@@ -119,7 +119,7 @@ class CommandSettingsWindow(QDialog):
         # Главный контейнер
         self.container = QWidget(self)
         self.container.setObjectName("SettingsContainer")
-        self.container.setGeometry(0, 0, self.width(), self.height())
+        self.container.setGeometry(0, 0, self.width(), self.height() - 120)
 
         # Кастомный заголовок
         self.title_bar = QWidget(self.container)

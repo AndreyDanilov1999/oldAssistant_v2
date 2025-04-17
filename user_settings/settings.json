@@ -1,8 +1,8 @@
 {
-    "voice": "sanych",
-    "assistant_name": "сан",
-    "assist_name2": "сан",
-    "assist_name3": "сан",
+    "voice": "jarvis",
+    "assistant_name": "джарвис",
+    "assist_name2": "джар",
+    "assist_name3": "джар",
     "steam_path": "D:/Steam/steam.exe",
     "is_censored": true,
     "volume_assist": 0.3,

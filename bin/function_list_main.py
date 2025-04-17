@@ -163,12 +163,11 @@ def close_paint():
 
 def open_path():
     try:
-        # Открыть окно "Переменные среды"
-        subprocess.run("rundll32 sysdm.cpl,EditEnvironmentVariables")
         speaker = get_current_speaker(settings_file)  # Получаем текущий голос
         audio_paths = get_audio_paths(speaker)
         start_folder = audio_paths.get('start_folder')
         react(start_folder)
+        subprocess.run("rundll32 sysdm.cpl,EditEnvironmentVariables")
     except Exception as e:
         speaker = get_current_speaker(settings_file)  # Получаем текущий голос
         audio_paths = get_audio_paths(speaker)

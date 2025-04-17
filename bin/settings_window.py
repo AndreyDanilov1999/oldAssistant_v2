@@ -9,7 +9,7 @@ from PyQt5.QtWidgets import QFileDialog, QMessageBox, QPushButton, QCheckBox, QL
     QDialogButtonBox, QButtonGroup, QApplication
 
 speakers = dict(Пласид='placide', Бестия='rogue', Джонни='johnny', СанСаныч='sanych',
-                Санбой='sanboy', Тигрица='tigress', Стейтем='stathem')
+                Санбой='sanboy', Тигрица='tigress', Стейтем='stathem', Джарвис="jarvis")
 
 
 class CustomInputDialog(QDialog):
