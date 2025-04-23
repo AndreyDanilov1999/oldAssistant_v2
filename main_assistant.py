@@ -6,6 +6,11 @@
 пользовательского ввода и управление интерфейсом.
 """
 import csv
+import ctypes
+import win32clipboard
+from PIL import ImageGrab, Image
+ctypes.windll.user32.SetProcessDPIAware()
+import io
 import json
 import logging
 import os.path
@@ -18,9 +23,7 @@ import traceback
 import zipfile
 import markdown2
 import requests
-import win32api
 import win32con
-import win32event
 import win32gui
 from PyQt5.QtSvg import QSvgWidget
 from packaging import version
@@ -40,11 +43,10 @@ from bin.speak_functions import react, react_detail
 from logging_config import logger, debug_logger
 from bin.lists import get_audio_paths
 from vosk import Model, KaldiRecognizer
-from PyQt5.QtGui import QIcon, QCursor, QFont, QColor, QPainterPath, QRegion, QPixmap
+from PyQt5.QtGui import QIcon, QCursor, QFont, QColor, QPixmap
 from PyQt5.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout, \
                              QPushButton, QCheckBox, QSystemTrayIcon, QAction, qApp, QMenu, QMessageBox, \
-                             QTextEdit, QDialog, QLabel, QLineEdit, QFileDialog, QSlider, QTextBrowser,
-                             QGraphicsDropShadowEffect, QMainWindow, QDialogButtonBox, QStyle, QSizePolicy,
+                             QTextEdit, QDialog, QLabel, QFileDialog, QTextBrowser, QMainWindow, QStyle, QSizePolicy,
                              QGraphicsColorizeEffect)
 from PyQt5.QtCore import Qt, QFileSystemWatcher, QTimer, QEvent
 
@@ -102,7 +104,7 @@ class Assistant(QMainWindow):
 
     def __init__(self):
         super().__init__()
-        self.version = "1.2.13"
+        self.version = "1.2.14"
         self.ps = "Powered by theoldman"
         self.label_version = QLabel(f"Версия: {self.version} {self.ps}", self)
         self.label_message = QLabel('', self)
@@ -128,6 +130,7 @@ class Assistant(QMainWindow):
         self.color_settings_path = get_path('user_settings', 'color_settings.json')
         self.default_preset_style = get_path('bin', 'color_presets', 'default.json')
         self.settings_file_path = get_path('user_settings', 'settings.json')
+        self.screenshot_tool = SystemScreenshot()
         self.update_settings(self.settings_file_path)
         self.settings = self.load_settings()
         self.assistant_name = self.settings.get('assistant_name', "джо")
@@ -181,7 +184,7 @@ class Assistant(QMainWindow):
 
         # Настройки окна
         self.resize(900, 650)
-        # Центрирование окна (современный способ)
+        # Центрирование окна
         screen_geometry = self.screen().availableGeometry()
         self.move(
             (screen_geometry.width() - self.width()) // 2,
@@ -248,7 +251,11 @@ class Assistant(QMainWindow):
         left_layout.addWidget(self.autostart_checkbox)
 
         self.open_folder_button = QPushButton("Ваши ярлыки")
-        self.open_folder_button.clicked.connect(self.open_folder)
+        self.open_folder_button.clicked.connect(self.open_folder_shortcuts)
+        left_layout.addWidget(self.open_folder_button)
+
+        self.open_folder_button = QPushButton("Скриншоты")
+        self.open_folder_button.clicked.connect(self.open_folder_screenshots)
         left_layout.addWidget(self.open_folder_button)
 
         self.settings_button = QPushButton("Настройки")
@@ -1311,6 +1318,10 @@ class Assistant(QMainWindow):
                                 if approve_folder:
                                     react(approve_folder)
                                 search_yandex(query)
+                            elif "фулл скрин" in command:
+                                self.capture_fullscreen()
+                            elif "скрин" in command:
+                                self.capture_area()
                             else:
                                 echo_folder = self.audio_paths.get('echo_folder')
                                 if echo_folder:
@@ -1437,9 +1448,11 @@ class Assistant(QMainWindow):
                 if ru_text:  # Русский текст имеет высший приоритет
                     final_text = ru_text
                     logger.info(f"Распознано (RU): {ru_text}")
+                    debug_logger.info(f"Распознано (RU): {ru_text}")
                 elif en_text:  # Если русского нет, используем английский
                     final_text = en_text
                     logger.info(f"Распознано (EN): {en_text}")
+                    debug_logger.info(f"Распознано (EN): {en_text}")
 
                 if final_text:
                     yield final_text
@@ -1478,7 +1491,7 @@ class Assistant(QMainWindow):
                 return True  # Возвращаем True, если команда была успешно обработана
         return False  # Возвращаем False, если команда не была найдена
 
-    def open_folder(self):
+    def open_folder_shortcuts(self):
         """Обработка нажатия кнопки 'Открыть папку с ярлыками'"""
         folder_path = get_path('user_settings', "links for assist")
         self.log_area.append(folder_path)
@@ -1490,10 +1503,31 @@ class Assistant(QMainWindow):
             # Если папка не существует, создаем её
             try:
                 os.makedirs(folder_path)  # Создаем папку
-                self.log_area.append(f'Папка "{folder_path}" была создана.')
+                logger.info(f'Папка "{folder_path}" была создана.')
+                debug_logger.info(f'Папка "{folder_path}" была создана.')
                 os.startfile(folder_path)  # Открываем папку после создания
             except Exception as e:
-                self.log_area.append(f'Ошибка при создании папки: {e}')
+                logger.error(f'Ошибка при создании папки: {e}')
+                debug_logger.error(f'Ошибка при создании папки: {e}')
+
+    def open_folder_screenshots(self):
+        """Обработка нажатия кнопки 'Открыть папку с ярлыками'"""
+        folder_path = get_path('user_settings', "screenshots")
+        self.log_area.append(folder_path)
+
+        # Проверяем, существует ли папка
+        if os.path.exists(folder_path) and os.path.isdir(folder_path):
+            os.startfile(folder_path)  # Открываем папку
+        else:
+            # Если папка не существует, создаем её
+            try:
+                os.makedirs(folder_path)  # Создаем папку
+                logger.info(f'Папка "{folder_path}" была создана.')
+                debug_logger.info(f'Папка "{folder_path}" была создана.')
+                os.startfile(folder_path)  # Открываем папку после создания
+            except Exception as e:
+                logger.error(f'Ошибка при создании папки: {e}')
+                debug_logger.error(f'Ошибка при создании папки: {e}')
 
     def open_main_settings(self):
         """Обработка нажатия кнопки 'Настройки'"""
@@ -1695,6 +1729,24 @@ class Assistant(QMainWindow):
                 debug_logger.error(error_msg)
             self.autostart_checkbox.setChecked(False)
             debug_logger.info(f"Задача '{task_name}' не найдена в планировщике")
+
+    def capture_area(self):
+        try:
+            approve_folder = self.audio_paths.get('approve_folder')
+            react(approve_folder)
+            self.screenshot_tool.capture_area()
+        except Exception as e:
+            logger.error(f'Ошибка {e}')
+            debug_logger.error(f'Ошибка {e}')
+
+    def capture_fullscreen(self):
+        try:
+            approve_folder = self.audio_paths.get('approve_folder')
+            react(approve_folder)
+            self.screenshot_tool.capture_fullscreen()
+        except Exception as e:
+            logger.error(f'Ошибка {e}')
+            debug_logger.error(f'Ошибка {e}')
 
 
 class UpdateApp(QDialog):
@@ -2030,6 +2082,175 @@ class ChangelogWindow(QDialog):
     def _show_error(self, message):
         """Отображает сообщение об ошибке"""
         self.text_browser.setPlainText(message)
+
+
+class SystemScreenshot:
+    def __init__(self, save_dir=get_path("user_settings", "screenshots")):
+        self.save_dir = save_dir
+        os.makedirs(self.save_dir, exist_ok=True)
+
+    def capture_area(self):
+        """Захват области с надежной проверкой буфера"""
+        try:
+            # Очищаем буфер перед захватом
+            self._clear_clipboard()
+
+            # Вызываем системный инструмент
+            self._press_win_shift_s()
+            logger.info("Выделите область на экране...")
+            debug_logger.info("Выделите область на экране...")
+
+            # Ждем и сохраняем с улучшенной проверкой
+            return self._wait_and_save_screenshot()
+        except Exception as e:
+            logger.error(f"Ошибка: {e}")
+            debug_logger.error(f"Ошибка: {e}")
+            return None
+
+    def capture_fullscreen(self):
+        """Захват всего экрана через Win+PrtScn"""
+        try:
+            # Очищаем буфер перед захватом
+            self._clear_clipboard()
+            self._press_win_prtscn()
+            time.sleep(1)
+            return self._wait_and_save_screenshot()
+        except Exception as e:
+            logger.error(f"Ошибка: {e}")
+            debug_logger.error(f"Ошибка: {e}")
+            return None
+
+    def _press_win_shift_s(self):
+        """Нажатие Win+Shift+S"""
+        ctypes.windll.user32.keybd_event(0x5B, 0, 0, 0)  # Win
+        ctypes.windll.user32.keybd_event(0x10, 0, 0, 0)  # Shift
+        ctypes.windll.user32.keybd_event(0x53, 0, 0, 0)  # S
+        time.sleep(0.1)
+        ctypes.windll.user32.keybd_event(0x53, 0, 2, 0)
+        ctypes.windll.user32.keybd_event(0x10, 0, 2, 0)
+        ctypes.windll.user32.keybd_event(0x5B, 0, 2, 0)
+
+    def _press_win_prtscn(self):
+        """Нажатие Win+PrtScn"""
+        ctypes.windll.user32.keybd_event(0x5B, 0, 0, 0)  # Win
+        ctypes.windll.user32.keybd_event(0x2C, 0, 0, 0)  # PrtScn
+        time.sleep(0.1)
+        ctypes.windll.user32.keybd_event(0x2C, 0, 2, 0)
+        ctypes.windll.user32.keybd_event(0x5B, 0, 2, 0)
+
+    def _move_latest_screenshot(self):
+        """Переносит последний скриншот из стандартной папки"""
+        try:
+            pics_dir = os.path.join(os.environ['USERPROFILE'], 'Pictures', 'Screenshots')
+            if os.path.exists(pics_dir):
+                files = [f for f in os.listdir(pics_dir) if f.lower().endswith('.png')]
+                if files:
+                    latest = max(
+                        [os.path.join(pics_dir, f) for f in files],
+                        key=os.path.getctime
+                    )
+                    filename = f"screenshot_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+                    new_path = os.path.join(self.save_dir, filename)
+                    os.rename(latest, new_path)
+                    return new_path
+        except Exception as e:
+            logger.error(f"Ошибка переноса: {e}")
+            debug_logger.error(f"Ошибка переноса: {e}")
+        return None
+
+    def _get_clipboard_sequence(self):
+        """Получаем номер последовательности буфера обмена"""
+        try:
+            win32clipboard.OpenClipboard()
+            return win32clipboard.GetClipboardSequenceNumber()
+        finally:
+            win32clipboard.CloseClipboard()
+
+    def _clear_clipboard(self):
+        """Очищаем буфер обмена"""
+        try:
+            win32clipboard.OpenClipboard()
+            win32clipboard.EmptyClipboard()
+        finally:
+            win32clipboard.CloseClipboard()
+
+    def _get_image_from_clipboard(self):
+        """Улучшенное получение изображения из буфера обмена"""
+        try:
+            win32clipboard.OpenClipboard()
+
+            # Проверяем доступные форматы
+            if win32clipboard.IsClipboardFormatAvailable(win32clipboard.CF_DIB):
+                # Работаем с DIB (Device Independent Bitmap)
+                try:
+                    data = win32clipboard.GetClipboardData(win32clipboard.CF_DIB)
+                    if isinstance(data, bytes):
+                        # Создаем BMP-файл в памяти
+                        bmp_header = b'BM' + (len(data) + 14).to_bytes(4,
+                                                                       'little') + b'\x00\x00\x00\x00\x36\x00\x00\x00'
+                        bmp_data = bmp_header + data
+                        return Image.open(io.BytesIO(bmp_data))
+                except Exception as e:
+                    logger.error(f"Ошибка обработки DIB: {e}")
+                    debug_logger.error(f"Ошибка обработки DIB: {e}")
+
+            # Альтернативный способ через ImageGrab
+            try:
+                image = ImageGrab.grabclipboard()
+                if image:
+                    return image
+            except Exception as e:
+                logger.error(f"Ошибка ImageGrab: {e}")
+                debug_logger.error(f"Ошибка ImageGrab: {e}")
+
+            # Проверяем PNG (если доступен)
+            png_format = win32clipboard.RegisterClipboardFormat("PNG")
+            if win32clipboard.IsClipboardFormatAvailable(png_format):
+                try:
+                    data = win32clipboard.GetClipboardData(png_format)
+                    if isinstance(data, bytes):
+                        return Image.open(io.BytesIO(data))
+                except Exception as e:
+                    logger.error(f"Ошибка обработки PNG: {e}")
+                    debug_logger.error(f"Ошибка обработки PNG: {e}")
+
+        except Exception as e:
+            logger.error(f"Ошибка доступа к буферу: {e}")
+            debug_logger.error(f"Ошибка доступа к буферу: {e}")
+        finally:
+            win32clipboard.CloseClipboard()
+
+        return None
+
+    def _wait_and_save_screenshot(self, timeout=5):
+        """Улучшенная версия с проверкой последовательности буфера"""
+        start_time = time.time()
+        last_sequence = -1
+
+        while time.time() - start_time < timeout:
+            try:
+                # Проверяем номер последовательности буфера
+                current_sequence = self._get_clipboard_sequence()
+
+                # Если буфер изменился
+                if current_sequence != last_sequence:
+                    image = self._get_image_from_clipboard()
+                    if image:
+                        filename = f"screenshot_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+                        filepath = os.path.join(self.save_dir, filename)
+                        image.save(filepath, "PNG")
+                        return filepath
+
+                    last_sequence = current_sequence
+
+            except Exception as e:
+                debug_logger.error(f"Ошибка проверки буфера: {e}")
+
+            time.sleep(0.3)
+
+        logger.error("Таймаут: скриншот не обнаружен")
+        debug_logger.error("Таймаут: скриншот не обнаружен")
+        return None
 
 
 if __name__ == '__main__':
