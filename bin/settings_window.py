@@ -199,10 +199,14 @@ class MainSettingsWindow(QDialog):
         self.separator.setFrameShape(QFrame.VLine)
 
         # Добавляем вкладки
-        self.add_tab("Основные", SettingsWidget(self.assistant))
+        self.add_tab("Основные", SettingsWidget(self.assistant, self))
         self.add_tab("Интерфейс", InterfaceWidget(self.assistant))
 
     def keyPressEvent(self, event):
+        """
+        Сворачивает с анимацией
+        :param event:
+        """
         if event.key() == Qt.Key_Escape:
             if self.opacity_animation.state() != QPropertyAnimation.Running:
                 self.hide_with_animation()
@@ -435,7 +439,7 @@ class InterfaceWidget(QWidget):
                 # Применяем стили
                 self.assistant.styles = styles
                 self.assistant.load_and_apply_styles()
-
+                self.assistant.check_start_win()
                 logger.info(f"Применён стиль из файла: {filename}")
                 debug_logger.info(f"Применён стиль из файла: {filename}")
 
@@ -598,16 +602,6 @@ class ColorSettingsWindow(QDialog):
         border_parts = border_style.split()
         self.border_color = border_parts[-1] if len(border_parts) > 2 else "#293f85"
 
-    # def choose_background_color(self):
-    #     try:
-    #         initial_color = QColor(self.bg_color) if hasattr(self, 'bg_color') else Qt.white
-    #         color = QColorDialog.getColor(initial_color, self)
-    #         if color.isValid():
-    #             self.bg_color = color.name()
-    #     except Exception as e:
-    #         logger.error(e)
-    #         debug_logger.error(f"Метод choose_background_color: {e}")
-
     def choose_background_color(self):
         try:
             # Создаем кастомное окно
@@ -682,16 +676,6 @@ class ColorSettingsWindow(QDialog):
         except Exception as e:
             logger.error(f"Ошибка в choose_background_color: {e}")
             debug_logger.exception(e)
-
-    # def choose_button_color(self):
-    #     try:
-    #         initial_color = QColor(self.btn_color) if hasattr(self, 'btn_color') else Qt.white
-    #         color = QColorDialog.getColor(initial_color, self)
-    #         if color.isValid():
-    #             self.btn_color = color.name()
-    #     except Exception as e:
-    #         logger.error(e)
-    #         debug_logger.error(f"Метод choose_button_color: {e}")
 
     def choose_button_color(self):
         try:
@@ -768,16 +752,6 @@ class ColorSettingsWindow(QDialog):
             logger.error(f"Ошибка в choose_background_color: {e}")
             debug_logger.exception(e)
 
-    # def choose_border_color(self):
-    #     try:
-    #         initial_color = QColor(self.border_color) if hasattr(self, 'border_color') else Qt.white
-    #         color = QColorDialog.getColor(initial_color, self)
-    #         if color.isValid():
-    #             self.border_color = color.name()
-    #     except Exception as e:
-    #         logger.error(e)
-    #         debug_logger.error(f"Метод choose_border_color: {e}")
-
     def choose_border_color(self):
         try:
             # Создаем кастомное окно
@@ -853,16 +827,6 @@ class ColorSettingsWindow(QDialog):
             logger.error(f"Ошибка в choose_background_color: {e}")
             debug_logger.exception(e)
 
-    # def choose_text_color(self):
-    #     try:
-    #         initial_color = QColor(self.text_color) if hasattr(self, 'text_color') else Qt.white
-    #         color = QColorDialog.getColor(initial_color, self)
-    #         if color.isValid():
-    #             self.text_color = color.name()
-    #     except Exception as e:
-    #         logger.error(e)
-    #         debug_logger.error(f"Метод choose_text_color: {e}")
-
     def choose_text_color(self):
         try:
             # Создаем кастомное окно
@@ -937,16 +901,6 @@ class ColorSettingsWindow(QDialog):
         except Exception as e:
             logger.error(f"Ошибка в choose_background_color: {e}")
             debug_logger.exception(e)
-
-    # def choose_text_edit_color(self):
-    #     try:
-    #         initial_color = QColor(self.text_edit_color) if hasattr(self, 'text_edit_color') else Qt.white
-    #         color = QColorDialog.getColor(initial_color, self)
-    #         if color.isValid():
-    #             self.text_edit_color = color.name()
-    #     except Exception as e:
-    #         logger.error(e)
-    #         debug_logger.error(f"Метод choose_text_edit_color: {e}")
 
     def choose_text_edit_color(self):
         try:
@@ -1113,6 +1067,7 @@ class ColorSettingsWindow(QDialog):
             }
             self.save_color_settings(new_styles)
             self.colorChanged.emit()
+            self.assistant.check_start_win()
         except Exception as e:
             logger.info(f"Ошибка при применении изменений: {e}")
             debug_logger.info(f"Ошибка при применении изменений: {e}")
@@ -1333,7 +1288,12 @@ class SettingsWidget(QWidget):
         self.current_steam_path = self.assistant.steam_path
         self.current_volume = self.assistant.volume_assist
         self.settings = QSettings("Настройки", "Общие")
+        self.main_settings_window = parent
         self.init_ui()
+
+    def hide_method(self):
+        if self.main_settings_window:
+            self.main_settings_window.hide_with_animation()
 
     def init_ui(self):
         layout = QVBoxLayout(self)
@@ -1464,4 +1424,6 @@ class SettingsWidget(QWidget):
         self.assistant.speaker = speakers[self.voice_combo.currentText()]
 
         self.assistant.save_settings()
+        self.hide_method()
         self.assistant.show_message(f"Настройки применены!")
+

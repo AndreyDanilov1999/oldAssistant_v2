@@ -7,6 +7,8 @@
 """
 import csv
 import ctypes
+import re
+
 import win32clipboard
 from PIL import ImageGrab, Image
 ctypes.windll.user32.SetProcessDPIAware()
@@ -25,7 +27,7 @@ import markdown2
 import requests
 import win32con
 import win32gui
-from PyQt5.QtSvg import QSvgWidget
+from PyQt5.QtSvg import QSvgWidget, QSvgRenderer
 from packaging import version
 import psutil
 import winsound
@@ -49,6 +51,7 @@ from PyQt5.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout, \
                              QTextEdit, QDialog, QLabel, QFileDialog, QTextBrowser, QMainWindow, QStyle, QSizePolicy,
                              QGraphicsColorizeEffect)
 from PyQt5.QtCore import Qt, QFileSystemWatcher, QTimer, QEvent
+import xml.etree.ElementTree as ET
 
 short_name = "https://raw.githubusercontent.com/AndreyDanilov1999/oldAssistant_v2/refs/heads/master/"
 # Сырая ссылка на version.txt в GitHub
@@ -104,7 +107,7 @@ class Assistant(QMainWindow):
 
     def __init__(self):
         super().__init__()
-        self.version = "1.2.14"
+        self.version = "1.2.15"
         self.ps = "Powered by theoldman"
         self.label_version = QLabel(f"Версия: {self.version} {self.ps}", self)
         self.label_message = QLabel('', self)
@@ -112,9 +115,9 @@ class Assistant(QMainWindow):
         self.relax_button = None
         self.drag_pos = None  # Для перемещения окна за ЛКМ
         self.open_folder_button = None
-        self.autostart_checkbox = None
         self.beta_version = False
         self.tray_icon = None
+        self.toggle_start = None
         self.start_button = None
         self.styles = None
         self.changelog_file_path = None
@@ -149,7 +152,7 @@ class Assistant(QMainWindow):
         self.load_and_apply_styles()
         # Проверка автозапуска при старте программы
         self.check_autostart()
-
+        self.check_start_win()
         # Прятать ли программу в трей
         if self.is_min_tray:
             self.hide()
@@ -216,6 +219,16 @@ class Assistant(QMainWindow):
 
         self.title_bar_layout.addStretch()
 
+        self.start_win_btn = QPushButton()
+        self.start_win_btn.setFixedSize(25, 25)
+        self.start_win_btn.setStyleSheet("background: transparent;")
+        self.start_win_btn.clicked.connect(self.toggle_start_win)
+        # Добавляем SVG на кнопку
+        self.start_svg = QSvgWidget("start-win.svg", self.start_win_btn)
+        self.start_svg.setFixedSize(13, 13)
+        self.start_svg.move(6, 6)  # Центрирование
+        self.title_bar_layout.addWidget(self.start_win_btn)
+
         # Кнопка "Свернуть"
         self.minimize_button = QPushButton("─")
         self.minimize_button.setObjectName("TrayButton")
@@ -245,10 +258,6 @@ class Assistant(QMainWindow):
         self.start_button = QPushButton("Старт ассистента")
         self.start_button.clicked.connect(self.start_assist_toggle)
         left_layout.addWidget(self.start_button)
-
-        self.autostart_checkbox = QCheckBox("Автозапуск")
-        self.autostart_checkbox.stateChanged.connect(self.toggle_autostart)
-        left_layout.addWidget(self.autostart_checkbox)
 
         self.open_folder_button = QPushButton("Ваши ярлыки")
         self.open_folder_button.clicked.connect(self.open_folder_shortcuts)
@@ -346,12 +355,6 @@ class Assistant(QMainWindow):
         self.timer = QTimer()
         self.timer.timeout.connect(self.check_for_updates)
         self.timer.start(2000)
-
-    def keyPressEvent(self, event):
-        if event.key() == Qt.Key_Escape:
-            event.ignore()  # Игнорируем Esc для главного окна
-        else:
-            super().keyPressEvent(event)
 
     def show_message(self, text, title="Уведомление", message_type="info", buttons=QMessageBox.Ok):
         """
@@ -484,6 +487,14 @@ class Assistant(QMainWindow):
             )
 
         return dialog.exec_()
+
+    def keyPressEvent(self, event):
+        """Сворачивает основное окно в трей по нажатию на Esc"""
+        if event.key() == Qt.Key_Escape:
+            self.hide()
+            event.accept()
+        else:
+            super().keyPressEvent(event)
 
     def open_download_link(self, event):
         """Открывает ссылку на скачивание при клике на текст."""
@@ -861,7 +872,8 @@ class Assistant(QMainWindow):
             "is_censored": self.is_censored,
             "volume_assist": self.volume_assist,
             "show_upd_msg": self.show_upd_msg,
-            "minimize_to_tray": self.is_min_tray
+            "minimize_to_tray": self.is_min_tray,
+            "start_win": self.toggle_start
         }
         try:
             # Проверяем, существует ли папка user_settings
@@ -1586,12 +1598,92 @@ class Assistant(QMainWindow):
         except Exception as e:
             self.log_area.append(f"Ошибка при очистке логов: {e}")
 
-    def toggle_autostart(self):
-        """Включение или отключение автозапуска"""
-        if self.autostart_checkbox.isChecked():
+    def check_start_win(self):
+        """Переключает состояние и меняет цвет иконки"""
+        if self.toggle_start:
+            self.update_svg_color(self.start_svg, self.color_settings_path)
+        else:
+            self.update_svg_contrast_color(self.start_svg)
+
+    def toggle_start_win(self):
+        """Переключает состояние и меняет цвет иконки"""
+        self.toggle_start = not self.toggle_start
+
+        if self.toggle_start:
             self.add_to_autostart()
+            self.update_svg_color(self.start_svg, self.color_settings_path)
         else:
             self.remove_from_autostart()
+            self.update_svg_contrast_color(self.start_svg)
+
+    def update_svg_color(self, svg_widget: QSvgWidget, style_file: str) -> None:
+        """Обновляет цвет SVG на цвет из настроек (специально для вашего SVG)"""
+        try:
+            # 1. Получаем цвет из JSON
+            with open(style_file) as f:
+                styles = json.load(f)
+
+            # Ищем цвет в border-bottom свойствах TitleBar
+            border_bottom = styles.get("TitleBar", {}).get("border-bottom", "")
+            color = next((p for p in border_bottom.split() if p.startswith("#")), "#FFFFFF")
+
+            bg_color = self.central_widget.palette().window().color()
+
+            # 2. Вычисляем яркость фона (формула восприятия яркости)
+            brightness = (0.299 * bg_color.red() +
+                          0.587 * bg_color.green() +
+                          0.114 * bg_color.blue()) / 255
+
+            # 3. Выбираем контрастный цвет
+            contrast_color = "#369EFF" if brightness > 0.5 else color
+
+            # 2. Загружаем стандартный SVG (ваш XML)
+            svg_template = '''<?xml version="1.0" encoding="utf-8"?>
+            <svg fill="{color}" width="20px" height="20px" viewBox="0 0 24 24" 
+                 xmlns="http://www.w3.org/2000/svg">
+                <path d="m9.84 12.663v9.39l-9.84-1.356v-8.034zm0-10.72v9.505h-9.84v-8.145zm14.16 10.72v11.337l-13.082-1.803v-9.534zm0-12.663v11.452h-13.082v-9.649z"/>
+            </svg>'''
+
+            # 3. Вставляем нужный цвет
+            colored_svg = svg_template.format(color=contrast_color)
+
+            # 4. Обновляем виджет
+            svg_widget.load(colored_svg.encode('utf-8'))
+
+        except Exception as e:
+            print(f"Ошибка при обновлении цвета SVG: {e}")
+            # Fallback - используем эффект цвета
+            effect = QGraphicsColorizeEffect()
+            effect.setColor(QColor(color))
+            svg_widget.setGraphicsEffect(effect)
+
+    def update_svg_contrast_color(self, svg_widget: QSvgWidget) -> None:
+        """Автоматически устанавливает контрастный цвет для SVG"""
+        # 1. Определяем цвет фона основного окна
+        bg_color = self.central_widget.palette().window().color()
+
+        # 2. Вычисляем яркость фона (формула восприятия яркости)
+        brightness = (0.299 * bg_color.red() +
+                      0.587 * bg_color.green() +
+                      0.114 * bg_color.blue()) / 255
+
+        # 3. Выбираем контрастный цвет
+        contrast_color = "#545454" if brightness > 0.5 else "#FFFFFF"
+
+        # 4. Обновляем SVG
+        try:
+            svg_template = '''<?xml version="1.0" encoding="utf-8"?>
+                        <svg fill="{color}" width="20px" height="20px" viewBox="0 0 24 24" 
+                             xmlns="http://www.w3.org/2000/svg">
+                            <path d="m9.84 12.663v9.39l-9.84-1.356v-8.034zm0-10.72v9.505h-9.84v-8.145zm14.16 10.72v11.337l-13.082-1.803v-9.534zm0-12.663v11.452h-13.082v-9.649z"/>
+                        </svg>'''
+            colored_svg = svg_template.format(color=contrast_color)
+            svg_widget.load(bytes(colored_svg, 'utf-8'))
+        except Exception:
+            # Fallback - используем эффект цвета
+            effect = QGraphicsColorizeEffect()
+            effect.setColor(QColor(contrast_color))
+            svg_widget.setGraphicsEffect(effect)
 
     def add_to_autostart(self):
         """Добавление программы в автозапуск через планировщик задач"""
@@ -1721,13 +1813,15 @@ class Assistant(QMainWindow):
                 encoding='cp866'
             )
             debug_logger.info(f"Найдена задача автозапуска: '{task_name}'")
-            self.autostart_checkbox.setChecked(True)
+            self.toggle_start = True
+            self.save_settings()
         except subprocess.CalledProcessError as e:
             if "не существует" not in e.stderr:
                 error_msg = f"Ошибка при проверке задачи '{task_name}': {e.stderr}"
                 logger.error(error_msg)
                 debug_logger.error(error_msg)
-            self.autostart_checkbox.setChecked(False)
+            self.toggle_start = False
+            self.save_settings()
             debug_logger.info(f"Задача '{task_name}' не найдена в планировщике")
 
     def capture_area(self):
@@ -1741,9 +1835,9 @@ class Assistant(QMainWindow):
 
     def capture_fullscreen(self):
         try:
+            self.screenshot_tool.capture_fullscreen()
             approve_folder = self.audio_paths.get('approve_folder')
             react(approve_folder)
-            self.screenshot_tool.capture_fullscreen()
         except Exception as e:
             logger.error(f'Ошибка {e}')
             debug_logger.error(f'Ошибка {e}')

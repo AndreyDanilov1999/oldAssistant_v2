@@ -16,6 +16,7 @@ a = Analysis(
         ('G:/PycharmProjects/oldAssistant_v2/bin/lists.py', 'bin'),
         ('G:/PycharmProjects/oldAssistant_v2/logging_config.py', '.'),
         ('G:/PycharmProjects/oldAssistant_v2/owl.svg', '.'),
+        ('G:/PycharmProjects/oldAssistant_v2/start-win.svg', '.'),
         ('G:/PycharmProjects/oldAssistant_v2/bin/audio_control.py', 'bin'),
         ('G:/PycharmProjects/oldAssistant_v2/bin/speak_functions.py', 'bin'),
         ('G:/PycharmProjects/oldAssistant_v2/bin/speak_voice', 'bin/speak_voice'),

@@ -5,7 +5,7 @@
         "font-size": "13px"
     },
     "QPushButton": {
-        "background-color": "#ffac90",
+        "background-color": "#ffe2ce",
         "color": "#000000",
         "height": "30px",
         "border": "1px solid #ffa515",
@@ -13,12 +13,12 @@
         "font-size": "13px"
     },
     "QPushButton:hover": {
-        "background-color": "#f5a286",
+        "background-color": "#f5d8c4",
         "color": "#000000",
         "font-size": "13px"
     },
     "QPushButton:pressed": {
-        "background-color": "#e18e72",
+        "background-color": "#e1c4b0",
         "padding-left": "3px",
         "padding-top": "3px"
     },
@@ -45,7 +45,7 @@
         "border-bottom": "1px solid #ffa515"
     },
     "TrayButton": {
-        "background-color": "#ffac90",
+        "background-color": "#ffe2ce",
         "color": "#000000",
         "height": "30px",
         "border": "1px solid #ffa515",
@@ -58,7 +58,7 @@
         "border": "1px solid #0790EC"
     },
     "CloseButton": {
-        "background-color": "#ffac90",
+        "background-color": "#ffe2ce",
         "color": "#000000",
         "height": "30px",
         "border": "1px solid #ffa515",
