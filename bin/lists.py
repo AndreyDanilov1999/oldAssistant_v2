@@ -51,7 +51,7 @@ def get_audio_paths(speaker):
         'morning_greet': os.path.join(voice_base, 'start_greet', 'с добрым утром.ogg'),
         'evening_greet': os.path.join(voice_base, 'start_greet', 'добрый вечер.ogg'),
         'error_file': os.path.join(voice_base, 'other', 'произошла ошибка.ogg'),
-        'off_file': os.path.join(voice_base, 'other', 'выключаю комп.ogg'),
+        'off_file': os.path.join(voice_base, 'other', 'отключаю питание.ogg'),
         'del_file': os.path.join(voice_base, 'other', 'файл удален.ogg'),
         'restart_file': os.path.join(voice_base, 'other', 'я ненадолго.ogg'),
         'wait_load_file': os.path.join(voice_base, 'other', 'подожди. собираю данные о процессах.ogg'),

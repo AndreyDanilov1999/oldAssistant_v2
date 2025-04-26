@@ -13,7 +13,7 @@ import pygetwindow as gw
 from win32com.client import Dispatch
 from bin.lists import get_audio_paths
 from logging_config import logger, debug_logger
-from bin.speak_functions import react, react_detail
+from bin.speak_functions import thread_react, thread_react_detail
 from path_builder import get_path
 
 def load_settings(settings_file):
@@ -280,7 +280,7 @@ def handler_folder(folder_path, action):
         os.startfile(folder_path)
         audio_paths = get_audio_paths(speaker)
         start_folder = audio_paths['start_folder']
-        react(start_folder)
+        thread_react(start_folder)
     if action == 'close':
         windows = gw.getAllTitles()  # Получаем все заголовки открытых окон
         folder_title = os.path.basename(folder_path)  # Получаем название папки
@@ -291,12 +291,12 @@ def handler_folder(folder_path, action):
                     window.close()  # Закрываем окно
                     audio_paths = get_audio_paths(speaker)
                     close_folder = audio_paths['close_folder']
-                    react(close_folder)
+                    thread_react(close_folder)
                     break
         except IndexError:
             audio_paths = get_audio_paths(speaker)
             error_file = audio_paths['error_file']
-            react_detail(error_file)
+            thread_react_detail(error_file)
             logger.error("Окно с указанным заголовком не найдено.")
             debug_logger.error("Окно с указанным заголовком не найдено.")
 
@@ -324,7 +324,7 @@ def open_url_link(game_id_or_url, filename):
                 # Открываем URL через стандартный механизм
                 subprocess.Popen(["start", game_id_or_url], shell=True)
                 start_folder = audio_paths['start_folder']
-                react(start_folder)
+                thread_react(start_folder)
             else:
                 # Если процессов нет, собираем их
                 before_processes = get_all_processes()
@@ -334,7 +334,7 @@ def open_url_link(game_id_or_url, filename):
 
                 audio_paths = get_audio_paths(speaker)
                 wait_load_file = audio_paths['wait_load_file']
-                react_detail(wait_load_file)
+                thread_react_detail(wait_load_file)
 
                 time.sleep(40)
                 # Собираем процессы после запуска
@@ -346,7 +346,7 @@ def open_url_link(game_id_or_url, filename):
                     save_process_names(filename, new_processes)  # Сохраняем все новые процессы
                     audio_paths = get_audio_paths(speaker)
                     done_load_file = audio_paths['done_load_file']
-                    react_detail(done_load_file)
+                    thread_react_detail(done_load_file)
                 else:
                     logger.error("Не удалось определить новые процессы.")
                     debug_logger.error("Не удалось определить новые процессы.")
@@ -362,7 +362,7 @@ def open_url_link(game_id_or_url, filename):
                 debug_logger.info(f"Нашел процессы '{filename}': {existing_processes}")
                 if game_id_or_url == '252490' and speaker == 'sanboy':
                     start_rust = audio_paths['start_rust']
-                    react_detail(start_rust)
+                    thread_react_detail(start_rust)
                 # Запускаем игру через Steam
                 # subprocess.Popen([steam_path, '-applaunch', game_id_or_url], shell=True)
                 process = subprocess.Popen(
@@ -386,7 +386,7 @@ def open_url_link(game_id_or_url, filename):
                 ).start()
 
                 start_folder = audio_paths['start_folder']
-                react(start_folder)
+                thread_react(start_folder)
             else:
                 # Если процессов нет, собираем их
                 before_processes = get_all_processes()
@@ -414,7 +414,7 @@ def open_url_link(game_id_or_url, filename):
 
                 audio_paths = get_audio_paths(speaker)
                 wait_load_file = audio_paths['wait_load_file']
-                react_detail(wait_load_file)
+                thread_react_detail(wait_load_file)
 
                 time.sleep(40)
                 # Собираем процессы после запуска
@@ -426,14 +426,14 @@ def open_url_link(game_id_or_url, filename):
                     save_process_names(filename, new_processes)  # Сохраняем все новые процессы
                     audio_paths = get_audio_paths(speaker)
                     done_load_file = audio_paths['done_load_file']
-                    react_detail(done_load_file)
+                    thread_react_detail(done_load_file)
                 else:
                     logger.error("Не удалось определить новые процессы.")
                     debug_logger.error("Не удалось определить новые процессы.")
     except Exception as e:
         audio_paths = get_audio_paths(speaker)
         error_file = audio_paths['error_file']
-        react_detail(error_file)
+        thread_react_detail(error_file)
         logger.error(f"Ошибка при открытии игры через Steam: {e}")
         debug_logger.error(f"Ошибка при открытии игры через Steam: {e}")
 
@@ -456,7 +456,7 @@ def open_link(filename, target_path, arguments, workdir):
             error_msg = f"Целевой файл не существует: {target_path}"
             logger.error(error_msg)
             debug_logger.error(error_msg)
-            react_detail(audio_paths['error_file'])
+            thread_react_detail(audio_paths['error_file'])
             return False
 
         # 2. Проверка доступности файла
@@ -464,7 +464,7 @@ def open_link(filename, target_path, arguments, workdir):
             error_msg = f"Нет доступа к файлу: {target_path}"
             logger.error(error_msg)
             debug_logger.error(error_msg)
-            react_detail(audio_paths['error_file'])
+            thread_react_detail(audio_paths['error_file'])
             return False
 
         if not workdir:
@@ -500,9 +500,9 @@ def open_link(filename, target_path, arguments, workdir):
         if existing_processes:
             debug_logger.info(f"Найдены процессы для '{filename}': {existing_processes}")
             start_folder = audio_paths['start_folder']
-            react(start_folder)
+            thread_react(start_folder)
         else:
-            react_detail(audio_paths['wait_load_file'])
+            thread_react_detail(audio_paths['wait_load_file'])
             before_processes = get_all_processes()
 
             # Ждем запуска процессов (с таймаутом)
@@ -514,12 +514,12 @@ def open_link(filename, target_path, arguments, workdir):
             if new_processes:
                 debug_logger.info(f"Обнаружены новые процессы: {new_processes}")
                 save_process_names(filename, new_processes)
-                react_detail(audio_paths['done_load_file'])
+                thread_react_detail(audio_paths['done_load_file'])
             else:
                 error_msg = "Не удалось определить новые процессы после запуска"
                 logger.warning(error_msg)
                 debug_logger.warning(error_msg)
-                react_detail(audio_paths['error_file'])
+                thread_react_detail(audio_paths['error_file'])
 
         return True
 
@@ -527,28 +527,28 @@ def open_link(filename, target_path, arguments, workdir):
         error_msg = f"Файл не найден: {str(e)}"
         logger.error(error_msg)
         debug_logger.error(error_msg)
-        react_detail(audio_paths['error_file'])
+        thread_react_detail(audio_paths['error_file'])
         return False
 
     except PermissionError as e:
         error_msg = f"Ошибка доступа: {str(e)}"
         logger.error(error_msg)
         debug_logger.error(error_msg)
-        react_detail(audio_paths['error_file'])
+        thread_react_detail(audio_paths['error_file'])
         return False
 
     except subprocess.SubprocessError as e:
         error_msg = f"Ошибка запуска процесса: {str(e)}"
         logger.error(error_msg)
         debug_logger.error(error_msg)
-        react_detail(audio_paths['error_file'])
+        thread_react_detail(audio_paths['error_file'])
         return False
 
     except Exception as e:
         error_msg = f"Неожиданная ошибка: {str(e)}"
         logger.error(error_msg)
         debug_logger.error(error_msg, exc_info=True)
-        react_detail(audio_paths['error_file'])
+        thread_react_detail(audio_paths['error_file'])
         return False
 
 def close_link(filename):
@@ -567,10 +567,10 @@ def close_link(filename):
         debug_logger.error("Имена процессов не найдены.")
         audio_paths = get_audio_paths(speaker)
         error_file = audio_paths['error_file']
-        react_detail(error_file)
+        thread_react_detail(error_file)
     audio_paths = get_audio_paths(speaker)
     close_folder = audio_paths['close_folder']
-    react(close_folder)
+    thread_react(close_folder)
     logger.info("Все процессы завершены.")
     debug_logger.info("Все процессы завершены.")
 

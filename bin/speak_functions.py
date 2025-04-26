@@ -1,6 +1,8 @@
 import json
 import os
 import random
+import threading
+
 from logging_config import logger, debug_logger
 from path_builder import get_path
 
@@ -85,3 +87,19 @@ def react_detail(file_path):
     except Exception as e:
         logger.error(f"Ошибка при воспроизведении аудио: {e}")
         debug_logger.error(f"Ошибка при воспроизведении аудио: {e}")
+
+def thread_react(folder_path):
+    """
+    Запускает функцию react в отдельном потоке.
+    :param folder_path: Путь к папке с аудиофайлами.
+    """
+    thread = threading.Thread(target=react, args=(folder_path,), daemon=True)
+    thread.start()
+
+def thread_react_detail(file_path):
+    """
+    Запускает функцию react в отдельном потоке.
+    :param file_path: Путь к папке с аудиофайлами.
+    """
+    thread = threading.Thread(target=react_detail, args=(file_path,), daemon=True)
+    thread.start()

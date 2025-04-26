@@ -7,8 +7,6 @@
 """
 import csv
 import ctypes
-import re
-
 import win32clipboard
 from PIL import ImageGrab, Image
 ctypes.windll.user32.SetProcessDPIAware()
@@ -27,7 +25,7 @@ import markdown2
 import requests
 import win32con
 import win32gui
-from PyQt5.QtSvg import QSvgWidget, QSvgRenderer
+from PyQt5.QtSvg import QSvgWidget
 from packaging import version
 import psutil
 import winsound
@@ -41,7 +39,7 @@ import pyaudio
 import subprocess
 from bin.audio_control import controller
 from bin.settings_window import MainSettingsWindow
-from bin.speak_functions import react, react_detail
+from bin.speak_functions import thread_react_detail, thread_react, react
 from logging_config import logger, debug_logger
 from bin.lists import get_audio_paths
 from vosk import Model, KaldiRecognizer
@@ -51,7 +49,6 @@ from PyQt5.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout, \
                              QTextEdit, QDialog, QLabel, QFileDialog, QTextBrowser, QMainWindow, QStyle, QSizePolicy,
                              QGraphicsColorizeEffect)
 from PyQt5.QtCore import Qt, QFileSystemWatcher, QTimer, QEvent
-import xml.etree.ElementTree as ET
 
 short_name = "https://raw.githubusercontent.com/AndreyDanilov1999/oldAssistant_v2/refs/heads/master/"
 # Сырая ссылка на version.txt в GitHub
@@ -107,7 +104,7 @@ class Assistant(QMainWindow):
 
     def __init__(self):
         super().__init__()
-        self.version = "1.2.15"
+        self.version = "1.2.16"
         self.ps = "Powered by theoldman"
         self.label_version = QLabel(f"Версия: {self.version} {self.ps}", self)
         self.label_message = QLabel('', self)
@@ -501,7 +498,7 @@ class Assistant(QMainWindow):
         if self.update_label.text() == "Установлена последняя версия":
             audio_paths = self.audio_paths
             update_button = audio_paths.get('update_button')
-            react_detail(update_button)
+            thread_react_detail(update_button)
         else:
             # Проверяем, есть ли ссылка
             if self.latest_version_url:
@@ -1172,7 +1169,7 @@ class Assistant(QMainWindow):
                                                                             'нах', 'хуй', 'бля', 'ебу', 'епт',
                                                                             'ёпт', 'гандон', 'пид']):
                     censored_folder = self.audio_paths.get('censored_folder')
-                    react(censored_folder)
+                    thread_react(censored_folder)
                     continue
 
                 # Режим уточнения команды (если предыдущая попытка не удалась)
@@ -1226,7 +1223,7 @@ class Assistant(QMainWindow):
                                     debug_logger.warning(f"Не удалось обработать команду: {restored_command}")
                                     what_folder = self.audio_paths.get('what_folder')
                                     if what_folder:
-                                        react(what_folder)
+                                        thread_react(what_folder)
                                     continue
 
                                 last_unrecognized_command = None
@@ -1328,7 +1325,7 @@ class Assistant(QMainWindow):
                                          .replace(self.assist_name3, "").strip())
                                 approve_folder = self.audio_paths.get('approve_folder')
                                 if approve_folder:
-                                    react(approve_folder)
+                                    thread_react(approve_folder)
                                 search_yandex(query)
                             elif "фулл скрин" in command:
                                 self.capture_fullscreen()
@@ -1337,15 +1334,15 @@ class Assistant(QMainWindow):
                             else:
                                 echo_folder = self.audio_paths.get('echo_folder')
                                 if echo_folder:
-                                    react(echo_folder)
+                                    thread_react(echo_folder)
 
                     if reaction_triggered:
                         what_folder = self.audio_paths.get('what_folder')
                         if what_folder:
-                            react(what_folder)
+                            thread_react(what_folder)
                         if self.speaker == "sanboy" and random.random() <= 0.7:
                             prorok_sanboy = self.audio_paths.get('prorok_sanboy')
-                            react_detail(prorok_sanboy)
+                            thread_react_detail(prorok_sanboy)
 
                 # Обработка плеера (без изменений)
                 if 'плеер' in text:
@@ -1353,15 +1350,15 @@ class Assistant(QMainWindow):
                            ['пауз', 'пуск', 'пуст', 'вкл', 'вруб', 'отруб', 'выкл', 'стоп']):
                         controller.play_pause()
                         player_folder = self.audio_paths.get('player_folder')
-                        react(player_folder)
+                        thread_react(player_folder)
                     elif any(keyword in text for keyword in ['след', 'впер', 'дальш', 'перекл']):
                         controller.next_track()
                         player_folder = self.audio_paths.get('player_folder')
-                        react(player_folder)
+                        thread_react(player_folder)
                     elif any(keyword in text for keyword in ['пред', 'назад']):
                         controller.previous_track()
                         player_folder = self.audio_paths.get('player_folder')
-                        react(player_folder)
+                        thread_react(player_folder)
 
         except Exception as e:
             logger.error(f"Ошибка в основном цикле ассистента: {e}")
@@ -1471,7 +1468,7 @@ class Assistant(QMainWindow):
 
         except Exception as e:
             error_file = self.audio_paths.get('error_file')
-            react_detail(error_file)
+            thread_react_detail(error_file)
             logger.error(f"Ошибка при обработке аудиоданных: {e}")
             debug_logger.error(f"Ошибка при обработке аудиоданных: {e}")
             debug_logger.error(traceback.format_exc())
@@ -1625,17 +1622,20 @@ class Assistant(QMainWindow):
 
             # Ищем цвет в border-bottom свойствах TitleBar
             border_bottom = styles.get("TitleBar", {}).get("border-bottom", "")
-            color = next((p for p in border_bottom.split() if p.startswith("#")), "#FFFFFF")
+            new_color = next((p for p in border_bottom.split() if p.startswith("#")), "#FFFFFF")
 
-            bg_color = self.central_widget.palette().window().color()
+            # Ищем цвет в border-bottom свойствах TitleBar
+            bg_color = styles.get("QWidget", {}).get("background-color", "")
+            base_bg_color = next((p for p in bg_color.split() if p.startswith("#")), "#FFFFFF")
+            base_bg_color = QColor(base_bg_color)
 
             # 2. Вычисляем яркость фона (формула восприятия яркости)
-            brightness = (0.299 * bg_color.red() +
-                          0.587 * bg_color.green() +
-                          0.114 * bg_color.blue()) / 255
+            brightness = (0.299 * base_bg_color.red() +
+                          0.587 * base_bg_color.green() +
+                          0.114 * base_bg_color.blue()) / 255
 
             # 3. Выбираем контрастный цвет
-            contrast_color = "#369EFF" if brightness > 0.5 else color
+            final_color = "#369EFF" if brightness > 0.5 else new_color
 
             # 2. Загружаем стандартный SVG (ваш XML)
             svg_template = '''<?xml version="1.0" encoding="utf-8"?>
@@ -1645,17 +1645,14 @@ class Assistant(QMainWindow):
             </svg>'''
 
             # 3. Вставляем нужный цвет
-            colored_svg = svg_template.format(color=contrast_color)
+            colored_svg = svg_template.format(color=final_color)
 
             # 4. Обновляем виджет
             svg_widget.load(colored_svg.encode('utf-8'))
 
         except Exception as e:
-            print(f"Ошибка при обновлении цвета SVG: {e}")
-            # Fallback - используем эффект цвета
-            effect = QGraphicsColorizeEffect()
-            effect.setColor(QColor(color))
-            svg_widget.setGraphicsEffect(effect)
+            logger.error(f"Ошибка при обновлении цвета SVG: {e}")
+            debug_logger.error(f"Ошибка при обновлении цвета SVG: {e}")
 
     def update_svg_contrast_color(self, svg_widget: QSvgWidget) -> None:
         """Автоматически устанавливает контрастный цвет для SVG"""
@@ -1827,7 +1824,7 @@ class Assistant(QMainWindow):
     def capture_area(self):
         try:
             approve_folder = self.audio_paths.get('approve_folder')
-            react(approve_folder)
+            thread_react(approve_folder)
             self.screenshot_tool.capture_area()
         except Exception as e:
             logger.error(f'Ошибка {e}')
@@ -1837,7 +1834,7 @@ class Assistant(QMainWindow):
         try:
             self.screenshot_tool.capture_fullscreen()
             approve_folder = self.audio_paths.get('approve_folder')
-            react(approve_folder)
+            thread_react(approve_folder)
         except Exception as e:
             logger.error(f'Ошибка {e}')
             debug_logger.error(f'Ошибка {e}')
@@ -2017,7 +2014,7 @@ if exist "{correct_archive_path}" (
             subprocess.run(['tasklist', '/FI', 'IMAGENAME eq Assistant.exe'], check=True, stdout=subprocess.PIPE)
             audio_paths = self.audio_paths
             restart_file = audio_paths.get('restart_file')
-            react_detail(restart_file)
+            thread_react_detail(restart_file)
             subprocess.run(['taskkill', '/IM', 'Assistant.exe', '/F'], check=True)
         except subprocess.CalledProcessError:
             self.assistant.show_message(f"Процесс Assistant.exe не найден.", "Предупреждение", "warning")
