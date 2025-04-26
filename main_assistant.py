@@ -48,7 +48,7 @@ from PyQt5.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout, \
                              QPushButton, QCheckBox, QSystemTrayIcon, QAction, qApp, QMenu, QMessageBox, \
                              QTextEdit, QDialog, QLabel, QFileDialog, QTextBrowser, QMainWindow, QStyle, QSizePolicy,
                              QGraphicsColorizeEffect)
-from PyQt5.QtCore import Qt, QFileSystemWatcher, QTimer, QEvent
+from PyQt5.QtCore import Qt, QFileSystemWatcher, QTimer, QEvent, pyqtSignal
 
 short_name = "https://raw.githubusercontent.com/AndreyDanilov1999/oldAssistant_v2/refs/heads/master/"
 # Сырая ссылка на version.txt в GitHub
@@ -88,6 +88,7 @@ class Assistant(QMainWindow):
     """
 Основной класс содержащий GUI и скрипт обработки команд
     """
+    close_child_windows = pyqtSignal()
 
     def check_memory_usage(self, limit_mb):
         """
@@ -104,7 +105,7 @@ class Assistant(QMainWindow):
 
     def __init__(self):
         super().__init__()
-        self.version = "1.2.16"
+        self.version = "1.2.17"
         self.ps = "Powered by theoldman"
         self.label_version = QLabel(f"Версия: {self.version} {self.ps}", self)
         self.label_message = QLabel('', self)
@@ -159,11 +160,6 @@ class Assistant(QMainWindow):
         self.run_assist()
         self.check_update_label()
         self.check_for_updates_app()
-
-    def mousePressEvent(self, event):
-        if event.button() == Qt.LeftButton:
-            self.drag_pos = event.globalPos() - self.frameGeometry().topLeft()
-            event.accept()
 
     def mouseMoveEvent(self, event):
         if self.drag_pos and event.buttons() == Qt.LeftButton:
@@ -229,7 +225,7 @@ class Assistant(QMainWindow):
         # Кнопка "Свернуть"
         self.minimize_button = QPushButton("─")
         self.minimize_button.setObjectName("TrayButton")
-        self.minimize_button.clicked.connect(self.hide)
+        self.minimize_button.clicked.connect(self.custom_hide)
         self.minimize_button.setFixedSize(25, 25)
         self.title_bar_layout.addWidget(self.minimize_button)
 
@@ -492,6 +488,18 @@ class Assistant(QMainWindow):
             event.accept()
         else:
             super().keyPressEvent(event)
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            # Если есть дочерние окна — отправляем сигнал на закрытие
+            if any(child.isVisible() for child in self.findChildren(QDialog)):
+                self.close_child_windows.emit()  # Закрываем все дочерние окна
+                event.accept()
+                return
+
+            # Иначе перемещаем окно
+            self.drag_pos = event.globalPos() - self.frameGeometry().topLeft()
+            event.accept()
 
     def open_download_link(self, event):
         """Открывает ссылку на скачивание при клике на текст."""
@@ -941,6 +949,10 @@ class Assistant(QMainWindow):
                 self.show()
                 self.activateWindow()
 
+    def custom_hide(self):
+        self.close_child_windows.emit()
+        self.hide()
+
     def changeEvent(self, event):
         """Обработка изменения состояния окна."""
         if event.type() == QEvent.WindowStateChange:
@@ -950,6 +962,7 @@ class Assistant(QMainWindow):
 
     def closeEvent(self, event):
         """Обработка закрытия окна с кастомным диалогом подтверждения"""
+        self.close_child_windows.emit()
         if self.is_assistant_running:
             dialog = QDialog(self)
             dialog.setWindowFlags(Qt.FramelessWindowHint | Qt.Dialog)
@@ -1547,7 +1560,7 @@ class Assistant(QMainWindow):
             if settings_widget:
                 settings_widget.voice_changed.connect(self.update_voice)
 
-            settings_window.exec_()
+            settings_window.show()
         except Exception as e:
             debug_logger.error(f"Ошибка при открытии настроек: {e}")
             self.show_message(f"Ошибка при открытии настроек: {e}", "Ошибка", "error")
@@ -1564,8 +1577,12 @@ class Assistant(QMainWindow):
 
     def other_options(self):
         """Открываем окно с прочими опциями"""
-        self.other_window = OtherOptionsWindow(self)
-        self.other_window.show()
+        try:
+            other_window = OtherOptionsWindow(self)
+            other_window.show()
+        except Exception as e:
+            debug_logger.error(f"Ошибка при открытии прочих опций: {e}")
+            self.show_message(f"Ошибка при открытии прочих опций: {e}", "Ошибка", "error")
 
     def changelog_window(self, event):
         """Открываем окно с логами изменений"""

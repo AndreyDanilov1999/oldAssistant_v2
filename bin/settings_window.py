@@ -109,7 +109,7 @@ class CustomInputDialog(QDialog):
 
         # Центрируем по горизонтали и позиционируем вертикально чуть ниже заголовка
         new_x = parent_rect.x() + (parent_rect.width() - self.width()) // 2
-        new_y = parent_rect.y() + title_bar_height + 15  # +10 для небольшого отступа
+        new_y = parent_rect.y() + title_bar_height + 15
 
         self.move(new_x, new_y)
 
@@ -141,6 +141,10 @@ class MainSettingsWindow(QDialog):
         self.assistant = parent
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.Dialog)
         self.setFixedSize(450, self.assistant.height())  # Шире для кнопок
+
+        # Подключаем сигнал родителя к слоту закрытия
+        if parent and hasattr(parent, "close_child_windows"):
+            parent.close_child_windows.connect(self.hide_with_animation)
 
         # Анимация движения
         self.pos_animation = QPropertyAnimation(self, b"pos")

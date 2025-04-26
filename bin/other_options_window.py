@@ -5,64 +5,24 @@ import simpleaudio as sa
 import numpy as np
 import pandas as pd
 from PyQt5.QtCore import Qt, QTimer, QPoint, QPropertyAnimation, QEasingCurve
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QPushButton, QMessageBox, QLabel, QStackedWidget, QFrame, QHBoxLayout, \
-    QDialog, QLineEdit, QSlider, QCheckBox
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QPushButton, QMessageBox, QLabel, QStackedWidget, \
+    QFrame, QHBoxLayout, QDialog, QLineEdit, QSlider, QCheckBox
 from logging_config import logger, debug_logger
 from path_builder import get_path
 
 
-
-# class OtherOptionsWindow(QDialog):
-#     def __init__(self, parent=None):
-#         super().__init__(parent)
-#         self.assistant = parent
-#         self.init_ui()
-#
-#     def init_ui(self):
-#         self.setWindowTitle("Прочие опции")
-#         self.setFixedSize(500, 450)
-#
-#         # Основной layout
-#         main_layout = QHBoxLayout(self)
-#
-#         # Левая колонка с кнопками
-#         left_column = QVBoxLayout()
-#         left_column.setAlignment(Qt.AlignTop)  # Выравниваем кнопки по верху
-#         main_layout.addLayout(left_column, 1)
-#
-#         # Добавляем линию-разделитель
-#         separator = QFrame()
-#         separator.setFrameShape(QFrame.VLine)  # Вертикальная линия
-#         separator.setFrameShadow(QFrame.Sunken)
-#         main_layout.addWidget(separator)
-#
-#         # Правая колонка с содержимым
-#         self.right_column = QStackedWidget()
-#         main_layout.addWidget(self.right_column, 2)
-#
-#         # Добавляем кнопки и их содержимое
-#         self.add_tab("Счетчик цензуры", CensorCounterWidget(self))
-#         self.add_tab("Обновления", CheckUpdateWidget(self.assistant))
-#         self.add_tab("Подробные логи", DebugLoggerWidget(self))
-#         self.add_tab("Релакс?", RelaxWidget(self))
-#
-#     def add_tab(self, button_name, content_widget):
-#         # Создаем кнопку
-#         button = QPushButton(button_name, self)
-#         button.clicked.connect(lambda _, w=content_widget: self.right_column.setCurrentWidget(w))
-#
-#         # Добавляем кнопку в левую колонку
-#         self.layout().itemAt(0).layout().addWidget(button)
-#
-#         # Добавляем содержимое в правую колонку
-#         self.right_column.addWidget(content_widget)
 class OtherOptionsWindow(QDialog):
+    """Основное окно с вкладками"""
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.assistant = parent
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.Dialog)
-        self.setWindowModality(Qt.WindowModal)
         self.setFixedSize(450, self.assistant.height())
+
+        # Подключаем сигнал родителя к слоту закрытия
+        if parent and hasattr(parent, "close_child_windows"):
+            parent.close_child_windows.connect(self.hide_with_animation)
 
         # Анимация движения
         self.pos_animation = QPropertyAnimation(self, b"pos")
