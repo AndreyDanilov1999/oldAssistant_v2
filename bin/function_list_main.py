@@ -8,7 +8,7 @@ from bin.func_list import get_current_speaker
 from logging_config import logger, debug_logger
 import subprocess
 import webbrowser
-from bin.speak_functions import thread_react_detail, thread_react
+from bin.speak_functions import thread_react_detail, thread_react, react_detail
 from path_builder import get_path
 
 settings_file = get_path('user_settings', "settings.json")
@@ -29,7 +29,7 @@ def shutdown_windows():
     speaker = get_current_speaker(settings_file)  # Получаем текущий голос
     audio_paths = get_audio_paths(speaker)
     off_file = audio_paths['off_file']
-    thread_react_detail(off_file)
+    react_detail(off_file)
     subprocess.run(["shutdown", "/s", "/t", "0"])
 
 def restart_windows():
@@ -39,7 +39,7 @@ def restart_windows():
     speaker = get_current_speaker(settings_file)  # Получаем текущий голос
     audio_paths = get_audio_paths(speaker)
     off_file = audio_paths['off_file']
-    thread_react_detail(off_file)
+    react_detail(off_file)
     subprocess.run(["shutdown", "/r", "/t", "0"])
 
 def open_volume_mixer():
