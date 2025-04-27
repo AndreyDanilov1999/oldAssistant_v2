@@ -8,9 +8,8 @@ from PyQt5.QtWidgets import QFileDialog, QMessageBox, QPushButton, QCheckBox, QL
     QVBoxLayout, QWidget, QDialog, QColorDialog, QFrame, QStackedWidget, QHBoxLayout, QGraphicsDropShadowEffect, \
     QDialogButtonBox, QButtonGroup, QApplication
 
-speakers = dict(Пласид='placide', Бестия='rogue', Джонни='johnny', СанСаныч='sanych',
-                Санбой='sanboy', Тигрица='tigress', Стейтем='stathem', Джарвис="jarvis")
-
+speakers = dict(Персик="persik", Джарвис="jarvis", Пласид='placide', Бестия='rogue',
+                Джонни='johnny', СанСаныч='sanych', Санбой='sanboy', Тигрица='tigress', Стейтем='stathem')
 
 class CustomInputDialog(QDialog):
     """Кастомное диалоговое окно ввода с собственной рамкой"""
