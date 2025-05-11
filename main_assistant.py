@@ -9,6 +9,9 @@ import csv
 import ctypes
 import win32clipboard
 from PIL import ImageGrab, Image
+
+from bin.game_mode_func import GamepadManager
+
 ctypes.windll.user32.SetProcessDPIAware()
 import io
 import json
@@ -105,7 +108,7 @@ class Assistant(QMainWindow):
 
     def __init__(self):
         super().__init__()
-        self.version = "1.2.18"
+        self.version = "1.2.19"
         self.ps = "Powered by theoldman"
         self.label_version = QLabel(f"Версия: {self.version} {self.ps}", self)
         self.label_message = QLabel('', self)
@@ -118,8 +121,10 @@ class Assistant(QMainWindow):
         self.toggle_start = None
         self.start_button = None
         self.styles = None
+        self._update_dialog = None
         self.changelog_file_path = None
         self.is_assistant_running = False
+        self.first_run = True
         self.assistant_thread = None
         self.censored_thread = None
         self.last_position = 0
@@ -132,6 +137,8 @@ class Assistant(QMainWindow):
         self.default_preset_style = get_path('bin', 'color_presets', 'default.json')
         self.settings_file_path = get_path('user_settings', 'settings.json')
         self.screenshot_tool = SystemScreenshot()
+        self.game_mode = None
+        self.game_mode_bool = False
         self.update_settings(self.settings_file_path)
         self.settings = self.load_settings()
         self.assistant_name = self.settings.get('assistant_name', "джо")
@@ -153,13 +160,17 @@ class Assistant(QMainWindow):
         self.check_start_win()
         # Прятать ли программу в трей
         if self.is_min_tray:
+            # Показ окна при первом запуске(для отладки)
+            if self.first_run:
+                self.preload_window()
             self.hide()
         else:
             self.showNormal()
 
         self.run_assist()
         self.check_update_label()
-        self.check_for_updates_app()
+        # self.check_for_updates_app()
+        QTimer.singleShot(2000, self.check_for_updates_app)
 
     def mouseMoveEvent(self, event):
         if self.drag_pos and event.buttons() == Qt.LeftButton:
@@ -348,6 +359,28 @@ class Assistant(QMainWindow):
         self.timer = QTimer()
         self.timer.timeout.connect(self.check_for_updates)
         self.timer.start(2000)
+
+    def preload_window(self):
+        """Предварительная загрузка окна"""
+        # Показываем в невидимой области
+        self.move(-10000, -10000)
+        self.showMinimized()
+        self.showNormal()
+
+        # Принудительная отрисовка
+        self.update()
+        QApplication.processEvents()
+
+        # Скрываем через короткое время
+        QTimer.singleShot(100, lambda: [self.hide(), self.center_window()])
+        self.first_run = False
+
+    def center_window(self):
+        """Центрирование окна"""
+        frame_geo = self.frameGeometry()
+        screen = QApplication.primaryScreen().availableGeometry()
+        frame_geo.moveCenter(screen.center())
+        self.move(frame_geo.topLeft())
 
     def show_message(self, text, title="Уведомление", message_type="info", buttons=QMessageBox.Ok):
         """
@@ -566,7 +599,7 @@ class Assistant(QMainWindow):
                 self.update_label.setText("Доступна новая версия")
                 self.check_update_label()
                 if self.settings.get("show_upd_msg", True):
-                    self.show_popup(latest_version)
+                    self.show_update_notification(latest_version)
             else:
                 self.update_label.setText("Установлена последняя версия")
 
@@ -587,11 +620,38 @@ class Assistant(QMainWindow):
             debug_logger.error(f"Неожиданная ошибка: {str(e)}", exc_info=True)
             self.update_label.setText("Ошибка обновления")
 
+    def handle_message_click(self, latest_version):
+        self.showNormal()
+        self.raise_()
+        self.activateWindow()
+        QTimer.singleShot(100, lambda: self.show_popup(latest_version))
+
+    def show_update_notification(self, latest_version):
+        """Показ уведомления о новой версии"""
+        if not self.isVisible():  # Если окно скрыто в трее
+            # Показываем message в трее
+            self.tray_icon.showMessage(
+                "Доступно обновление",
+                "Нажмите для подробностей",
+                QSystemTrayIcon.Information,
+                3000  # 3 секунды
+            )
+            self.tray_icon.messageClicked.connect(
+                lambda: self.handle_message_click(latest_version)
+            )
+        else:
+            # Если окно видимо - показываем обычный диалог
+            self.show_popup(latest_version)
+
     def show_popup(self, latest_version):
-        """Кастомное окно обновления с минимальными изменениями"""
+        """Кастомное окно обновления"""
         dialog = QDialog(self)
         dialog.setWindowFlags(Qt.FramelessWindowHint | Qt.Dialog)
         dialog.setFixedSize(450, 200)
+        screen_geometry = QApplication.primaryScreen().availableGeometry()
+        dialog.move(
+            screen_geometry.center() - dialog.rect().center()
+        )
 
         # Основной контейнер с рамкой
         container = QWidget(dialog)
@@ -1314,6 +1374,11 @@ class Assistant(QMainWindow):
                                     open_appdata()
                                 else:
                                     close_appdata()
+                            elif 'игровой режим' in command:
+                                if action_type == 'open':
+                                    self.start_game_mode()
+                                else:
+                                    self.stop_game_mode()
                             else:
                                 # Пытаемся обработать команду
                                 app_processed = self.handle_app_command(command, action_type)
@@ -1373,6 +1438,23 @@ class Assistant(QMainWindow):
                         player_folder = self.audio_paths.get('player_folder')
                         thread_react(player_folder)
 
+
+                elif self.game_mode_bool:
+                    found_cmd = self.game_mode.find_command(text)
+                    if not found_cmd:
+                        logger.info("Команда не распознана")
+                        continue
+                    if "сброс" in text:
+                        self.game_mode.cleanup()
+                        logger.info("Все кнопки отпущены")
+                    elif "держи" in text:
+                        self.game_mode.trigger(found_cmd, hold=True)
+                        logger.info(f"Удерживаю {found_cmd}")
+                    else:
+                        self.game_mode.trigger(found_cmd)
+                        logger.info(f"Нажимаю {found_cmd}")
+
+
         except Exception as e:
             logger.error(f"Ошибка в основном цикле ассистента: {e}")
             debug_logger.error(f"Ошибка в основном цикле ассистента: {e}")
@@ -1383,6 +1465,37 @@ class Assistant(QMainWindow):
     # "Основной цикл ассистента(конец)"
     # "--------------------------------------------------------------------------------------------------"
     # "Основной цикл ассистента(конец)"
+
+    def install_game_mode(self):
+        try:
+            self.game_mode = GamepadManager()
+            if self.game_mode.init_success:
+                logger.info("Игровой режим успешно инициализирован")
+            else:
+                logger.warning("Не удалось инициализировать игровой режим")
+                self.game_mode = None
+        except Exception as e:
+            logger.error(f"Ошибка при инициализации GamepadManager: {e}")
+            self.game_mode = None
+
+    def start_game_mode(self):
+        self.install_game_mode()
+        self.game_mode.set_game("God of War")
+        logger.info(self.game_mode)
+        logger.info(self.game_mode.running)
+        if self.game_mode and not self.game_mode.running:
+            self.game_mode.start_proxy()
+            self.game_mode_bool = True
+            logger.info("Игровой режим активирован")
+        else:
+            logger.warning("Невозможно активировать игровой режим")
+
+    def stop_game_mode(self):
+        if self.game_mode and self.game_mode.running:
+            self.game_mode.stop_proxy()
+            self.game_mode.cleanup()
+            self.game_mode_bool = False
+            logger.info("Игровой режим деактивирован")
 
     def check_microphone_available(self):
         """Проверка наличия микрофона в системе."""
@@ -2368,7 +2481,9 @@ if __name__ == '__main__':
         app = QApplication([])
         app.setWindowIcon(QIcon(get_path('icon_assist.ico')))
         window = Assistant()
+
         app.exec_()
+
     except Exception as e:
         logger.error(f"Произошла ошибка: {e}")
         debug_logger.error(f"Произошла ошибка: {e}")

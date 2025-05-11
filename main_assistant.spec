@@ -3,7 +3,10 @@
 a = Analysis(
     ['main_assistant.py'],
     pathex=['G:/PycharmProjects/oldAssistant_v2'],
-    binaries=[(r'G:\PycharmProjects\oldAssistant_v2\.venv\Lib\site-packages\vosk\libvosk.dll', 'vosk')],
+    binaries=[
+        (r'G:\PycharmProjects\oldAssistant_v2\.venv\Lib\site-packages\vosk\libvosk.dll', 'vosk'),
+        (r'G:\PycharmProjects\oldAssistant_v2\.venv\Lib\site-packages\vgamepad\win\vigem\client\x64\ViGEmClient.dll', 'vgamepad/win/vigem/client/x64')
+    ],
     datas=[
         ('G:/PycharmProjects/oldAssistant_v2/icon_assist.ico', '.'),
         ('G:/PycharmProjects/oldAssistant_v2/user_settings/settings.json', 'user_settings'),
@@ -11,6 +14,7 @@ a = Analysis(
         ('G:/PycharmProjects/oldAssistant_v2/user_settings/color_settings.json', 'user_settings'),
         ('G:/PycharmProjects/oldAssistant_v2/user_settings/commands.json', 'user_settings'),
         ('G:/PycharmProjects/oldAssistant_v2/user_settings/links.json', 'user_settings'),
+        ('G:/PycharmProjects/oldAssistant_v2/user_settings/game_profiles_binds.json', 'user_settings'),
         ('G:/PycharmProjects/oldAssistant_v2/bin/func_list.py', 'bin'),
         ('G:/PycharmProjects/oldAssistant_v2/bin/function_list_main.py', 'bin'),
         ('G:/PycharmProjects/oldAssistant_v2/bin/lists.py', 'bin'),
@@ -24,6 +28,7 @@ a = Analysis(
         ('G:/PycharmProjects/oldAssistant_v2/bin/model_en', 'bin/model_en'),
         ('G:/PycharmProjects/oldAssistant_v2/bin/commands_settings_window.py', 'bin'),
         ('G:/PycharmProjects/oldAssistant_v2/bin/settings_window.py', 'bin'),
+        ('G:/PycharmProjects/oldAssistant_v2/bin/game_mode_func.py', 'bin'),
         ('G:/PycharmProjects/oldAssistant_v2/bin/other_options_window.py', 'bin'),
         ('G:/PycharmProjects/oldAssistant_v2/user_settings/links for assist', 'user_settings/links for assist'),
         ('G:/PycharmProjects/oldAssistant_v2/user_settings/presets', 'user_settings/presets'),
