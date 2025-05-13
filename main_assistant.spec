@@ -28,7 +28,6 @@ a = Analysis(
         ('G:/PycharmProjects/oldAssistant_v2/bin/model_en', 'bin/model_en'),
         ('G:/PycharmProjects/oldAssistant_v2/bin/commands_settings_window.py', 'bin'),
         ('G:/PycharmProjects/oldAssistant_v2/bin/settings_window.py', 'bin'),
-        ('G:/PycharmProjects/oldAssistant_v2/bin/game_mode_func.py', 'bin'),
         ('G:/PycharmProjects/oldAssistant_v2/bin/other_options_window.py', 'bin'),
         ('G:/PycharmProjects/oldAssistant_v2/user_settings/links for assist', 'user_settings/links for assist'),
         ('G:/PycharmProjects/oldAssistant_v2/user_settings/presets', 'user_settings/presets'),

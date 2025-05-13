@@ -10,8 +10,6 @@ import ctypes
 import win32clipboard
 from PIL import ImageGrab, Image
 
-from bin.game_mode_func import GamepadManager
-
 ctypes.windll.user32.SetProcessDPIAware()
 import io
 import json
@@ -55,7 +53,7 @@ from PyQt5.QtCore import Qt, QFileSystemWatcher, QTimer, QEvent, pyqtSignal
 
 short_name = "https://raw.githubusercontent.com/AndreyDanilov1999/oldAssistant_v2/refs/heads/master/"
 # Сырая ссылка на version.txt в GitHub
-EXP_VERSION_FILE_URL = f"{short_name}exp-verison.txt"
+EXP_VERSION_FILE_URL = f"{short_name}exp-version.txt"
 VERSION_FILE_URL = f"{short_name}version.txt"
 CHANGELOG_TXT_URL = f"{short_name}changelog.txt"
 CHANGELOG_MD_URL = f"{short_name}changelog.md"
@@ -137,8 +135,8 @@ class Assistant(QMainWindow):
         self.default_preset_style = get_path('bin', 'color_presets', 'default.json')
         self.settings_file_path = get_path('user_settings', 'settings.json')
         self.screenshot_tool = SystemScreenshot()
-        self.game_mode = None
-        self.game_mode_bool = False
+        # self.game_mode = None
+        # self.game_mode_bool = False
         self.update_settings(self.settings_file_path)
         self.settings = self.load_settings()
         self.assistant_name = self.settings.get('assistant_name', "джо")
@@ -1374,11 +1372,11 @@ class Assistant(QMainWindow):
                                     open_appdata()
                                 else:
                                     close_appdata()
-                            elif 'игровой режим' in command:
-                                if action_type == 'open':
-                                    self.start_game_mode()
-                                else:
-                                    self.stop_game_mode()
+                            # elif 'игровой режим' in command:
+                            #     if action_type == 'open':
+                            #         self.start_game_mode()
+                            #     else:
+                            #         self.stop_game_mode()
                             else:
                                 # Пытаемся обработать команду
                                 app_processed = self.handle_app_command(command, action_type)
@@ -1439,20 +1437,20 @@ class Assistant(QMainWindow):
                         thread_react(player_folder)
 
 
-                elif self.game_mode_bool:
-                    found_cmd = self.game_mode.find_command(text)
-                    if not found_cmd:
-                        logger.info("Команда не распознана")
-                        continue
-                    if "сброс" in text:
-                        self.game_mode.cleanup()
-                        logger.info("Все кнопки отпущены")
-                    elif "держи" in text:
-                        self.game_mode.trigger(found_cmd, hold=True)
-                        logger.info(f"Удерживаю {found_cmd}")
-                    else:
-                        self.game_mode.trigger(found_cmd)
-                        logger.info(f"Нажимаю {found_cmd}")
+                # elif self.game_mode_bool:
+                #     found_cmd = self.game_mode.find_command(text)
+                #     if not found_cmd:
+                #         logger.info("Команда не распознана")
+                #         continue
+                #     if "сброс" in text:
+                #         self.game_mode.cleanup()
+                #         logger.info("Все кнопки отпущены")
+                #     elif "держи" in text:
+                #         self.game_mode.trigger(found_cmd, hold=True)
+                #         logger.info(f"Удерживаю {found_cmd}")
+                #     else:
+                #         self.game_mode.trigger(found_cmd)
+                #         logger.info(f"Нажимаю {found_cmd}")
 
 
         except Exception as e:
@@ -1466,36 +1464,36 @@ class Assistant(QMainWindow):
     # "--------------------------------------------------------------------------------------------------"
     # "Основной цикл ассистента(конец)"
 
-    def install_game_mode(self):
-        try:
-            self.game_mode = GamepadManager()
-            if self.game_mode.init_success:
-                logger.info("Игровой режим успешно инициализирован")
-            else:
-                logger.warning("Не удалось инициализировать игровой режим")
-                self.game_mode = None
-        except Exception as e:
-            logger.error(f"Ошибка при инициализации GamepadManager: {e}")
-            self.game_mode = None
-
-    def start_game_mode(self):
-        self.install_game_mode()
-        self.game_mode.set_game("God of War")
-        logger.info(self.game_mode)
-        logger.info(self.game_mode.running)
-        if self.game_mode and not self.game_mode.running:
-            self.game_mode.start_proxy()
-            self.game_mode_bool = True
-            logger.info("Игровой режим активирован")
-        else:
-            logger.warning("Невозможно активировать игровой режим")
-
-    def stop_game_mode(self):
-        if self.game_mode and self.game_mode.running:
-            self.game_mode.stop_proxy()
-            self.game_mode.cleanup()
-            self.game_mode_bool = False
-            logger.info("Игровой режим деактивирован")
+    # def install_game_mode(self):
+    #     try:
+    #         self.game_mode = GamepadManager()
+    #         if self.game_mode.init_success:
+    #             logger.info("Игровой режим успешно инициализирован")
+    #         else:
+    #             logger.warning("Не удалось инициализировать игровой режим")
+    #             self.game_mode = None
+    #     except Exception as e:
+    #         logger.error(f"Ошибка при инициализации GamepadManager: {e}")
+    #         self.game_mode = None
+    #
+    # def start_game_mode(self):
+    #     self.install_game_mode()
+    #     self.game_mode.set_game("God of War")
+    #     logger.info(self.game_mode)
+    #     logger.info(self.game_mode.running)
+    #     if self.game_mode and not self.game_mode.running:
+    #         self.game_mode.start_proxy()
+    #         self.game_mode_bool = True
+    #         logger.info("Игровой режим активирован")
+    #     else:
+    #         logger.warning("Невозможно активировать игровой режим")
+    #
+    # def stop_game_mode(self):
+    #     if self.game_mode and self.game_mode.running:
+    #         self.game_mode.stop_proxy()
+    #         self.game_mode.cleanup()
+    #         self.game_mode_bool = False
+    #         logger.info("Игровой режим деактивирован")
 
     def check_microphone_available(self):
         """Проверка наличия микрофона в системе."""
