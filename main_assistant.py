@@ -59,6 +59,7 @@ CHANGELOG_TXT_URL = f"{short_name}changelog.txt"
 CHANGELOG_MD_URL = f"{short_name}changelog.md"
 MUTEX_NAME = "Assistant_123456789ABC"
 
+
 def activate_existing_window():
     hwnd = win32gui.FindWindow(None, "Ассистент")
     if not hwnd:
@@ -106,7 +107,7 @@ class Assistant(QMainWindow):
 
     def __init__(self):
         super().__init__()
-        self.version = "1.2.19"
+        self.version = "1.2.20"
         self.ps = "Powered by theoldman"
         self.label_version = QLabel(f"Версия: {self.version} {self.ps}", self)
         self.label_message = QLabel('', self)
@@ -1201,6 +1202,8 @@ class Assistant(QMainWindow):
         greeting()
         last_unrecognized_command = None  # Хранит контекст неудачной команды
         last_activity_time = time.time()  # Время последней активности
+        name_mentioned_time = None  # Время последнего упоминания имени ассистента
+        name_mentioned = False  # Флаг, что имя было упомянуто
 
         if not self.initialize_audio():
             return
@@ -1215,6 +1218,13 @@ class Assistant(QMainWindow):
                     logger.info("Сброс контекста из-за неактивности (7 секунд)")
                     debug_logger.info("Сброс контекста из-за неактивности (7 секунд)")
                     continue
+
+                # Сбрасываем флаг упоминания имени, если прошло более 30 секунд
+                if name_mentioned and (current_time - name_mentioned_time) > 30:
+                    name_mentioned = False
+                    name_mentioned_time = None
+                    logger.info("Сброс флага упоминания имени (30 секунд)")
+                    debug_logger.info("Сброс флага упоминания имени (30 секунд)")
 
                 if not self.is_assistant_running:
                     break
@@ -1231,17 +1241,44 @@ class Assistant(QMainWindow):
                                       "error")
                     break
 
-                if any(keyword in text for keyword in ['сук', 'суч', 'пизд', 'еба', 'ёба',
-                                                       'нах', 'хуй', 'бля', 'ебу', 'епт',
-                                                       'ёпт', 'гандон', 'пид']):
+                if any(keyword in text for keyword in ['сук', 'суч', 'пизд', 'ебан', 'ебат', 'ёбан',
+                                                       'нах', 'хуй', 'блять', 'блядь', 'ебу', 'епта',
+                                                       'ёпта', 'гандон', 'пидор', 'пидар', "хуё", "хуя",
+                                                       "хую", "хуе", "залуп", "залупа", "пиздюк",
+                                                       "ебанут", "ебарь", "ебанат", "еблан", "ебло",
+                                                       "еблив", "ебуч", "ёбыр", "заеб", "наеб", "объеб",
+                                                       "подъеб", "разъеб", "съеб"]):
                     self.censor_counter()
 
-                if self.is_censored and any(keyword in text for keyword in ['сук', 'суч', 'пизд', 'еба', 'ёба',
-                                                                            'нах', 'хуй', 'бля', 'ебу', 'епт',
-                                                                            'ёпт', 'гандон', 'пид']):
+                if self.is_censored and any(
+                        keyword in text for keyword in ['сук', 'суч', 'пизд', 'ебан', 'ебат', 'ёбан',
+                                                        'нах', 'хуй', 'блять', 'блядь', 'ебу', 'епта',
+                                                        'ёпта', 'гандон', 'пидор', 'пидар', "хуё", "хуя",
+                                                        "хую", "хуе", "залуп", "залупа", "пиздюк",
+                                                        "ебанут", "ебарь", "ебанат", "еблан", "ебло",
+                                                        "еблив", "ебуч", "ёбыр", "заеб", "наеб", "объеб",
+                                                        "подъеб", "разъеб", "съеб"]):
                     censored_folder = self.audio_paths.get('censored_folder')
                     thread_react(censored_folder)
                     continue
+
+                # Проверка на упоминание имени ассистента (одно слово)
+                words = text.split()
+                if len(words) == 1 and words[0].lower() in [self.assistant_name.lower(),
+                                                            self.assist_name2.lower(),
+                                                            self.assist_name3.lower()]:
+                    echo_folder = self.audio_paths.get('echo_folder')
+                    if echo_folder:
+                        thread_react(echo_folder)
+                    name_mentioned = True
+                    name_mentioned_time = current_time
+                    continue
+
+                # Проверка на наличие имени ассистента в тексте или флаг упоминания
+                has_assistant_name = (self.assistant_name in text or
+                                      self.assist_name2 in text or
+                                      self.assist_name3 in text or
+                                      name_mentioned)
 
                 # Режим уточнения команды (если предыдущая попытка не удалась)
                 if last_unrecognized_command:
@@ -1298,12 +1335,19 @@ class Assistant(QMainWindow):
                                     continue
 
                                 last_unrecognized_command = None
+                            if not matched_special and not matched_keyword:
+                                what_folder = self.audio_paths.get('what_folder')
+                                if what_folder:
+                                    thread_react(what_folder)
 
-                if self.assistant_name in text or self.assist_name2 in text or self.assist_name3 in text:
+                if has_assistant_name:
                     reaction_triggered = False
-                    action_keywords = ['откр', 'закр', 'вкл', 'выкл', 'запус',
+                    action_keywords = ['откр', 'закр', 'вкл', 'выкл', 'откл', 'запус',
                                        'отруб', 'выруб']
                     action = next((kw for kw in action_keywords if kw in text), None)
+
+                    # Проверяем, есть ли в тексте слова-действия
+                    has_action_words = any(kw in text.lower() for kw in action_keywords)
 
                     commands = []
                     if " и " in text:
@@ -1335,7 +1379,7 @@ class Assistant(QMainWindow):
                         action_type = None
                         if any(kw in command for kw in ['запус', 'откр', 'вкл', 'вруб']):
                             action_type = 'open'
-                        elif any(kw in command for kw in ['закр', 'выкл', 'выруб', 'отруб']):
+                        elif any(kw in command for kw in ['закр', 'выкл', 'выруб', 'отруб', 'откл']):
                             action_type = 'close'
 
                         if action_type:
@@ -1372,11 +1416,6 @@ class Assistant(QMainWindow):
                                     open_appdata()
                                 else:
                                     close_appdata()
-                            # elif 'игровой режим' in command:
-                            #     if action_type == 'open':
-                            #         self.start_game_mode()
-                            #     else:
-                            #         self.stop_game_mode()
                             else:
                                 # Пытаемся обработать команду
                                 app_processed = self.handle_app_command(command, action_type)
@@ -1391,26 +1430,43 @@ class Assistant(QMainWindow):
                                     }
                                     reaction_triggered = True
                         else:
-                            # Поиск и другие команды (без изменений)
-                            if "поищи" in command or 'найди' in command:
-                                query = (command.replace("поищи", "").replace("найди", "")
-                                         .replace(self.assistant_name, "")
-                                         .replace(self.assist_name2, "")
-                                         .replace("в интернете", "")
-                                         .replace("в инете", "")
-                                         .replace(self.assist_name3, "").strip())
-                                approve_folder = self.audio_paths.get('approve_folder')
-                                if approve_folder:
-                                    thread_react(approve_folder)
-                                search_yandex(query)
-                            elif "фулл скрин" in command:
-                                self.capture_fullscreen()
-                            elif "скрин" in command:
-                                self.capture_area()
-                            else:
-                                echo_folder = self.audio_paths.get('echo_folder')
-                                if echo_folder:
-                                    thread_react(echo_folder)
+                            # Если есть имя ассистента, но нет команды или непонятная команда
+                            if (self.assistant_name in command or
+                                    self.assist_name2 in command or
+                                    self.assist_name3 in command or
+                                    name_mentioned):
+
+                                # Реагируем только если есть слова-действия, но команда не распознана
+                                if has_action_words:
+                                    what_folder = self.audio_paths.get('what_folder')
+                                    if what_folder:
+                                        thread_react(what_folder)
+                                    reaction_triggered = True
+                                else:
+                                    # Поиск и другие команды (без изменений)
+                                    if "поищи" in command or 'найди' in command:
+                                        query = (command.replace("поищи", "").replace("найди", "")
+                                                 .replace(self.assistant_name, "")
+                                                 .replace(self.assist_name2, "")
+                                                 .replace("в интернете", "")
+                                                 .replace("в инете", "")
+                                                 .replace(self.assist_name3, "").strip())
+                                        approve_folder = self.audio_paths.get('approve_folder')
+                                        if approve_folder:
+                                            thread_react(approve_folder)
+                                        search_yandex(query)
+                                    elif "фулл скрин" in command:
+                                        self.capture_fullscreen()
+                                    elif "скрин" in command:
+                                        self.capture_area()
+                                    # elif 'игровой режим' in command:
+                                    #     if action_type == 'open':
+                                    #         self.start_game_mode()
+                                    #     else:
+                                    #         self.stop_game_mode()
+                                    else:
+                                        # Если просто разговор, а не команда - не реагируем вопросом
+                                        pass
 
                     if reaction_triggered:
                         what_folder = self.audio_paths.get('what_folder')
@@ -1436,22 +1492,20 @@ class Assistant(QMainWindow):
                         player_folder = self.audio_paths.get('player_folder')
                         thread_react(player_folder)
 
-
-                # elif self.game_mode_bool:
-                #     found_cmd = self.game_mode.find_command(text)
-                #     if not found_cmd:
-                #         logger.info("Команда не распознана")
-                #         continue
-                #     if "сброс" in text:
-                #         self.game_mode.cleanup()
-                #         logger.info("Все кнопки отпущены")
-                #     elif "держи" in text:
-                #         self.game_mode.trigger(found_cmd, hold=True)
-                #         logger.info(f"Удерживаю {found_cmd}")
-                #     else:
-                #         self.game_mode.trigger(found_cmd)
-                #         logger.info(f"Нажимаю {found_cmd}")
-
+                    # elif self.game_mode_bool:
+                    #     found_cmd = self.game_mode.find_command(text)
+                    #     if not found_cmd:
+                    #         logger.info("Команда не распознана")
+                    #         continue
+                    #     if "сброс" in text:
+                    #         self.game_mode.cleanup()
+                    #         logger.info("Все кнопки отпущены")
+                    #     elif "держи" in text:
+                    #         self.game_mode.trigger(found_cmd, hold=True)
+                    #         logger.info(f"Удерживаю {found_cmd}")
+                    #     else:
+                    #         self.game_mode.trigger(found_cmd)
+                    #         logger.info(f"Нажимаю {found_cmd}")
 
         except Exception as e:
             logger.error(f"Ошибка в основном цикле ассистента: {e}")
