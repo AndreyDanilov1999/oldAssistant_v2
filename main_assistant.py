@@ -58,8 +58,8 @@ VERSION_FILE_URL = f"{short_name}version.txt"
 CHANGELOG_TXT_URL = f"{short_name}changelog.txt"
 CHANGELOG_MD_URL = f"{short_name}changelog.md"
 MUTEX_NAME = "Assistant_123456789ABC"
-
-
+https://raw.githubusercontent.com/AndreyDanilov1999/oldAssistant_v2/refs/heads/master/exp-version.txt
+https://raw.githubusercontent.com/AndreyDanilov1999/oldAssistant_v2/refs/heads/master/exp-verison.txt
 def activate_existing_window():
     hwnd = win32gui.FindWindow(None, "Ассистент")
     if not hwnd:
@@ -107,7 +107,7 @@ class Assistant(QMainWindow):
 
     def __init__(self):
         super().__init__()
-        self.version = "1.2.20"
+        self.version = "1.2.21"
         self.ps = "Powered by theoldman"
         self.label_version = QLabel(f"Версия: {self.version} {self.ps}", self)
         self.label_message = QLabel('', self)
@@ -1342,6 +1342,15 @@ class Assistant(QMainWindow):
 
                 if has_assistant_name:
                     reaction_triggered = False
+                    # Системные команды (без изменений)
+                    if 'выключи комп' in text:
+                        # shutdown_windows()
+                        logger.info("shutdown")
+                        continue
+                    elif 'перезагрузить комп' in text:
+                        # restart_windows()
+                        logger.info("restart")
+                        continue
                     action_keywords = ['откр', 'закр', 'вкл', 'выкл', 'откл', 'запус',
                                        'отруб', 'выруб']
                     action = next((kw for kw in action_keywords if kw in text), None)
@@ -1366,14 +1375,6 @@ class Assistant(QMainWindow):
 
                         if action and not any(kw in command for kw in action_keywords):
                             command = f"{action} {command}"
-
-                        # Системные команды (без изменений)
-                        if 'выключи комп' in command:
-                            shutdown_windows()
-                            continue
-                        elif 'перезагрузить комп' in command:
-                            restart_windows()
-                            continue
 
                         # Определяем тип действия
                         action_type = None
