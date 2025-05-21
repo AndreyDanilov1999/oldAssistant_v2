@@ -58,8 +58,7 @@ VERSION_FILE_URL = f"{short_name}version.txt"
 CHANGELOG_TXT_URL = f"{short_name}changelog.txt"
 CHANGELOG_MD_URL = f"{short_name}changelog.md"
 MUTEX_NAME = "Assistant_123456789ABC"
-https://raw.githubusercontent.com/AndreyDanilov1999/oldAssistant_v2/refs/heads/master/exp-version.txt
-https://raw.githubusercontent.com/AndreyDanilov1999/oldAssistant_v2/refs/heads/master/exp-verison.txt
+
 def activate_existing_window():
     hwnd = win32gui.FindWindow(None, "Ассистент")
     if not hwnd:
