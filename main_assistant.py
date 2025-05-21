@@ -1343,11 +1343,11 @@ class Assistant(QMainWindow):
                     reaction_triggered = False
                     # Системные команды (без изменений)
                     if 'выключи комп' in text:
-                        # shutdown_windows()
+                        shutdown_windows()
                         logger.info("shutdown")
                         continue
                     elif 'перезагрузить комп' in text:
-                        # restart_windows()
+                        restart_windows()
                         logger.info("restart")
                         continue
                     action_keywords = ['откр', 'закр', 'вкл', 'выкл', 'откл', 'запус',
