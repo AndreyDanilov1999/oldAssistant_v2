@@ -5,8 +5,9 @@ import simpleaudio as sa
 import numpy as np
 import pandas as pd
 from PyQt5.QtCore import Qt, QTimer, QPoint, QPropertyAnimation, QEasingCurve
+from PyQt5.QtGui import QFont, QTextCursor
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QPushButton, QMessageBox, QLabel, QStackedWidget, \
-    QFrame, QHBoxLayout, QDialog, QLineEdit, QSlider, QCheckBox
+    QFrame, QHBoxLayout, QDialog, QLineEdit, QSlider, QCheckBox, QTextEdit, QDesktopWidget
 from logging_config import logger, debug_logger
 from path_builder import get_path
 
@@ -101,7 +102,7 @@ class OtherOptionsWindow(QDialog):
         main_layout.addWidget(self.content_stack)
 
         # Добавляем вкладки
-        self.add_tab("Счетчик цензуры", CensorCounterWidget(self))
+        self.add_tab("Счетчик цензуры", CensorCounterWidget(self.assistant, self))
         self.add_tab("Обновления", CheckUpdateWidget(self.assistant))
         self.add_tab("Подробные логи", DebugLoggerWidget(self))
         self.add_tab("Релакс?", RelaxWidget(self))
@@ -183,8 +184,9 @@ class OtherOptionsWindow(QDialog):
 
 
 class CensorCounterWidget(QWidget):
-    def __init__(self, parent=None):
+    def __init__(self, assistant, parent=None):
         super().__init__(parent)
+        self.assistant = assistant
         self.init_ui()
         self.load_data()
 
@@ -296,8 +298,8 @@ class CensorCounterWidget(QWidget):
             today = pd.Timestamp.now().normalize()  # или .floor('D')
 
             # Для отладки: выводим даты из данных
-            debug_logger.info(f"Даты в данных: {clean_data['date'].dt.strftime('%Y-%m-%d').tolist()}")
-            debug_logger.info(f"Текущая дата: {today.strftime('%Y-%m-%d')}")
+            # debug_logger.info(f"Даты в данных: {clean_data['date'].dt.strftime('%Y-%m-%d').tolist()}")
+            # debug_logger.info(f"Текущая дата: {today.strftime('%Y-%m-%d')}")
 
             # Маски для фильтрации
             day_mask = (clean_data["date"].dt.normalize() == today)
@@ -305,9 +307,9 @@ class CensorCounterWidget(QWidget):
             month_mask = (clean_data["date"].dt.normalize() >= (today - pd.Timedelta(days=29)))
 
             # Проверка масок (для отладки)
-            debug_logger.info(f"Строки за день: {clean_data[day_mask]}")
-            debug_logger.info(f"Строки за неделю: {clean_data[week_mask]}")
-            debug_logger.info(f"Строки за месяц: {clean_data[month_mask]}")
+            # debug_logger.info(f"Строки за день: {clean_data[day_mask]}")
+            # debug_logger.info(f"Строки за неделю: {clean_data[week_mask]}")
+            # debug_logger.info(f"Строки за месяц: {clean_data[month_mask]}")
 
             # Считаем суммы
             day_score = int(clean_data.loc[day_mask, "score"].sum())
@@ -326,47 +328,86 @@ class CensorCounterWidget(QWidget):
             debug_logger.error(f"Ошибка в calculate_scores: {e}", exc_info=True)
             self.update_labels()
 
+    # def reset_censor_counter(self):
+    #     """
+    #     Сбрасывает счетчик, обнуляя таблицу censor_counter.csv.
+    #     Оставляет только заголовки.
+    #     """
+    #
+    #     # Диалоговое окно с подтверждением
+    #     msg_box = QMessageBox(self)
+    #     msg_box.setWindowTitle('Сброс счетчика')
+    #     msg_box.setText("Точно сбросить значения?")
+    #     yes_button = msg_box.addButton("Да", QMessageBox.YesRole)
+    #     no_button = msg_box.addButton("Нет", QMessageBox.NoRole)
+    #     yes_button.setStyleSheet("padding: 1px 10px;")
+    #     no_button.setStyleSheet("padding: 1px 10px;")
+    #     msg_box.setIcon(QMessageBox.Warning)
+    #     msg_box.exec_()
+    #
+    #     # Если пользователь нажал "Нет", выходим из метода
+    #     if msg_box.clickedButton() == no_button:
+    #         debug_logger.info("Сброс счетчика отменен.")
+    #         return
+    #
+    #     # Путь к CSV-файлу
+    #     CSV_FILE = get_path('user_settings', 'censor_counter.csv')
+    #
+    #     # Проверяем, существует ли файл
+    #     if not Path(CSV_FILE).exists():
+    #         logger.error("Файл censor_counter.csv не существует. Невозможно сбросить счетчик.")
+    #         debug_logger.error("Файл censor_counter.csv не существует. Невозможно сбросить счетчик.")
+    #         return
+    #
+    #     # Открываем файл для записи и оставляем только заголовки
+    #     with open(CSV_FILE, mode='w', newline='') as file:
+    #         writer = csv.writer(file)
+    #         writer.writerow(['date', 'score', 'total_score'])  # Записываем заголовки
+    #
+    #
+    #     # Обновляем лейблы после сброса
+    #     self.update_labels()
+
     def reset_censor_counter(self):
         """
         Сбрасывает счетчик, обнуляя таблицу censor_counter.csv.
         Оставляет только заголовки.
         """
+        # Используем кастомное диалоговое окно для подтверждения
+        result = self.assistant.show_message(
+            text="Точно сбросить значения?",
+            title="Сброс счетчика",
+            message_type="warning",
+            buttons=QMessageBox.Yes | QMessageBox.No
+        )
 
-        # Диалоговое окно с подтверждением
-        msg_box = QMessageBox(self)
-        msg_box.setWindowTitle('Сброс счетчика')
-        msg_box.setText("Точно сбросить значения?")
-        yes_button = msg_box.addButton("Да", QMessageBox.YesRole)
-        no_button = msg_box.addButton("Нет", QMessageBox.NoRole)
-        yes_button.setStyleSheet("padding: 1px 10px;")
-        no_button.setStyleSheet("padding: 1px 10px;")
-        msg_box.setIcon(QMessageBox.Warning)
-        msg_box.exec_()
-
-        # Если пользователь нажал "Нет", выходим из метода
-        if msg_box.clickedButton() == no_button:
+        # Если пользователь нажал "Нет" или закрыл окно, выходим из метода
+        if result == 0:
+            logger.info("Сброс счетчика отменен.")
             debug_logger.info("Сброс счетчика отменен.")
             return
 
-        # Путь к CSV-файлу
-        CSV_FILE = get_path('user_settings', 'censor_counter.csv')
+        if result == 1:
+            # Путь к CSV-файлу
+            CSV_FILE = get_path('user_settings', 'censor_counter.csv')
 
-        # Проверяем, существует ли файл
-        if not Path(CSV_FILE).exists():
-            logger.error("Файл censor_counter.csv не существует. Невозможно сбросить счетчик.")
-            debug_logger.error("Файл censor_counter.csv не существует. Невозможно сбросить счетчик.")
-            return
+            # Проверяем, существует ли файл
+            if not Path(CSV_FILE).exists():
+                error_msg = "Файл censor_counter.csv не существует. Невозможно сбросить счетчик."
+                logger.error(error_msg)
+                debug_logger.error(error_msg)
+                self.assistant.show_message(error_msg, "Ошибка", "error")
+                return
 
-        # Открываем файл для записи и оставляем только заголовки
-        with open(CSV_FILE, mode='w', newline='') as file:
-            writer = csv.writer(file)
-            writer.writerow(['date', 'score', 'total_score'])  # Записываем заголовки
+            # Открываем файл для записи и оставляем только заголовки
+            with open(CSV_FILE, mode='w', newline='') as file:
+                writer = csv.writer(file)
+                writer.writerow(['date', 'score', 'total_score'])  # Записываем заголовки
 
-        logger.info("Счетчик успешно сброшен.")
-        debug_logger.info("Счетчик успешно сброшен.")
-
-        # Обновляем лейблы после сброса
-        self.update_labels()
+            logger.info("Счетчик успешно сброшен.")
+            debug_logger.info("Счетчик успешно сброшен.")
+            # Обновляем лейблы после сброса
+            self.update_labels()
 
     def update_labels(self):
         """
@@ -425,12 +466,99 @@ class DebugLoggerWidget(QWidget):
         self.check_button.clicked.connect(self.open_folder)
         layout.addWidget(self.check_button)
 
+        self.open_button = QPushButton("Открыть лог-файл")
+        self.open_button.clicked.connect(self.load_window)
+        layout.addWidget(self.open_button)
+
         layout.addStretch()
 
     def open_folder(self):
         path = get_path("log")
-
         os.startfile(path)
+
+    def load_window(self):
+        try:
+            debuglog = DebuglogWindow(self)
+            debuglog.show()
+        except Exception as e:
+            logger.error(f"Ошибка при открытии/закрытии окна дебаг-файла: {e}")
+            debug_logger.error(f"Ошибка при открытии/закрытии окна дебаг-файла: {e}")
+
+
+class DebuglogWindow(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+        self.setWindowFlags(Qt.FramelessWindowHint | Qt.Dialog)
+        self.setFixedSize(1000, 900)
+        screen_geometry = QDesktopWidget().screenGeometry()
+        x = (screen_geometry.width() - self.width()) // 2
+        y = (screen_geometry.height() - self.height()) // 2
+        self.move(x, y)
+
+        # Основной контейнер с рамкой
+        container = QWidget(self)
+        container.setObjectName("MessageContainer")
+        container.setGeometry(0, 0, self.width(), self.height())
+
+        # Заголовок с крестиком
+        title_bar = QWidget(container)
+        title_bar.setObjectName("TitleBar")
+        title_bar.setGeometry(1, 1, self.width() - 2, 35)
+
+        title_layout = QHBoxLayout(title_bar)
+        title_layout.setContentsMargins(10, 5, 10, 5)
+        title_layout.setSpacing(5)
+
+        title_label = QLabel("Подробный лог-файл")
+        title_label.setObjectName("TitleLabel")
+        title_label.setFixedSize(150, 20)
+        title_layout.addWidget(title_label)
+        title_layout.addStretch()
+
+        close_btn = QPushButton("✕")
+        close_btn.setObjectName("CloseButton")
+        close_btn.setFixedSize(25, 25)
+        close_btn.clicked.connect(self.close)
+        title_layout.addWidget(close_btn)
+
+        # Основное содержимое
+        content_widget = QWidget(container)
+        content_widget.setGeometry(1, 36, self.width() - 2, self.height() - 37)
+
+        # Вертикальный layout
+        layout = QVBoxLayout(content_widget)
+        layout.setContentsMargins(10, 10, 10, 10)
+
+        self.log_area = QTextEdit()
+        self.log_area.setReadOnly(True)
+        self.log_area.setFont(QFont("Consolas"))
+        self.log_area.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
+        self.load_debuglog()
+
+        layout.addWidget(self.log_area)
+
+        # Кнопка закрытия
+        close_button = QPushButton("Закрыть")
+        close_button.clicked.connect(self.close)
+        layout.addWidget(close_button)
+
+
+    def load_debuglog(self):
+        path = get_path("log", "debug_assist.log")
+        try:
+            if not os.path.exists(path):
+                self.logger.info("Файл логов не найден. Создаем новый.")
+                with open(path, "w", encoding="utf-8"):
+                    pass  # Создаем пустой файл
+
+            with open(path, "r", encoding="utf-8-sig", errors="replace") as file:
+                existing_logs = file.read()
+                self.log_area.append(existing_logs)
+                self.last_position = file.tell()  # Сохраняем позицию последнего прочитанного байта
+        except Exception as e:
+            self.logger.error(f"Ошибка при чтении файла логов: {e}")
+            self.log_area.append(f"Ошибка при чтении файла логов: {e}")
 
 
 class RelaxWidget(QWidget):

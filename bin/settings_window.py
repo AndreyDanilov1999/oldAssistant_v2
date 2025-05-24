@@ -1192,12 +1192,7 @@ class ColorSettingsWindow(QDialog):
                     }, f, indent=4, ensure_ascii=False)
 
                 self.load_presets()
-                msg_box = QMessageBox(self)
-                msg_box.setWindowTitle('Успех')
-                msg_box.setText(f"Пресет сохранен!")
-                ok_button = msg_box.addButton("ОК", QMessageBox.AcceptRole)
-                ok_button.setStyleSheet("padding: 1px 10px;")
-                msg_box.exec_()
+                self.assistant.show_message("Пресет сохранен!", "Уведомление", "info")
                 break  # Выход из цикла после успешного сохранения
 
             except Exception as e:

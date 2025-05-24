@@ -106,7 +106,7 @@ class Assistant(QMainWindow):
 
     def __init__(self):
         super().__init__()
-        self.version = "1.2.21"
+        self.version = "1.2.22"
         self.ps = "Powered by theoldman"
         self.label_version = QLabel(f"Версия: {self.version} {self.ps}", self)
         self.label_message = QLabel('', self)
@@ -167,13 +167,48 @@ class Assistant(QMainWindow):
 
         self.run_assist()
         self.check_update_label()
-        # self.check_for_updates_app()
         QTimer.singleShot(2000, self.check_for_updates_app)
 
-    def mouseMoveEvent(self, event):
-        if self.drag_pos and event.buttons() == Qt.LeftButton:
-            self.move(event.globalPos() - self.drag_pos)
+    def title_bar_mouse_press(self, event):
+        """Обработка нажатия мыши на заголовок"""
+        if event.button() == Qt.LeftButton:
+            self.drag_pos = event.globalPos() - self.frameGeometry().topLeft()
             event.accept()
+
+    def title_bar_mouse_move(self, event):
+        """Обработка перемещения мыши при удерживании на заголовке"""
+        if self.drag_pos and event.buttons() == Qt.LeftButton:
+            # Получаем новую позицию основного окна
+            new_pos = event.globalPos() - self.drag_pos
+            self.move(new_pos)
+
+            # Если окно настроек открыто - перемещаем его вместе с основным
+            if hasattr(self, 'settings_window') and self.settings_window.isVisible():
+                # Позиционируем окно настроек относительно основного
+                settings_x = new_pos.x() - self.settings_window.width()
+                settings_y = new_pos.y()
+                self.settings_window.move(settings_x, settings_y)
+
+            # Если окно настроек открыто - перемещаем его вместе с основным
+            if hasattr(self, 'other_window') and self.other_window.isVisible():
+                # Позиционируем окно настроек относительно основного
+                settings_x = new_pos.x() - self.other_window.width()
+                settings_y = new_pos.y()
+                self.other_window.move(settings_x, settings_y)
+
+            event.accept()
+
+    # def title_bar_mouse_move(self, event):
+    #     """Обработка перемещения мыши при удерживании на заголовке"""
+    #     if self.drag_pos and event.buttons() == Qt.LeftButton:
+    #         self.move(event.globalPos() - self.drag_pos)
+    #
+    #         event.accept()
+
+    def title_bar_mouse_release(self, event):
+        """Обработка отпускания кнопки мыши"""
+        self.drag_pos = None
+        event.accept()
 
     def initui(self):
         """Инициализация пользовательского интерфейса."""
@@ -206,6 +241,15 @@ class Assistant(QMainWindow):
         self.title_bar_widget.setObjectName("TitleBar")
         self.title_bar_layout = QHBoxLayout(self.title_bar_widget)
         self.title_bar_layout.setContentsMargins(10, 5, 10, 5)
+
+        # Отключаем перетаскивание для всего окна
+        self.setMouseTracking(True)
+        self.drag_pos = None
+
+        # Настраиваем title bar
+        self.title_bar_widget.mousePressEvent = self.title_bar_mouse_press
+        self.title_bar_widget.mouseMoveEvent = self.title_bar_mouse_move
+        self.title_bar_widget.mouseReleaseEvent = self.title_bar_mouse_release
 
         # Добавляем иконку в заголовок
         icon_label = QLabel()
@@ -515,7 +559,7 @@ class Assistant(QMainWindow):
     def keyPressEvent(self, event):
         """Сворачивает основное окно в трей по нажатию на Esc"""
         if event.key() == Qt.Key_Escape:
-            self.hide()
+            self.custom_hide()
             event.accept()
         else:
             super().keyPressEvent(event)
@@ -1717,18 +1761,25 @@ class Assistant(QMainWindow):
                 debug_logger.error(f'Ошибка при создании папки: {e}')
 
     def open_main_settings(self):
-        """Обработка нажатия кнопки 'Настройки'"""
+        """Обработка нажатия кнопки 'Настройки' (работает как переключатель)"""
         try:
-            settings_window = MainSettingsWindow(self)
+            # Проверяем, существует ли уже окно настроек и видимо ли оно
+            if hasattr(self, 'settings_window') and self.settings_window.isVisible():
+                # Если окно открыто - закрываем его
+                self.settings_window.hide_with_animation()
+                return
+
+            # Создаем новое окно, если его нет или оно не видимо
+            self.settings_window = MainSettingsWindow(self)
             # Получаем виджет настроек и подключаем сигнал
-            settings_widget = settings_window.get_settings_widget()
+            settings_widget = self.settings_window.get_settings_widget()
             if settings_widget:
                 settings_widget.voice_changed.connect(self.update_voice)
 
-            settings_window.show()
+            self.settings_window.show()
         except Exception as e:
-            debug_logger.error(f"Ошибка при открытии настроек: {e}")
-            self.show_message(f"Ошибка при открытии настроек: {e}", "Ошибка", "error")
+            debug_logger.error(f"Ошибка при открытии/закрытии настроек: {e}")
+            self.show_message(f"Ошибка при открытии/закрытии настроек: {e}", "Ошибка", "error")
 
     def open_commands_settings(self):
         """Обработка нажатия кнопки 'Ваши команды'"""
@@ -1743,8 +1794,13 @@ class Assistant(QMainWindow):
     def other_options(self):
         """Открываем окно с прочими опциями"""
         try:
-            other_window = OtherOptionsWindow(self)
-            other_window.show()
+            # Проверяем, существует ли уже окно настроек и видимо ли оно
+            if hasattr(self, 'other_window') and self.other_window.isVisible():
+                # Если окно открыто - закрываем его
+                self.other_window.hide_with_animation()
+                return
+            self.other_window = OtherOptionsWindow(self)
+            self.other_window.show()
         except Exception as e:
             debug_logger.error(f"Ошибка при открытии прочих опций: {e}")
             self.show_message(f"Ошибка при открытии прочих опций: {e}", "Ошибка", "error")
