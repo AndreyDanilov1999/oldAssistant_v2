@@ -10,6 +10,8 @@ import ctypes
 import win32clipboard
 from PIL import ImageGrab, Image
 
+from bin.guide_window import GuideWindow
+
 ctypes.windll.user32.SetProcessDPIAware()
 import io
 import json
@@ -106,7 +108,7 @@ class Assistant(QMainWindow):
 
     def __init__(self):
         super().__init__()
-        self.version = "1.2.22"
+        self.version = "1.2.23"
         self.ps = "Powered by theoldman"
         self.label_version = QLabel(f"Версия: {self.version} {self.ps}", self)
         self.label_message = QLabel('', self)
@@ -197,13 +199,6 @@ class Assistant(QMainWindow):
                 self.other_window.move(settings_x, settings_y)
 
             event.accept()
-
-    # def title_bar_mouse_move(self, event):
-    #     """Обработка перемещения мыши при удерживании на заголовке"""
-    #     if self.drag_pos and event.buttons() == Qt.LeftButton:
-    #         self.move(event.globalPos() - self.drag_pos)
-    #
-    #         event.accept()
 
     def title_bar_mouse_release(self, event):
         """Обработка отпускания кнопки мыши"""
@@ -324,6 +319,10 @@ class Assistant(QMainWindow):
         self.other_button = QPushButton("Прочее")
         self.other_button.clicked.connect(self.other_options)
         left_layout.addWidget(self.other_button)
+
+        self.guide_button = QPushButton("Обучение")
+        self.guide_button.clicked.connect(self.guide_options)
+        left_layout.addWidget(self.guide_button)
 
         left_layout.addStretch()
 
@@ -1329,59 +1328,59 @@ class Assistant(QMainWindow):
                         # Обновляем время последней активности при обработке команды
                         last_activity_time = current_time
                         # Проверяем, содержит ли текст только кириллические символы (исключаем английскую речь)
-                        if any(cyr_char in text.lower() for cyr_char in 'абвгдеёжзийклмнопрстуфхцчшщъыьэюя'):
-                            # Сначала проверяем специальные команды (калькулятор, диспетчер и т.д.)
-                            special_commands = {
-                                'микшер': (open_volume_mixer, close_volume_mixer),
-                                'калькул': (open_calc, close_calc),
-                                'пэйнт': (open_paint, close_paint),
-                                'пейнт': (open_paint, close_paint),
-                                'переменные': (open_path, None),
-                                'диспетчер': (open_taskmgr, close_taskmgr),
-                                'корзин': (open_recycle_bin, close_recycle_bin),
-                                'дат': (open_appdata, close_appdata),
-                            }
+                        # if any(cyr_char in text.lower() for cyr_char in 'абвгдеёжзийклмнопрстуфхцчшщъыьэюя'):
+                        # Сначала проверяем специальные команды (калькулятор, диспетчер и т.д.)
+                        special_commands = {
+                            'микшер': (open_volume_mixer, close_volume_mixer),
+                            'калькул': (open_calc, close_calc),
+                            'пэйнт': (open_paint, close_paint),
+                            'пейнт': (open_paint, close_paint),
+                            'переменные': (open_path, None),
+                            'диспетчер': (open_taskmgr, close_taskmgr),
+                            'корзин': (open_recycle_bin, close_recycle_bin),
+                            'дат': (open_appdata, close_appdata),
+                        }
 
-                            # Ищем совпадение со специальными командами
-                            matched_special = next((kw for kw in special_commands if kw in text.lower()), None)
+                        # Ищем совпадение со специальными командами
+                        matched_special = next((kw for kw in special_commands if kw in text.lower()), None)
 
-                            if matched_special:
-                                if last_unrecognized_command['action_type'] == 'open':
-                                    special_commands[matched_special][0]()
-                                elif last_unrecognized_command['action_type'] == 'close':
-                                    if special_commands[matched_special][1]:
-                                        special_commands[matched_special][1]()
-                                last_unrecognized_command = None
-                                continue
+                        if matched_special:
+                            if last_unrecognized_command['action_type'] == 'open':
+                                special_commands[matched_special][0]()
+                            elif last_unrecognized_command['action_type'] == 'close':
+                                if special_commands[matched_special][1]:
+                                    special_commands[matched_special][1]()
+                            last_unrecognized_command = None
+                            continue
 
-                            # Ищем прямое совпадение с командами из файла
-                            matched_keyword = next((kw for kw in self.commands if kw in text.lower()), None)
+                        # Ищем прямое совпадение с командами из файла
+                        matched_keyword = next((kw for kw in self.commands if kw in text.lower()), None)
 
-                            if matched_keyword:
-                                # Восстанавливаем полную команду
-                                restored_command = f"{last_unrecognized_command['action']} {matched_keyword}"
-                                debug_logger.info(f"Восстановленная команда: {restored_command}")
+                        if matched_keyword:
+                            # Восстанавливаем полную команду
+                            restored_command = f"{last_unrecognized_command['action']} {matched_keyword}"
+                            debug_logger.info(f"Восстановленная команда: {restored_command}")
 
-                                # Определяем тип действия
-                                action_type = last_unrecognized_command['action_type']
+                            # Определяем тип действия
+                            action_type = last_unrecognized_command['action_type']
 
-                                # Пытаемся обработать как приложение
-                                app_processed = self.handle_app_command(restored_command, action_type)
-                                folder_processed = self.handle_folder_command(restored_command, action_type)
+                            # Пытаемся обработать как приложение
+                            app_processed = self.handle_app_command(restored_command, action_type)
+                            folder_processed = self.handle_folder_command(restored_command, action_type)
 
-                                if not folder_processed and not app_processed:
-                                    logger.warning(f"Не удалось обработать команду: {restored_command}")
-                                    debug_logger.warning(f"Не удалось обработать команду: {restored_command}")
-                                    what_folder = self.audio_paths.get('what_folder')
-                                    if what_folder:
-                                        thread_react(what_folder)
-                                    continue
-
-                                last_unrecognized_command = None
-                            if not matched_special and not matched_keyword:
+                            if not folder_processed and not app_processed:
+                                logger.warning(f"Не удалось обработать команду: {restored_command}")
+                                debug_logger.warning(f"Не удалось обработать команду: {restored_command}")
                                 what_folder = self.audio_paths.get('what_folder')
                                 if what_folder:
                                     thread_react(what_folder)
+                                continue
+
+                            last_unrecognized_command = None
+                        if not matched_special and not matched_keyword:
+                            what_folder = self.audio_paths.get('what_folder')
+                            if what_folder:
+                                thread_react(what_folder)
 
                 if has_assistant_name:
                     reaction_triggered = False
@@ -1678,12 +1677,12 @@ class Assistant(QMainWindow):
                 final_text = ""
                 if ru_text:  # Русский текст имеет высший приоритет
                     final_text = ru_text
-                    logger.info(f"Распознано (RU): {ru_text}")
-                    debug_logger.info(f"Распознано (RU): {ru_text}")
+                    logger.info(f"Распознано [RU]: {ru_text}")
+                    debug_logger.info(f"Распознано [RU]: {ru_text}")
                 elif en_text:  # Если русского нет, используем английский
                     final_text = en_text
-                    logger.info(f"Распознано (EN): {en_text}")
-                    debug_logger.info(f"Распознано (EN): {en_text}")
+                    logger.info(f"Распознано [EN]: {en_text}")
+                    debug_logger.info(f"Распознано [EN]: {en_text}")
 
                 if final_text:
                     yield final_text
@@ -1725,7 +1724,7 @@ class Assistant(QMainWindow):
     def open_folder_shortcuts(self):
         """Обработка нажатия кнопки 'Открыть папку с ярлыками'"""
         folder_path = get_path('user_settings', "links for assist")
-        self.log_area.append(folder_path)
+        debug_logger.info(f"Открытие папки ярлыков , {folder_path}")
 
         # Проверяем, существует ли папка
         if os.path.exists(folder_path) and os.path.isdir(folder_path):
@@ -1744,7 +1743,7 @@ class Assistant(QMainWindow):
     def open_folder_screenshots(self):
         """Обработка нажатия кнопки 'Открыть папку с ярлыками'"""
         folder_path = get_path('user_settings', "screenshots")
-        self.log_area.append(folder_path)
+        debug_logger.info(f"Открытие папки скриншотов, {folder_path}")
 
         # Проверяем, существует ли папка
         if os.path.exists(folder_path) and os.path.isdir(folder_path):
@@ -1763,7 +1762,7 @@ class Assistant(QMainWindow):
     def open_main_settings(self):
         """Обработка нажатия кнопки 'Настройки' (работает как переключатель)"""
         try:
-            # Проверяем, существует ли уже окно настроек и видимо ли оно
+
             if hasattr(self, 'settings_window') and self.settings_window.isVisible():
                 # Если окно открыто - закрываем его
                 self.settings_window.hide_with_animation()
@@ -1777,6 +1776,10 @@ class Assistant(QMainWindow):
                 settings_widget.voice_changed.connect(self.update_voice)
 
             self.settings_window.show()
+            # На случай, если юзер попытается открыть "Настройки", когда уже открыта вкладка "Прочее"
+            if hasattr(self, 'other_window') and self.other_window.isVisible():
+                self.other_window.hide_with_animation()
+                return
         except Exception as e:
             debug_logger.error(f"Ошибка при открытии/закрытии настроек: {e}")
             self.show_message(f"Ошибка при открытии/закрытии настроек: {e}", "Ошибка", "error")
@@ -1794,16 +1797,30 @@ class Assistant(QMainWindow):
     def other_options(self):
         """Открываем окно с прочими опциями"""
         try:
-            # Проверяем, существует ли уже окно настроек и видимо ли оно
             if hasattr(self, 'other_window') and self.other_window.isVisible():
                 # Если окно открыто - закрываем его
                 self.other_window.hide_with_animation()
                 return
+
             self.other_window = OtherOptionsWindow(self)
             self.other_window.show()
+            # На случай, если юзер попытается открыть "Прочее", когда уже открыта вкладка "Настройки"
+            if hasattr(self, 'settings_window') and self.settings_window.isVisible():
+                self.settings_window.hide_with_animation()
+                return
         except Exception as e:
             debug_logger.error(f"Ошибка при открытии прочих опций: {e}")
             self.show_message(f"Ошибка при открытии прочих опций: {e}", "Ошибка", "error")
+
+    def guide_options(self):
+        """Открываем окно с гайдами"""
+        try:
+            self.guide_window = GuideWindow(self)
+            self.guide_window.show()
+
+        except Exception as e:
+            debug_logger.error(f"Ошибка при открытии окна гайдов: {e}")
+            self.show_message(f"Ошибка при открытии окна гайдов: {e}", "Ошибка", "error")
 
     def changelog_window(self, event):
         """Открываем окно с логами изменений"""

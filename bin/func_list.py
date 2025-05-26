@@ -219,7 +219,6 @@ def search_links():
     # Сохраняем команды в JSON-файл
     with open(root_links, 'w', encoding='utf-8') as file:
         json.dump(current_shortcuts, file, ensure_ascii=False, indent=4)
-        logger.info("Ярлыки сохранены в файле: %s", root_links)
         debug_logger.info("Ярлыки сохранены в файле: %s", root_links)
 
 

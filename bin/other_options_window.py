@@ -254,7 +254,6 @@ class CensorCounterWidget(QWidget):
             self.data["score"] = self.data["score"].fillna(0).astype(int)
             self.data["total_score"] = self.data["total_score"].fillna(0).astype(int)
 
-            logger.info("Данные счетчика цензуры успешно загружены")
             debug_logger.debug("Данные счетчика цензуры успешно загружены")
 
             self.calculate_scores()
@@ -327,46 +326,6 @@ class CensorCounterWidget(QWidget):
             logger.error(f"Ошибка в calculate_scores: {e}", exc_info=True)
             debug_logger.error(f"Ошибка в calculate_scores: {e}", exc_info=True)
             self.update_labels()
-
-    # def reset_censor_counter(self):
-    #     """
-    #     Сбрасывает счетчик, обнуляя таблицу censor_counter.csv.
-    #     Оставляет только заголовки.
-    #     """
-    #
-    #     # Диалоговое окно с подтверждением
-    #     msg_box = QMessageBox(self)
-    #     msg_box.setWindowTitle('Сброс счетчика')
-    #     msg_box.setText("Точно сбросить значения?")
-    #     yes_button = msg_box.addButton("Да", QMessageBox.YesRole)
-    #     no_button = msg_box.addButton("Нет", QMessageBox.NoRole)
-    #     yes_button.setStyleSheet("padding: 1px 10px;")
-    #     no_button.setStyleSheet("padding: 1px 10px;")
-    #     msg_box.setIcon(QMessageBox.Warning)
-    #     msg_box.exec_()
-    #
-    #     # Если пользователь нажал "Нет", выходим из метода
-    #     if msg_box.clickedButton() == no_button:
-    #         debug_logger.info("Сброс счетчика отменен.")
-    #         return
-    #
-    #     # Путь к CSV-файлу
-    #     CSV_FILE = get_path('user_settings', 'censor_counter.csv')
-    #
-    #     # Проверяем, существует ли файл
-    #     if not Path(CSV_FILE).exists():
-    #         logger.error("Файл censor_counter.csv не существует. Невозможно сбросить счетчик.")
-    #         debug_logger.error("Файл censor_counter.csv не существует. Невозможно сбросить счетчик.")
-    #         return
-    #
-    #     # Открываем файл для записи и оставляем только заголовки
-    #     with open(CSV_FILE, mode='w', newline='') as file:
-    #         writer = csv.writer(file)
-    #         writer.writerow(['date', 'score', 'total_score'])  # Записываем заголовки
-    #
-    #
-    #     # Обновляем лейблы после сброса
-    #     self.update_labels()
 
     def reset_censor_counter(self):
         """

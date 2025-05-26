@@ -138,8 +138,10 @@ class MainSettingsWindow(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.assistant = parent
+        self.settings_widget = SettingsWidget(self.assistant, self)
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.Dialog)
         self.setFixedSize(450, self.assistant.height())  # Шире для кнопок
+
 
         # Подключаем сигнал родителя к слоту закрытия
         if parent and hasattr(parent, "close_child_windows"):
@@ -1348,8 +1350,8 @@ class SettingsWidget(QWidget):
         self.steam_path_input.setText(self.assistant.steam_path)
         layout.addWidget(self.steam_path_input)
 
-        select_steam_button = QPushButton("Выбрать файл", self)
-        select_steam_button.clicked.connect(self.select_steam_file)
+        select_steam_button = QPushButton("Выбрать папку", self)
+        select_steam_button.clicked.connect(self.select_steam_folder)
         layout.addWidget(select_steam_button)
 
         # Чекбоксы
@@ -1389,11 +1391,17 @@ class SettingsWidget(QWidget):
         """Обработка чекбокса 'Сворачивать в трей'"""
         self.assistant.is_min_tray = self.minimize_check.isChecked()
 
-    def select_steam_file(self):
-        file_path, _ = QFileDialog.getOpenFileName(
-            self, "Выберите steam.exe", "", "Executable Files (*.exe);;All Files (*)")
-        if file_path:
-            self.steam_path_input.setText(file_path)
+    def select_steam_folder(self):
+        folder_path = QFileDialog.getExistingDirectory(
+            self, "Выберите папку с steam.exe")
+
+        if folder_path:
+            # Проверяем наличие steam.exe в выбранной папке
+            steam_exe_path = os.path.normpath(os.path.join(folder_path, "steam.exe"))
+            if os.path.exists(steam_exe_path):
+                self.steam_path_input.setText(steam_exe_path)
+            else:
+                self.assistant.show_message("Файл steam.exe не найден в выбранной папке!", "Предупреждение", "warning")
 
     def on_voice_change(self, index):
         new_voice_key = self.voice_combo.currentText()
