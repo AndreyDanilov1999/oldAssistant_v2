@@ -9,9 +9,7 @@ import csv
 import ctypes
 import win32clipboard
 from PIL import ImageGrab, Image
-
 from bin.guide_window import GuideWindow
-
 ctypes.windll.user32.SetProcessDPIAware()
 import io
 import json
@@ -108,7 +106,7 @@ class Assistant(QMainWindow):
 
     def __init__(self):
         super().__init__()
-        self.version = "1.2.23"
+        self.version = "1.2.24"
         self.ps = "Powered by theoldman"
         self.label_version = QLabel(f"Версия: {self.version} {self.ps}", self)
         self.label_message = QLabel('', self)
@@ -197,6 +195,13 @@ class Assistant(QMainWindow):
                 settings_x = new_pos.x() - self.other_window.width()
                 settings_y = new_pos.y()
                 self.other_window.move(settings_x, settings_y)
+
+            # Если окно настроек открыто - перемещаем его вместе с основным
+            if hasattr(self, 'guide_window') and self.guide_window.isVisible():
+                # Позиционируем окно настроек относительно основного
+                settings_x = new_pos.x() - self.guide_window.width()
+                settings_y = new_pos.y()
+                self.guide_window.move(settings_x, settings_y)
 
             event.accept()
 
@@ -1780,6 +1785,10 @@ class Assistant(QMainWindow):
             if hasattr(self, 'other_window') and self.other_window.isVisible():
                 self.other_window.hide_with_animation()
                 return
+            if hasattr(self, 'guide_window') and self.guide_window.isVisible():
+                # Если окно открыто - закрываем его
+                self.guide_window.hide_with_animation()
+                return
         except Exception as e:
             debug_logger.error(f"Ошибка при открытии/закрытии настроек: {e}")
             self.show_message(f"Ошибка при открытии/закрытии настроек: {e}", "Ошибка", "error")
@@ -1804,9 +1813,12 @@ class Assistant(QMainWindow):
 
             self.other_window = OtherOptionsWindow(self)
             self.other_window.show()
-            # На случай, если юзер попытается открыть "Прочее", когда уже открыта вкладка "Настройки"
+            # На случай, если юзер попытается открыть "Прочее" или "Обучение", когда уже открыта вкладка "Настройки"
             if hasattr(self, 'settings_window') and self.settings_window.isVisible():
                 self.settings_window.hide_with_animation()
+                return
+            if hasattr(self, 'guide_window') and self.guide_window.isVisible():
+                self.guide_window.hide_with_animation()
                 return
         except Exception as e:
             debug_logger.error(f"Ошибка при открытии прочих опций: {e}")
@@ -1815,9 +1827,18 @@ class Assistant(QMainWindow):
     def guide_options(self):
         """Открываем окно с гайдами"""
         try:
+            if hasattr(self, 'guide_window') and self.guide_window.isVisible():
+                self.guide_window.hide_with_animation()
+                return
+
             self.guide_window = GuideWindow(self)
             self.guide_window.show()
-
+            if hasattr(self, 'settings_window') and self.settings_window.isVisible():
+                self.settings_window.hide_with_animation()
+                return
+            if hasattr(self, 'other_window') and self.other_window.isVisible():
+                self.other_window.hide_with_animation()
+                return
         except Exception as e:
             debug_logger.error(f"Ошибка при открытии окна гайдов: {e}")
             self.show_message(f"Ошибка при открытии окна гайдов: {e}", "Ошибка", "error")

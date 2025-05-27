@@ -142,7 +142,6 @@ class MainSettingsWindow(QDialog):
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.Dialog)
         self.setFixedSize(450, self.assistant.height())  # Шире для кнопок
 
-
         # Подключаем сигнал родителя к слоту закрытия
         if parent and hasattr(parent, "close_child_windows"):
             parent.close_child_windows.connect(self.hide_with_animation)
