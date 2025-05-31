@@ -955,6 +955,10 @@ class Assistant(QMainWindow):
         self.stop_assist()
         qApp.quit()
 
+    def reload_commands(self):
+        print("метод вызван")
+        self.load_commands()
+
     def load_commands(self):
         """Загружает команды из JSON-файла."""
         file_path = get_path('user_settings', 'commands.json')  # Полный путь к файлу
@@ -1798,6 +1802,7 @@ class Assistant(QMainWindow):
         """Обработка нажатия кнопки 'Ваши команды'"""
         try:
             settings_window = CommandSettingsWindow(self)
+            settings_window.commands_updated.connect(self.reload_commands)
 
             settings_window.exec_()
         except Exception as e:

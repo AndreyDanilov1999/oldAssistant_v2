@@ -18,7 +18,7 @@ class CommandSettingsWindow(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.assistant = parent
-        self.current_commands = {}  # Центральное хранилище команд
+        self.current_commands = parent.commands.copy() if hasattr(parent, 'commands') else {}  # Центральное хранилище команд
         self.load_commands()
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.Dialog)
         self.setFixedSize(parent.width(), parent.height())
@@ -160,13 +160,23 @@ class CommandSettingsWindow(QDialog):
             self.current_commands = {}
 
     def save_commands(self):
-        """Централизованное сохранение команд"""
+        """Централизованное сохранение команд с уведомлением"""
         try:
             path = get_path('user_settings', 'commands.json')
             with open(path, 'w', encoding='utf-8') as file:
                 json.dump(self.current_commands, file, ensure_ascii=False, indent=4)
+
+            if hasattr(self.assistant, 'commands'):
+                self.assistant.commands = self.current_commands.copy()
+
+            self.load_commands()
         except Exception as e:
             logger.error(f"Ошибка сохранения команд: {e}")
+
+    def handle_commands_change(self, new_commands):
+        """Обработчик изменений из дочерних виджетов"""
+        self.current_commands = new_commands
+        self.save_commands()  # Будет испущен сигнал commands_updated
 
 class CreateCommandsWidget(QWidget):
     """
@@ -396,126 +406,130 @@ class FolderCommandForm(QWidget):
 
 
 class CommandsWidget(QWidget):
-    """ Класс для обработки окна "Добавленные функции" """
+    """Класс для обработки окна 'Добавленные команды'"""
 
     def __init__(self, assistant, parent=None):
         super().__init__(parent)
         self.assistant = assistant
-        self.commands = self.assistant.commands
+        self.parent_window = parent
+        self.commands = {}
         self.init_ui()
-        self.update_commands_list()
+        self.load_initial_commands()
 
+        # Подключаем сигнал обновления команд
         if hasattr(parent, 'commands_updated'):
             parent.commands_updated.connect(self.on_commands_updated)
 
-    def on_commands_updated(self):
-        """Обработчик обновления команд"""
-        links_file = get_path('user_settings', 'links.json')
-        new_links = self.load_commands_from_file(links_file)
+    def load_initial_commands(self):
+        """Первоначальная загрузка команд"""
+        self.commands = self.load_commands_from_file(get_path('user_settings', 'commands.json'))
+        self.update_commands_list()
 
-        commands_file = get_path('user_settings', 'commands.json')
-        self.commands = self.load_commands_from_file(commands_file)
+    def on_commands_updated(self, new_commands):
+        """Обработчик обновления команд (принимает словарь новых команд)"""
+        self.commands = new_commands.copy()
         self.update_commands_list()
 
     def init_ui(self):
+        """Инициализация интерфейса"""
         self.setWindowTitle("Добавленные команды")
         layout = QVBoxLayout(self)
         layout.setContentsMargins(15, 15, 15, 15)
         layout.setSpacing(20)
 
         self.commands_list = QListWidget(self)
-        self.commands_list.setSelectionMode(QListWidget.SingleSelection)  # Одиночный выбор
+        self.commands_list.setSelectionMode(QListWidget.SingleSelection)
         layout.addWidget(self.commands_list)
 
         self.delete_button = QPushButton("Удалить выбранную команду", self)
         self.delete_button.clicked.connect(self.delete_command)
         layout.addWidget(self.delete_button)
 
-        self.setLayout(layout)
-
     def showEvent(self, event):
         """Переопределяем метод показа виджета"""
         super().showEvent(event)
-        self.select_last_item()  # Выбираем последний элемент при показе
+        self.select_last_item()
 
     def select_last_item(self):
         """Выбирает последний элемент в списке"""
         if self.commands_list.count() > 0:
             last_index = self.commands_list.count() - 1
             self.commands_list.setCurrentRow(last_index)
-            self.commands_list.scrollToBottom()  # Прокручиваем к последнему элементу
+            self.commands_list.scrollToBottom()
 
     def update_commands_list(self):
-        """Обновляет список команд и выбирает последний элемент"""
+        """Обновляет список команд"""
         self.commands_list.clear()
-        commands_file = get_path('user_settings', 'commands.json')
-        self.commands = self.load_commands_from_file(commands_file)
 
         if not isinstance(self.commands, dict):
-            logger.error("Файл JSON не содержит словарь.")
-            self.assistant.show_message("Файл JSON имеет некорректный формат.", "Ошибка", "error")
-            self.commands = {}
+            logger.error("Команды должны быть словарем")
+            self.assistant.show_message("Некорректный формат команд", "Ошибка", "error")
+            return
 
         for key, value in self.commands.items():
             item_text = f"{key} : {value}"
-            try:
-                item = QListWidgetItem(item_text)
-                self.commands_list.addItem(item)
-            except Exception as e:
-                logger.error(f"Ошибка при добавлении элемента: {e}")
+            item = QListWidgetItem(item_text)
+            self.commands_list.addItem(item)
 
-        # После обновления списка выбираем последний элемент
         self.select_last_item()
 
     def load_commands_from_file(self, filename):
+        """Загрузка команд из файла"""
         try:
             with open(filename, 'r', encoding='utf-8') as file:
                 return json.load(file)
         except FileNotFoundError:
-            logger.warning(f"Файл {filename} не найден. Создаём новый файл.")
-            with open(filename, 'w', encoding='utf-8') as file:
-                json.dump({}, file)
+            logger.warning(f"Файл {filename} не найден, создаем новый")
             return {}
         except json.JSONDecodeError:
-            logger.error("Ошибка: файл содержит некорректный JSON.")
-            self.assistant.show_message("Ошибка в формате файла JSON.", "Ошибка", "error")
+            logger.error(f"Ошибка в формате файла {filename}")
+            self.assistant.show_message("Ошибка в формате JSON", "Ошибка", "error")
             return {}
 
     def delete_command(self):
+        """Удаление выбранной команды"""
         selected_items = self.commands_list.selectedItems()
         if not selected_items:
-            self.assistant.show_message("Пожалуйста, выберите команду для удаления.", "Предупреждение", "warning")
+            self.assistant.show_message("Выберите команду для удаления", "Предупреждение", "warning")
             return
 
+        # Удаляем выбранные команды
         for item in selected_items:
             key = item.text().split(" : ")[0]
             if key in self.commands:
-                value = self.commands[key]
+                self.remove_command_from_process_names(self.commands[key])
                 del self.commands[key]
                 self.commands_list.takeItem(self.commands_list.row(item))
 
-                process_names_file = get_path('user_settings', 'process_names.json')
-                try:
-                    with open(process_names_file, 'r', encoding='utf-8') as file:
-                        process_names = json.load(file)
-                    updated_process_names = [entry for entry in process_names if list(entry.keys())[0] != value]
-                    with open(process_names_file, 'w', encoding='utf-8') as file:
-                        json.dump(updated_process_names, file, ensure_ascii=False, indent=4)
-                except IOError as e:
-                    logger.error(f"Ошибка при работе с файлом {process_names_file}: {e}")
-                    self.assistant.show_message(f"Не удалось обновить process_names.json: {e}", "Ошибка", "error")
-
         self.save_commands()
-        # После удаления снова выбираем последний элемент
         self.select_last_item()
 
-    def save_commands(self):
+    def remove_command_from_process_names(self, command_value):
+        """Удаляет команду из process_names.json"""
+        process_names_file = get_path('user_settings', 'process_names.json')
         try:
-            path = get_path('user_settings', 'commands.json')
-            with open(path, 'w', encoding='utf-8') as file:
-                json.dump(self.commands, file, ensure_ascii=False, indent=4)
+            with open(process_names_file, 'r', encoding='utf-8') as file:
+                process_names = json.load(file)
+
+            updated_names = [entry for entry in process_names if list(entry.keys())[0] != command_value]
+
+            with open(process_names_file, 'w', encoding='utf-8') as file:
+                json.dump(updated_names, file, ensure_ascii=False, indent=4)
         except Exception as e:
-            logger.error(f"Ошибка сохранения команд: {e}")
+            logger.error(f"Ошибка при обновлении process_names.json: {e}")
+
+    def save_commands(self):
+        """Только сохраняет команды, НЕ испускает сигнал"""
+        try:
+            with open(get_path('user_settings', 'commands.json'), 'w', encoding='utf-8') as file:
+                json.dump(self.commands, file, ensure_ascii=False, indent=4)
+
+            # Просим родительское окно обработать обновление
+            if hasattr(self.parent_window, 'handle_commands_change'):
+                self.parent_window.handle_commands_change(self.commands)
+
+        except Exception as e:
+            logger.error(f"Ошибка сохранения: {e}")
 
 
 class ProcessLinksWidget(QWidget):
