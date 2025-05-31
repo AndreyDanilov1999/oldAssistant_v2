@@ -8,6 +8,7 @@ a = Analysis(
         (r'G:\PycharmProjects\oldAssistant_v2\.venv\Lib\site-packages\vgamepad\win\vigem\client\x64\ViGEmClient.dll', 'vgamepad/win/vigem/client/x64')
     ],
     datas=[
+        ('G:/PycharmProjects/oldAssistant_v2/app.manifest', '.'),
         ('G:/PycharmProjects/oldAssistant_v2/icon_assist.ico', '.'),
         ('G:/PycharmProjects/oldAssistant_v2/user_settings/settings.json', 'user_settings'),
         ('G:/PycharmProjects/oldAssistant_v2/user_settings/process_names.json', 'user_settings'),
@@ -22,6 +23,7 @@ a = Analysis(
         ('G:/PycharmProjects/oldAssistant_v2/owl.svg', '.'),
         ('G:/PycharmProjects/oldAssistant_v2/start-win.svg', '.'),
         ('G:/PycharmProjects/oldAssistant_v2/bin/audio_control.py', 'bin'),
+        ('G:/PycharmProjects/oldAssistant_v2/bin/init.py', 'bin'),
         ('G:/PycharmProjects/oldAssistant_v2/bin/speak_functions.py', 'bin'),
         ('G:/PycharmProjects/oldAssistant_v2/bin/speak_voice', 'bin/speak_voice'),
         ('G:/PycharmProjects/oldAssistant_v2/bin/model_ru', 'bin/model_ru'),
@@ -30,6 +32,7 @@ a = Analysis(
         ('G:/PycharmProjects/oldAssistant_v2/bin/settings_window.py', 'bin'),
         ('G:/PycharmProjects/oldAssistant_v2/bin/other_options_window.py', 'bin'),
         ('G:/PycharmProjects/oldAssistant_v2/bin/guide_window.py', 'bin'),
+        ('G:/PycharmProjects/oldAssistant_v2/bin/owl_start.svg', 'bin'),
         ('G:/PycharmProjects/oldAssistant_v2/user_settings/links for assist', 'user_settings/links for assist'),
         ('G:/PycharmProjects/oldAssistant_v2/user_settings/presets', 'user_settings/presets'),
         ('G:/PycharmProjects/oldAssistant_v2/user_settings/screenshots', 'user_settings/screenshots'),
@@ -66,6 +69,7 @@ exe = EXE(
     entitlements_file=None,
     icon=['icon_assist.ico'],
     manifest="G:/PycharmProjects/oldAssistant_v2/app.manifest",
+    uac_admin=True,
 )
 coll = COLLECT(
     exe,

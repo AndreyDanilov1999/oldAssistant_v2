@@ -9,7 +9,6 @@ from path_builder import get_path
 os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "1"  # Скрываем приветствие pygame
 import pygame
 
-pygame.mixer.init()
 
 def load_volume_assist():
     settings_file_path = get_path('user_settings', 'settings.json')
@@ -47,6 +46,7 @@ def react(folder_path):
         logger.info(f"Ответ ассистента: {random_filename}")
         debug_logger.info(f"Ответ ассистента: {random_filename}")
 
+        pygame.mixer.init()
         # Загрузка и воспроизведение аудиофайла
         pygame.mixer.music.load(random_audio_file)
         pygame.mixer.music.set_volume(volume_reduction_factor)  # Установка громкости
@@ -72,6 +72,7 @@ def react_detail(file_path):
         logger.info(f"Ответ ассистента: {file_name}")
         debug_logger.info(f"Ответ ассистента: {file_name}")
 
+        pygame.mixer.init()
         # Остановить текущее воспроизведение
         pygame.mixer.music.stop()
 

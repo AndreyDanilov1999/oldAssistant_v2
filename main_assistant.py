@@ -10,6 +10,8 @@ import ctypes
 import win32clipboard
 from PIL import ImageGrab, Image
 from bin.guide_window import GuideWindow
+from bin.init import InitScreen
+
 ctypes.windll.user32.SetProcessDPIAware()
 import io
 import json
@@ -48,8 +50,8 @@ from PyQt5.QtGui import QIcon, QCursor, QFont, QColor, QPixmap
 from PyQt5.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout, \
                              QPushButton, QCheckBox, QSystemTrayIcon, QAction, qApp, QMenu, QMessageBox, \
                              QTextEdit, QDialog, QLabel, QFileDialog, QTextBrowser, QMainWindow, QStyle, QSizePolicy,
-                             QGraphicsColorizeEffect)
-from PyQt5.QtCore import Qt, QFileSystemWatcher, QTimer, QEvent, pyqtSignal
+                             QGraphicsColorizeEffect, QProgressBar)
+from PyQt5.QtCore import Qt, QFileSystemWatcher, QTimer, QEvent, pyqtSignal, QThread, QMetaObject
 
 short_name = "https://raw.githubusercontent.com/AndreyDanilov1999/oldAssistant_v2/refs/heads/master/"
 # Сырая ссылка на version.txt в GitHub
@@ -106,13 +108,13 @@ class Assistant(QMainWindow):
 
     def __init__(self):
         super().__init__()
-        self.version = "1.2.24"
+        self.version = "1.3.0"
         self.ps = "Powered by theoldman"
         self.label_version = QLabel(f"Версия: {self.version} {self.ps}", self)
         self.label_message = QLabel('', self)
         self.latest_version_url = None
         self.relax_button = None
-        self.drag_pos = None  # Для перемещения окна за ЛКМ
+        self.drag_pos = None
         self.open_folder_button = None
         self.beta_version = False
         self.tray_icon = None
@@ -151,6 +153,12 @@ class Assistant(QMainWindow):
         self.commands = self.load_commands()
         self.audio_paths = get_audio_paths(self.speaker)
         self.initui()
+        self.splash = InitScreen()
+        self.splash.init_complete.connect(self.handle_init_result)
+        self.splash.show()
+        self.splash.start_checks(self)
+
+    def check_up(self):
         self.check_or_create_folder()
         self.load_and_apply_styles()
         # Проверка автозапуска при старте программы
@@ -161,13 +169,16 @@ class Assistant(QMainWindow):
             # Показ окна при первом запуске(для отладки)
             if self.first_run:
                 self.preload_window()
-            self.hide()
         else:
             self.showNormal()
-
         self.run_assist()
         self.check_update_label()
         QTimer.singleShot(2000, self.check_for_updates_app)
+
+    def handle_init_result(self, success):
+        """Обработчик результата инициализации"""
+        if success:
+            self.check_up()
 
     def title_bar_mouse_press(self, event):
         """Обработка нажатия мыши на заголовок"""
@@ -432,133 +443,136 @@ class Assistant(QMainWindow):
         """
         Кастомное окно сообщений
         """
-        # Звуковое сопровождение (оставляем как было)
-        sound = {
-            'info': winsound.MB_ICONASTERISK,
-            'warning': winsound.MB_ICONEXCLAMATION,
-            'error': winsound.MB_ICONHAND,
-            'question': winsound.MB_ICONQUESTION
-        }.get(message_type, winsound.MB_ICONASTERISK)
-        winsound.MessageBeep(sound)
+        try:
+            # Звуковое сопровождение (оставляем как было)
+            sound = {
+                'info': winsound.MB_ICONASTERISK,
+                'warning': winsound.MB_ICONEXCLAMATION,
+                'error': winsound.MB_ICONHAND,
+                'question': winsound.MB_ICONQUESTION
+            }.get(message_type, winsound.MB_ICONASTERISK)
+            winsound.MessageBeep(sound)
 
-        # Создаем кастомное окно вместо QMessageBox
-        dialog = QDialog(self)
-        dialog.setWindowFlags(Qt.FramelessWindowHint | Qt.Dialog)
-        dialog.setAttribute(Qt.WA_TranslucentBackground)
-        dialog.setFixedSize(300, 200)
+            # Создаем кастомное окно вместо QMessageBox
+            dialog = QDialog(self)
+            dialog.setWindowFlags(Qt.FramelessWindowHint | Qt.Dialog)
+            dialog.setAttribute(Qt.WA_TranslucentBackground)
+            dialog.setFixedSize(300, 200)
 
-        # Основной контейнер с рамкой 1px
-        container = QWidget(dialog)
-        container.setObjectName("MessageContainer")
-        container.setGeometry(0, 0, dialog.width(), dialog.height())
+            # Основной контейнер с рамкой 1px
+            container = QWidget(dialog)
+            container.setObjectName("MessageContainer")
+            container.setGeometry(0, 0, dialog.width(), dialog.height())
 
-        title_bar = QWidget(container)
-        title_bar.setObjectName("TitleBar")
-        title_bar.setGeometry(1, 1, dialog.width() - 2, 35)
+            title_bar = QWidget(container)
+            title_bar.setObjectName("TitleBar")
+            title_bar.setGeometry(1, 1, dialog.width() - 2, 35)
 
-        # Горизонтальный layout как у вас было
-        title_layout = QHBoxLayout(title_bar)
-        title_layout.setContentsMargins(10, 5, 10, 5)
-        title_layout.setSpacing(5)
+            # Горизонтальный layout как у вас было
+            title_layout = QHBoxLayout(title_bar)
+            title_layout.setContentsMargins(10, 5, 10, 5)
+            title_layout.setSpacing(5)
 
-        title_label = QLabel(title)
-        title_label.setObjectName("TitleLable")
-        title_layout.addWidget(title_label)
-        title_layout.addStretch()
+            title_label = QLabel(title)
+            title_label.setObjectName("TitleLable")
+            title_layout.addWidget(title_label)
+            title_layout.addStretch()
 
-        close_btn = QPushButton("✕")
-        close_btn.setObjectName("CloseButton")
-        close_btn.setFixedSize(25, 25)
-        close_btn.clicked.connect(dialog.reject)
-        title_layout.addWidget(close_btn)
+            close_btn = QPushButton("✕")
+            close_btn.setObjectName("CloseButton")
+            close_btn.setFixedSize(25, 25)
+            close_btn.clicked.connect(dialog.reject)
+            title_layout.addWidget(close_btn)
 
-        # ЦЕНТРАЛЬНЫЙ СЛОЙ: Контент (иконка + текст)
-        content_widget = QWidget(container)
-        content_widget.setObjectName("ContentMessage")
-        content_widget.setGeometry(
-            1,  # X: 1px от левого края
-            36,  # Y: 1px бордер + 35px заголовка
-            dialog.width() - 2,  # Ширина минус бордер
-            dialog.height() - 36 - 45  # Высота: общая - заголовок - место для кнопок
-        )
-
-        content_layout = QHBoxLayout(content_widget)
-        content_layout.setContentsMargins(10, 5, 10, 5)
-        content_layout.setSpacing(10)
-
-        # Иконка
-        icon_widget = QWidget()
-        icon_widget.setFixedSize(50, 50)
-
-        icon = self.style().standardIcon({
-                                             "info": QStyle.SP_MessageBoxInformation,
-                                             "warning": QStyle.SP_MessageBoxWarning,
-                                             "error": QStyle.SP_MessageBoxCritical,
-                                             "question": QStyle.SP_MessageBoxQuestion
-                                         }.get(message_type, QStyle.SP_MessageBoxInformation))
-
-        icon_label = QLabel()
-        icon_label.setPixmap(icon.pixmap(40, 40))
-        # icon_label.setAlignment(Qt.AlignCenter)
-
-        icon_layout = QVBoxLayout(icon_widget)
-        icon_layout.addWidget(icon_label)
-        content_layout.addWidget(icon_widget)
-
-        # Текст
-        text_label = QLabel(text)
-        text_label.setWordWrap(True)
-        text_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-        # text_label.setAlignment(Qt.AlignVCenter)
-        content_layout.addWidget(text_label)
-
-        # НИЖНИЙ СЛОЙ: Кнопки
-        button_widget = QWidget(container)
-        button_widget.setGeometry(
-            1,  # X: 1px от левого края
-            dialog.height() - 45,  # Y: отступаем 45px снизу (35px кнопки + 10px отступ)
-            dialog.width() - 2,  # Ширина минус бордер
-            35  # Высота блока кнопок
-        )
-
-        button_layout = QHBoxLayout(button_widget)
-        button_layout.setContentsMargins(0, 0, 0, 0)
-        button_layout.setSpacing(10)
-
-        # Добавляем stretch для центрирования кнопок
-        button_layout.addStretch()
-
-        if buttons == QMessageBox.Ok:
-            btn = QPushButton("OK")
-            btn.clicked.connect(dialog.accept)
-            button_layout.addWidget(btn)
-        elif buttons == QMessageBox.Yes | QMessageBox.No:
-            btn_yes = QPushButton("Да")
-            btn_yes.clicked.connect(dialog.accept)
-            button_layout.addWidget(btn_yes)
-
-            btn_no = QPushButton("Нет")
-            btn_no.clicked.connect(dialog.reject)
-            button_layout.addWidget(btn_no)
-
-        button_layout.addStretch()
-
-        for btn in button_widget.findChildren(QPushButton):
-            btn.setStyleSheet("""
-                    QPushButton {
-                        padding: 1px 10px;
-                        min-width: 60px
-                    }
-                """)
-
-        # Позиционируем окно по центру родителя
-        if self.parent():
-            parent_rect = self.parent().geometry()
-            dialog.move(
-                parent_rect.center() - dialog.rect().center()
+            # ЦЕНТРАЛЬНЫЙ СЛОЙ: Контент (иконка + текст)
+            content_widget = QWidget(container)
+            content_widget.setObjectName("ContentMessage")
+            content_widget.setGeometry(
+                1,  # X: 1px от левого края
+                36,  # Y: 1px бордер + 35px заголовка
+                dialog.width() - 2,  # Ширина минус бордер
+                dialog.height() - 36 - 45  # Высота: общая - заголовок - место для кнопок
             )
 
-        return dialog.exec_()
+            content_layout = QHBoxLayout(content_widget)
+            content_layout.setContentsMargins(10, 5, 10, 5)
+            content_layout.setSpacing(10)
+
+            # Иконка
+            icon_widget = QWidget()
+            icon_widget.setFixedSize(50, 50)
+
+            icon = self.style().standardIcon({
+                                                 "info": QStyle.SP_MessageBoxInformation,
+                                                 "warning": QStyle.SP_MessageBoxWarning,
+                                                 "error": QStyle.SP_MessageBoxCritical,
+                                                 "question": QStyle.SP_MessageBoxQuestion
+                                             }.get(message_type, QStyle.SP_MessageBoxInformation))
+
+            icon_label = QLabel()
+            icon_label.setPixmap(icon.pixmap(40, 40))
+            # icon_label.setAlignment(Qt.AlignCenter)
+
+            icon_layout = QVBoxLayout(icon_widget)
+            icon_layout.addWidget(icon_label)
+            content_layout.addWidget(icon_widget)
+
+            # Текст
+            text_label = QLabel(text)
+            text_label.setWordWrap(True)
+            text_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+            # text_label.setAlignment(Qt.AlignVCenter)
+            content_layout.addWidget(text_label)
+
+            # НИЖНИЙ СЛОЙ: Кнопки
+            button_widget = QWidget(container)
+            button_widget.setGeometry(
+                1,  # X: 1px от левого края
+                dialog.height() - 45,  # Y: отступаем 45px снизу (35px кнопки + 10px отступ)
+                dialog.width() - 2,  # Ширина минус бордер
+                35  # Высота блока кнопок
+            )
+
+            button_layout = QHBoxLayout(button_widget)
+            button_layout.setContentsMargins(0, 0, 0, 0)
+            button_layout.setSpacing(10)
+
+            # Добавляем stretch для центрирования кнопок
+            button_layout.addStretch()
+
+            if buttons == QMessageBox.Ok:
+                btn = QPushButton("OK")
+                btn.clicked.connect(dialog.accept)
+                button_layout.addWidget(btn)
+            elif buttons == QMessageBox.Yes | QMessageBox.No:
+                btn_yes = QPushButton("Да")
+                btn_yes.clicked.connect(dialog.accept)
+                button_layout.addWidget(btn_yes)
+
+                btn_no = QPushButton("Нет")
+                btn_no.clicked.connect(dialog.reject)
+                button_layout.addWidget(btn_no)
+
+            button_layout.addStretch()
+
+            for btn in button_widget.findChildren(QPushButton):
+                btn.setStyleSheet("""
+                        QPushButton {
+                            padding: 1px 10px;
+                            min-width: 60px
+                        }
+                    """)
+
+            # Позиционируем окно по центру родителя
+            if self.parent():
+                parent_rect = self.parent().geometry()
+                dialog.move(
+                    parent_rect.center() - dialog.rect().center()
+                )
+
+            return dialog.exec_()
+        except Exception as e:
+            return QMessageBox.critical(self, "Ошибка", f"{text}\n\nДетали: {str(e)}")
 
     def keyPressEvent(self, event):
         """Сворачивает основное окно в трей по нажатию на Esc"""
@@ -1144,11 +1158,20 @@ class Assistant(QMainWindow):
         else:
             event.accept()
 
+    def cleanup_before_exit(self):
+        """Подготовка к выходу"""
+        print("вызван")
+        if hasattr(self, 'splash') and self.splash.check_thread:
+            self.splash.check_thread.quit()
+            self.splash.check_thread.wait(1000)
+            print("сработал")
+            self.close()
+
     def handle_close_confirmation(self, confirmed, event, dialog):
         """Обрабатывает ответ пользователя"""
         dialog.close()
         if confirmed:
-            self.stop_assist()  # Ваш метод для остановки ассистента
+            self.stop_assist()
             event.accept()
         else:
             event.ignore()
@@ -1560,7 +1583,8 @@ class Assistant(QMainWindow):
             debug_logger.error(f"Ошибка в основном цикле ассистента: {e}")
             debug_logger.error(traceback.format_exc())
             self.show_message(f"Ошибка в основном цикле ассистента: {e}", "Ошибка",
-                              "error")
+                              "warning")
+
 
     # "Основной цикл ассистента(конец)"
     # "--------------------------------------------------------------------------------------------------"
@@ -1597,30 +1621,8 @@ class Assistant(QMainWindow):
     #         self.game_mode_bool = False
     #         logger.info("Игровой режим деактивирован")
 
-    def check_microphone_available(self):
-        """Проверка наличия микрофона в системе."""
-        p = pyaudio.PyAudio()
-        try:
-            # Получаем информацию об устройстве ввода по умолчанию
-            default_input_device = p.get_default_input_device_info()
-            logger.info(f"Устройство ввода: {default_input_device.get('name')}")
-            debug_logger.info(f"Устройство ввода: {default_input_device.get('name')}")
-            return True
-        except IOError:
-            # Если устройство по умолчанию не найдено
-            logger.warning("Микрофон не обнаружен.")
-            debug_logger.warning("Микрофон не обнаружен.")
-            return False
-        finally:
-            p.terminate()
-
     def initialize_audio(self):
         """Инициализация моделей и аудиопотока."""
-        # Проверка наличия микрофона
-        if not self.check_microphone_available():
-            self.show_message(f"Микрофон не обнаружен. Пожалуйста, подключите микрофон и перезагрузите программу.",
-                              "Ошибка", "error")
-            return False
         logger.info("Загрузка моделей для распознавания...")
         debug_logger.debug("Загрузка моделей для распознавания...")
         model_path_ru = get_path("bin", "model_ru")
@@ -1698,7 +1700,6 @@ class Assistant(QMainWindow):
             logger.error(f"Ошибка при обработке аудиоданных: {e}")
             debug_logger.error(f"Ошибка при обработке аудиоданных: {e}")
             debug_logger.error(traceback.format_exc())
-            self.show_message(f"Ошибка при обработке аудиоданных: {e}", "Ошибка", "error")
         finally:
             logger.info("Остановка аудиопотока...")
             debug_logger.info("Остановка аудиопотока...")
@@ -1890,7 +1891,7 @@ class Assistant(QMainWindow):
             self.update_svg_contrast_color(self.start_svg)
 
     def update_svg_color(self, svg_widget: QSvgWidget, style_file: str) -> None:
-        """Обновляет цвет SVG на цвет из настроек (специально для вашего SVG)"""
+        """Обновляет цвет SVG на цвет из настроек"""
         try:
             # 1. Получаем цвет из JSON
             with open(style_file) as f:

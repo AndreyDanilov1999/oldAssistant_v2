@@ -30,6 +30,7 @@ class GuideWindow(QDialog):
         self.video_files = {
             "Создание команд": f"{path_guides}/new_commands.mp4",
             "Настройки и опции": f"{path_guides}/settings.mp4",
+            "Скачивание и установка обновления": f"{path_guides}/update.mp4"
         }
 
         self.init_ui()
@@ -84,7 +85,7 @@ class GuideWindow(QDialog):
         buttons_frame.setObjectName("ButtonsFrame")  # (если нужно стилизовать через CSS)
 
         # Горизонтальный layout
-        buttons_layout = QHBoxLayout(buttons_frame)
+        buttons_layout = QVBoxLayout(buttons_frame)
         buttons_layout.setSpacing(10)
         buttons_layout.setContentsMargins(10, 10, 10, 10)  # Отступы от краёв
 

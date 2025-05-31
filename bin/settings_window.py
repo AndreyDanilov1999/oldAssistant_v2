@@ -365,6 +365,10 @@ class InterfaceWidget(QWidget):
         btn_dark_blue.clicked.connect(lambda: self.apply_style_file("dark_blue.json"))
         left_col.addWidget(btn_dark_blue)
 
+        btn_purple_neon = QPushButton("Фиолетовый неон")
+        btn_purple_neon.clicked.connect(lambda: self.apply_style_file("purple_neon.json"))
+        left_col.addWidget(btn_purple_neon)
+
         # Правая колонка (5 кнопок)
         btn_dark = QPushButton("Dark")
         btn_dark.clicked.connect(lambda: self.apply_style_file("dark.json"))
@@ -389,6 +393,10 @@ class InterfaceWidget(QWidget):
         btn_white_blue = QPushButton("Светло-голубой")
         btn_white_blue.clicked.connect(lambda: self.apply_style_file("white_blue.json"))
         right_col.addWidget(btn_white_blue)
+
+        btn_orange_purple = QPushButton("Violet&Orange")
+        btn_orange_purple.clicked.connect(lambda: self.apply_style_file("dark_orange_purple.json"))
+        right_col.addWidget(btn_orange_purple)
 
         cols.addLayout(left_col)
         cols.addLayout(right_col)
