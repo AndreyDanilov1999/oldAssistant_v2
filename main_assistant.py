@@ -59,7 +59,7 @@ EXP_VERSION_FILE_URL = f"{short_name}exp-version.txt"
 VERSION_FILE_URL = f"{short_name}version.txt"
 CHANGELOG_TXT_URL = f"{short_name}changelog.txt"
 CHANGELOG_MD_URL = f"{short_name}changelog.md"
-MUTEX_NAME = "Assistant_123456789ABC"
+MUTEX_NAME = "Assistant_123456789AB"
 
 def activate_existing_window():
     hwnd = win32gui.FindWindow(None, "Ассистент")
@@ -108,7 +108,7 @@ class Assistant(QMainWindow):
 
     def __init__(self):
         super().__init__()
-        self.version = "1.3.0"
+        self.version = "1.3.1"
         self.ps = "Powered by theoldman"
         self.label_version = QLabel(f"Версия: {self.version} {self.ps}", self)
         self.label_message = QLabel('', self)
@@ -387,6 +387,7 @@ class Assistant(QMainWindow):
         # Инициализируем QSystemTrayIcon
         self.tray_icon = QSystemTrayIcon(self)
         self.tray_icon.setIcon(QIcon(get_path('icon_assist.ico')))
+        self.tray_icon.setToolTip("Ассистент")
 
         show_action = QAction("Развернуть", self)
         show_action.triggered.connect(self.show)
@@ -1338,9 +1339,9 @@ class Assistant(QMainWindow):
 
                 # Проверка на упоминание имени ассистента (одно слово)
                 words = text.split()
-                if len(words) == 1 and words[0].lower() in [self.assistant_name.lower(),
-                                                            self.assist_name2.lower(),
-                                                            self.assist_name3.lower()]:
+                if len(words) == 1 and any(
+                        name.lower() in words[0].lower()
+                        for name in [self.assistant_name, self.assist_name2, self.assist_name3]):
                     echo_folder = self.audio_paths.get('echo_folder')
                     if echo_folder:
                         thread_react(echo_folder)
@@ -1353,6 +1354,7 @@ class Assistant(QMainWindow):
                                       self.assist_name2 in text or
                                       self.assist_name3 in text or
                                       name_mentioned)
+                print(has_assistant_name, text, self.assistant_name, self.assist_name2, self.assist_name3)
 
                 # Режим уточнения команды (если предыдущая попытка не удалась)
                 if last_unrecognized_command:
