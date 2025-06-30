@@ -1,0 +1,77 @@
+{
+    "QWidget": {
+        "background-color": "#11110f",
+        "color": "#FFFFFF",
+        "font-size": "13px"
+    },
+    "QPushButton": {
+        "background-color": "#180b24",
+        "color": "#FFFFFF",
+        "height": "30px",
+        "border": "1px solid #FFFFFF",
+        "border-radius": "3px",
+        "font-size": "13px",
+        "width": "200px"
+    },
+    "QPushButton:hover": {
+        "background-color": "#FB3C02",
+        "color": "#FFFFFF",
+        "font-size": "13px"
+    },
+    "QPushButton:pressed": {
+        "background-color": "#000006",
+        "padding-left": "3px",
+        "padding-top": "3px"
+    },
+    "QTextEdit": {
+        "background-color": "#11110f",
+        "color": "#8d9efc",
+        "border": "1px solid",
+        "border-radius": "4px",
+        "font-size": "15px"
+    },
+    "label_version": {
+        "color": "#8d9efc",
+        "font-size": "10px"
+    },
+    "label_message": {
+        "color": "#abbdff",
+        "font-size": "13px"
+    },
+    "update_label": {
+        "color": "#8d9efc",
+        "font-size": "12px"
+    },
+    "TitleBar": {
+        "border-bottom": "1px solid #FFFFFF"
+    },
+    "TrayButton": {
+        "background-color": "#180b24",
+        "color": "#abbdff",
+        "height": "30px",
+        "border": "1px solid #a364ec",
+        "border-radius": "3px",
+        "font-size": "13px"
+    },
+    "TrayButton:hover": {
+        "color": "#ffffff",
+        "background-color": "#0790EC",
+        "border": "1px solid #0790EC"
+    },
+    "CloseButton": {
+        "background-color": "#180b24",
+        "color": "#abbdff",
+        "height": "30px",
+        "border": "1px solid #a364ec",
+        "border-radius": "3px",
+        "font-size": "13px"
+    },
+    "CloseButton:hover": {
+        "color": "#ffffff",
+        "background-color": "#E04F4F",
+        "border": "1px solid #E04F4F"
+    },
+    "MessageContainer": {
+        "border": "1px solid #a364ec"
+    }
+}

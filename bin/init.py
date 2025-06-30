@@ -1,6 +1,8 @@
 import ctypes
 import json
 import os
+import re
+
 import pyaudio
 import winsound
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, QTimer
@@ -34,8 +36,10 @@ class InitScreen(QWidget):
             (screen_geometry.height() - self.height()) // 2
         )
         layout = QVBoxLayout()
+        layout.addStretch()
         self.svg_image = QSvgWidget()
         self.svg_image.load(self.svg_path)
+        self.svg_image.setFixedSize(180, 150)
         self.svg_image.setStyleSheet("""
                     background: transparent;
                     border: none;
@@ -43,7 +47,9 @@ class InitScreen(QWidget):
                 """)
         self.color_svg = QGraphicsColorizeEffect()
         self.svg_image.setGraphicsEffect(self.color_svg)
-        layout.addWidget(self.svg_image)
+        layout.addWidget(self.svg_image, alignment=Qt.AlignCenter)
+
+        layout.addStretch()
 
         self.label = QLabel("Инициализация...", self)
         self.label.setAlignment(Qt.AlignCenter)
@@ -323,7 +329,8 @@ class CheckThread(QThread):
             total_steps = 100
             admin_weight = 10
             device_weight = 10
-            files_weight = 80
+            path_weight = 10
+            files_weight = 70
 
             self.progress_update.emit("Проверка прав администратора...", 0)
             if not self.check_admin():
@@ -335,6 +342,10 @@ class CheckThread(QThread):
                 self.progress_update.emit("Проверка прав администратора...", i + 1)
 
             if not self.check_audio_devices(device_weight):
+                return
+
+            if self.check_main_path(get_path(), path_weight):
+                self.checks_complete.emit(False, "", "Ошибка: В пути обнаружена кириллица!")
                 return
 
             files_ok = self.check_main_files(files_weight)
@@ -376,13 +387,21 @@ class CheckThread(QThread):
 
         return True
 
+    def check_main_path(self, path, path_weight):
+        self.progress_update.emit("Проверяю путь до исполняемого файла...", 21)
+        for i in range(path_weight):
+            QThread.msleep(10)  # имитация долгой проверки
+            self.progress_update.emit("Проверяю путь до исполняемого файла...", 29)
+        cyrillic_pattern = re.compile(r'[а-яА-ЯёЁ]')
+        return bool(cyrillic_pattern.search(path))
+
     def input_device(self, device_weight):
         p = pyaudio.PyAudio()
 
         self.progress_update.emit("Ищу устройства ввода-вывода...", 10)
         for i in range(device_weight):
             QThread.msleep(10)  # имитация долгой проверки
-            self.progress_update.emit("Ищу устройства ввода-вывода...", 10)
+            self.progress_update.emit("Ищу устройства ввода-вывода...", 14)
 
             try:
                 default_input_device = p.get_default_input_device_info()
@@ -395,10 +414,10 @@ class CheckThread(QThread):
     def output_device(self, device_weight):
         p = pyaudio.PyAudio()
 
-        self.progress_update.emit("Ищу устройства ввода-вывода...", 10)
+        self.progress_update.emit("Ищу устройства ввода-вывода...", 15)
         for i in range(device_weight):
             QThread.msleep(10)  # имитация долгой проверки
-            self.progress_update.emit("Ищу устройства ввода-вывода...", 20)
+            self.progress_update.emit("Ищу устройства ввода-вывода...", 19)
         try:
             default_output_device = p.get_default_output_device_info()
             return True

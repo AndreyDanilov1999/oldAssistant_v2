@@ -394,7 +394,7 @@ class CheckUpdateWidget(QWidget):
         layout = QVBoxLayout(self)
 
         self.check_button = QPushButton("Проверить обновления")
-        self.check_button.clicked.connect(self.assistant.check_for_updates_app)
+        self.check_button.clicked.connect(self.assistant.check_update_app)
         layout.addWidget(self.check_button)
 
         self.update_check = QCheckBox("Уведомлять о бета-версиях", self)

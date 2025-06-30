@@ -7,8 +7,10 @@
 """
 import csv
 import ctypes
+import shutil
 import win32clipboard
 from PIL import ImageGrab, Image
+from bin.check_update import check_version, load_changelog, download_update
 from bin.guide_window import GuideWindow
 from bin.init import InitScreen
 
@@ -18,7 +20,6 @@ import json
 import logging
 import os.path
 import random
-import tempfile
 from pathlib import Path
 import sys
 import time
@@ -49,16 +50,10 @@ from vosk import Model, KaldiRecognizer
 from PyQt5.QtGui import QIcon, QCursor, QFont, QColor, QPixmap
 from PyQt5.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout, \
                              QPushButton, QCheckBox, QSystemTrayIcon, QAction, qApp, QMenu, QMessageBox, \
-                             QTextEdit, QDialog, QLabel, QFileDialog, QTextBrowser, QMainWindow, QStyle, QSizePolicy,
-                             QGraphicsColorizeEffect, QProgressBar)
-from PyQt5.QtCore import Qt, QFileSystemWatcher, QTimer, QEvent, pyqtSignal, QThread, QMetaObject
+                             QTextEdit, QDialog, QLabel, QTextBrowser, QMainWindow, QStyle, QSizePolicy,
+                             QGraphicsColorizeEffect)
+from PyQt5.QtCore import Qt, QFileSystemWatcher, QTimer, QEvent, pyqtSignal, QThread, QObject
 
-short_name = "https://raw.githubusercontent.com/AndreyDanilov1999/oldAssistant_v2/refs/heads/master/"
-# Сырая ссылка на version.txt в GitHub
-EXP_VERSION_FILE_URL = f"{short_name}exp-version.txt"
-VERSION_FILE_URL = f"{short_name}version.txt"
-CHANGELOG_TXT_URL = f"{short_name}changelog.txt"
-CHANGELOG_MD_URL = f"{short_name}changelog.md"
 MUTEX_NAME = "Assistant_123456789AB"
 
 def activate_existing_window():
@@ -108,7 +103,7 @@ class Assistant(QMainWindow):
 
     def __init__(self):
         super().__init__()
-        self.version = "1.3.1"
+        self.version = "1.3.2"
         self.ps = "Powered by theoldman"
         self.label_version = QLabel(f"Версия: {self.version} {self.ps}", self)
         self.label_message = QLabel('', self)
@@ -132,6 +127,8 @@ class Assistant(QMainWindow):
         self.log_file_path = get_path('assistant.log')
         self.init_logger()
         self.svg_file_path = get_path("owl.svg")
+        self.icon_start_win = get_path("bin", "icons", "start-win.svg")
+        self.icon_update = get_path("bin", "icons", "install-btn.svg")
         self.process_names = get_path('user_settings', 'process_names.json')
         self.color_settings_path = get_path('user_settings', 'color_settings.json')
         self.default_preset_style = get_path('bin', 'color_presets', 'default.json')
@@ -150,6 +147,7 @@ class Assistant(QMainWindow):
         self.is_censored = self.settings.get('is_censored', False)
         self.show_upd_msg = self.settings.get("show_upd_msg", False)
         self.is_min_tray = self.settings.get("minimize_to_tray", True)
+        self.type_version = "stable"
         self.commands = self.load_commands()
         self.audio_paths = get_audio_paths(self.speaker)
         self.initui()
@@ -173,7 +171,7 @@ class Assistant(QMainWindow):
             self.showNormal()
         self.run_assist()
         self.check_update_label()
-        QTimer.singleShot(2000, self.check_for_updates_app)
+        QTimer.singleShot(2000, self.check_update_app)
 
     def handle_init_result(self, success):
         """Обработчик результата инициализации"""
@@ -276,18 +274,34 @@ class Assistant(QMainWindow):
 
         self.title_bar_layout.addStretch()
 
+        self.update_btn = QPushButton()
+        self.update_btn.setCursor(QCursor(Qt.PointingHandCursor))  # Курсор в виде руки
+        self.update_btn.setFixedSize(25, 25)
+        self.update_btn.setStyleSheet("background: transparent;")
+        self.update_btn.clicked.connect(self.open_update_app)
+        self.update_btn.hide()
+
+        # Добавляем SVG на кнопку
+        self.update_svg = QSvgWidget(self.icon_update, self.update_btn)
+        self.update_svg.setFixedSize(24, 24)
+        self.update_svg.move(2, 3)  # Центрирование
+        self.title_bar_layout.addWidget(self.update_btn)
+
         self.start_win_btn = QPushButton()
+        self.start_win_btn.setCursor(QCursor(Qt.PointingHandCursor))
         self.start_win_btn.setFixedSize(25, 25)
         self.start_win_btn.setStyleSheet("background: transparent;")
         self.start_win_btn.clicked.connect(self.toggle_start_win)
+
         # Добавляем SVG на кнопку
-        self.start_svg = QSvgWidget("start-win.svg", self.start_win_btn)
+        self.start_svg = QSvgWidget(self.icon_start_win, self.start_win_btn)
         self.start_svg.setFixedSize(13, 13)
         self.start_svg.move(6, 6)  # Центрирование
         self.title_bar_layout.addWidget(self.start_win_btn)
 
         # Кнопка "Свернуть"
         self.minimize_button = QPushButton("─")
+        self.minimize_button.setCursor(QCursor(Qt.PointingHandCursor))
         self.minimize_button.setObjectName("TrayButton")
         self.minimize_button.clicked.connect(self.custom_hide)
         self.minimize_button.setFixedSize(25, 25)
@@ -295,6 +309,7 @@ class Assistant(QMainWindow):
 
         # Кнопка "Закрыть"
         self.close_button = QPushButton("✕")
+        self.close_button.setCursor(QCursor(Qt.PointingHandCursor))
         self.close_button.clicked.connect(self.close)
         self.close_button.setFixedSize(25, 25)
         self.close_button.setObjectName("CloseButton")
@@ -353,15 +368,11 @@ class Assistant(QMainWindow):
         self.svg_image.setGraphicsEffect(self.color_svg)
         left_layout.addWidget(self.svg_image)
 
-        # Текст "Доступна новая версия"
+        # Текст "Доступно обновление"
         self.update_label = QLabel("")
         self.update_label.setCursor(QCursor(Qt.PointingHandCursor))  # Курсор в виде руки
-        self.update_label.mousePressEvent = self.open_download_link  # Обработка клика
+        self.update_label.mousePressEvent = self.update_answer  # Обработка клика
         left_layout.addWidget(self.update_label)
-
-        self.update_button = QPushButton("Установить обновление")
-        self.update_button.clicked.connect(self.update_app)
-        left_layout.addWidget(self.update_button)
 
         # Лейбл, при нажатии будет открываться changelog
         self.label_version.setCursor(QCursor(Qt.PointingHandCursor))
@@ -595,75 +606,96 @@ class Assistant(QMainWindow):
             self.drag_pos = event.globalPos() - self.frameGeometry().topLeft()
             event.accept()
 
-    def open_download_link(self, event):
-        """Открывает ссылку на скачивание при клике на текст."""
-        if self.update_label.text() == "Установлена последняя версия":
-            audio_paths = self.audio_paths
-            update_button = audio_paths.get('update_button')
-            thread_react_detail(update_button)
-        else:
-            # Проверяем, есть ли ссылка
-            if self.latest_version_url:
-                webbrowser.open(self.latest_version_url)
+    def open_update_app(self, event):
+        """Запускает скрипт для установки обновления при клике на текст."""
+        try:
+            self.update_app()
+        except Exception as e:
+            debug_logger.error(f"Ошибка при запуске программы обновления: {e}")
+
+    def update_answer(self, event):
+        """Реакция бота на отсутствие обновления"""
+        try:
+            if self.update_label.text() == "Установлена последняя версия":
+                audio_paths = self.audio_paths
+                update_button = audio_paths.get('update_button')
+                thread_react_detail(update_button)
+            else:
+                print("error")
+        except Exception as e:
+            debug_logger.error(f"Ошибка при запуске программы обновления: {e}")
 
     def check_update_label(self):
         """
         Метод для отображения или скрытия кнопки "Установить обновление"
         """
-        # Проверяем текст лейбла и управляем видимостью кнопки
-        if self.update_label.text() == "Доступна новая версия":
-            self.update_button.show()
+        if self.update_label.text() == "Доступно обновление":
+            self.update_btn.show()
         else:
-            self.update_button.hide()
+            self.update_btn.hide()
 
-    def check_for_updates_app(self):
-        """Проверяет обновления с автоматическим выбором формата changelog"""
+    def update_complete(self):
+        download_dir = get_path("update")
+        temp_dir = get_path("update_pack")
+
+        # Создаём папки, если их нет
+        os.makedirs(download_dir, exist_ok=True)
+        os.makedirs(temp_dir, exist_ok=True)
+
+        # Удаление всех .zip файлов в папке update
+        for old_file in os.listdir(download_dir):
+            old_path = os.path.join(download_dir, old_file)
+            if os.path.isfile(old_path) and old_file.endswith('.zip'):
+                try:
+                    os.remove(old_path)
+                    debug_logger.info(f"Удалён старый .zip файл: {old_path}")
+                except Exception as e:
+                    debug_logger.error(f"Не удалось удалить файл {old_path}: {e}")
+
+        # Очистка папки update_pack (рекурсивно)
+        if os.path.exists(temp_dir):
+            for item in os.listdir(temp_dir):
+                item_path = os.path.join(temp_dir, item)
+                try:
+                    if os.path.isfile(item_path) or os.path.islink(item_path):
+                        os.unlink(item_path)
+                        debug_logger.info(f"Файл удален: {item_path}")
+                    elif os.path.isdir(item_path):
+                        shutil.rmtree(item_path)
+                        debug_logger.info(f"Папка удалена рекурсивно: {item_path}")
+                except Exception as e:
+                    debug_logger.error(f"Не удалось удалить {item_path}. Ошибка: {e}")
+        else:
+            debug_logger.info(f"Папка не существует: {temp_dir}")
+
+    def check_update_app(self):
+        """Проверяет обновления"""
+        self.dot_animation = DotAnimation()
+        self.dot_animation.update_signal.connect(self.update_label.setText)
+        self.dot_animation.start()
         try:
             self.check_update_label()
-            # Выбираем URL в зависимости от режима проверки
-            version_url = EXP_VERSION_FILE_URL if self.beta_version else VERSION_FILE_URL
-            # Загружаем файл версии
-            version_response = requests.get(
-                version_url,
-                timeout=10,
-                headers={'Cache-Control': 'no-cache'}
-            )
-            version_response.raise_for_status()
-            version_content = version_response.text.strip()
-
-            version_parts = version_content.split(maxsplit=1)
-            if len(version_parts) < 2:
-                raise ValueError("Неверный формат файла версии")
-
-            latest_version, latest_version_url = version_parts[0], version_parts[1].strip()
+            stable_version, exp_version = check_version()
+            new_version = exp_version if self.beta_version else stable_version
+            latest_version = version.parse(new_version)
             current_ver = version.parse(self.version)
-            latest_ver = version.parse(latest_version)
+            type_version = "exp" if self.beta_version else "stable"
 
-            # Загружаем changelog
-            changelog_response = requests.get(
-                CHANGELOG_MD_URL,
-                timeout=15,
-                headers={'Cache-Control': 'no-cache'}
-            )
-            changelog_response.raise_for_status()
+            load_changelog()
+            self.changelog_file_path = get_path('update', 'changelog.md')
 
-            changelog_path = os.path.join(tempfile.gettempdir(), 'changelog.md')
-            with open(changelog_path, 'w', encoding='utf-8') as f:
-                f.write(changelog_response.text)
-            debug_logger.debug(f"Changelog сохранен в: {changelog_path}")
-
-            self.changelog_file_path = changelog_path
-            self.latest_version_url = latest_version_url
-
-            # Сравниваем с последней доступной версией
-            if latest_ver > current_ver:
-                self.update_label.setText("Доступна новая версия")
-                self.check_update_label()
-                if self.settings.get("show_upd_msg", True):
-                    self.show_update_notification(latest_version)
+            if latest_version > current_ver:
+                # download_update(type_version,
+                #                 on_complete=self.handle_download_complete)
+                self.download_thread = DownloadThread(type_version)
+                self.download_thread.download_complete.connect(self.handle_download_complete)
+                self.download_thread.finished.connect(self.dot_animation.stop)
+                self.download_thread.start()
             else:
+                self.dot_animation.stop()
                 self.update_label.setText("Установлена последняя версия")
-
+                self.check_update_label()
+                self.update_complete()
         except requests.Timeout:
             logger.warning("Таймаут при проверке обновлений")
             debug_logger.warning("Таймаут при проверке обновлений")
@@ -681,30 +713,55 @@ class Assistant(QMainWindow):
             debug_logger.error(f"Неожиданная ошибка: {str(e)}", exc_info=True)
             self.update_label.setText("Ошибка обновления")
 
-    def handle_message_click(self, latest_version):
+    def handle_download_complete(self, file_path, success=True, skipped=False, error=None):
+        self.dot_animation.stop()
+        self.update_label.setText("Доступно обновление")
+        self.check_update_label()
+        try:
+            if success:
+                self.type_version = "exp" if "exp_" in os.path.basename(file_path).lower() else "stable"
+                version = self.extract_version_simple(file_path)
+                if self.settings.get("show_upd_msg", True):
+                    self.show_update_notice(version)
+                if skipped:
+                    debug_logger.info(f"[SKIP] Файл уже существует")
+                else:
+                    debug_logger.info(f"[OK] Новый файл загружен")
+            else:
+                debug_logger.error(f"[ERROR] Не удалось скачать: {error}")
+        except Exception as e:
+            debug_logger.error(f"Ошибка handle_download_complete: {str(e)}", exc_info=True)
+
+    def extract_version_simple(self, filename):
+        parts = filename.split('_')
+        if len(parts) >= 3:
+            return parts[-1].replace('.zip', '')
+        return ""
+
+    def handle_message_click(self):
         self.showNormal()
         self.raise_()
         self.activateWindow()
-        QTimer.singleShot(100, lambda: self.show_popup(latest_version))
+        QTimer.singleShot(100, lambda: self.update_app)
 
-    def show_update_notification(self, latest_version):
+    def show_update_notice(self, version):
         """Показ уведомления о новой версии"""
         if not self.isVisible():  # Если окно скрыто в трее
             # Показываем message в трее
             self.tray_icon.showMessage(
                 "Доступно обновление",
-                "Нажмите для подробностей",
+                "Нажмите для перезагрузки",
                 QSystemTrayIcon.Information,
                 3000  # 3 секунды
             )
             self.tray_icon.messageClicked.connect(
-                lambda: self.handle_message_click(latest_version)
+                lambda: self.handle_message_click
             )
         else:
             # Если окно видимо - показываем обычный диалог
-            self.show_popup(latest_version)
+            self.show_popup(version)
 
-    def show_popup(self, latest_version):
+    def show_popup(self, version):
         """Кастомное окно обновления"""
         dialog = QDialog(self)
         dialog.setWindowFlags(Qt.FramelessWindowHint | Qt.Dialog)
@@ -746,8 +803,7 @@ class Assistant(QMainWindow):
 
         # Текст сообщения
         text_label = QLabel(
-            f"<b>Доступна новая версия: {latest_version}</b>"
-            "<p>Хотите скачать обновление?</p>"
+            f"<b>Доступна новая версия\n{version}</b>"
         )
         text_label.setAlignment(Qt.AlignCenter)
         text_label.setWordWrap(True)
@@ -781,7 +837,7 @@ class Assistant(QMainWindow):
             self.changelog_window(None)
 
         def on_install():
-            webbrowser.open(self.latest_version_url)
+            self.update_app()
             if checkbox.isChecked():
                 self.show_upd_msg = False
                 self.save_settings()
@@ -957,7 +1013,6 @@ class Assistant(QMainWindow):
         qApp.quit()
 
     def reload_commands(self):
-        print("метод вызван")
         self.load_commands()
 
     def load_commands(self):
@@ -1165,11 +1220,9 @@ class Assistant(QMainWindow):
 
     def cleanup_before_exit(self):
         """Подготовка к выходу"""
-        print("вызван")
         if hasattr(self, 'splash') and self.splash.check_thread:
             self.splash.check_thread.quit()
             self.splash.check_thread.wait(1000)
-            print("сработал")
             self.close()
 
     def handle_close_confirmation(self, confirmed, event, dialog):
@@ -1354,8 +1407,6 @@ class Assistant(QMainWindow):
                                       self.assist_name2 in text or
                                       self.assist_name3 in text or
                                       name_mentioned)
-                print(has_assistant_name, text, self.assistant_name, self.assist_name2, self.assist_name3)
-
                 # Режим уточнения команды (если предыдущая попытка не удалась)
                 if last_unrecognized_command:
                     if text:
@@ -1857,8 +1908,8 @@ class Assistant(QMainWindow):
         dialog.exec_()
 
     def update_app(self):
-        """Обработка нажатия кнопки Установить обновление"""
-        dialog = UpdateApp(self)
+        """Обработка нажатия кнопки 'Установить обновление'"""
+        dialog = UpdateApp(self, self.type_version)
         dialog.main()
 
     def update_voice(self, new_voice):
@@ -2125,183 +2176,103 @@ class Assistant(QMainWindow):
 
 
 class UpdateApp(QDialog):
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, type_version="stable"):
         super().__init__(parent)
         self.assistant = parent
-        # Путь к текущей версии программы (на один уровень выше _internal)
-        self.CURRENT_DIR = os.path.dirname(get_path())
-
-    def select_new_version_archive(self):
-        """Выбор ZIP-архива с новой версией программы"""
-        archive_path, _ = QFileDialog.getOpenFileName(
-            self,
-            "Выберите архив с новой версией программы",
-            "",
-            "ZIP Files (*.zip)"
-        )
-        if archive_path and self.validate_new_version_archive(archive_path):
-            return archive_path
-        return None
-
-    def validate_new_version_archive(self, archive_path):
-        """Проверка, что в архиве есть _internal и Assistant.exe"""
-        russian_letters = "абвгдеёжзийклмнопрстуфхцчшщъыьэюяАБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ"
-        if any(char in russian_letters for char in archive_path):
-            self.assistant.show_message("Путь к архиву содержит русские символы...", "Ошибка", "error")
-            return False
-
-        try:
-            with zipfile.ZipFile(archive_path, 'r') as zip_ref:
-                file_list = zip_ref.namelist()
-
-            # Проверка наличия папки _internal
-            has_internal = any(file.startswith("_internal/") for file in file_list)
-            if not has_internal:
-                self.assistant.show_message(f"В выбранном архиве отсутствует папка _internal.", "Ошибка", "error")
-                return False
-
-            # Проверка наличия Assistant.exe
-            has_assistant_exe = "Assistant.exe" in file_list
-            if not has_assistant_exe:
-                self.assistant.show_message(f"В выбранном архиве отсутствует файл Assistant.exe.", "Ошибка", "error")
-                return False
-
-            return True
-        except Exception as e:
-            self.assistant.show_message(f"Не удалось проверить архив: {str(e)}", "Ошибка", "error")
-            return False
-
-    def extract_archive(self, archive_path, extract_dir):
-        """Распаковка архива с обработкой кодировки имён файлов"""
-        try:
-            with zipfile.ZipFile(archive_path, 'r') as zip_ref:
-                for file_info in zip_ref.infolist():
-                    # Исправляем имя файла
-                    try:
-                        # Пробуем декодировать имя файла из cp437 (или другой кодировки)
-                        file_info.filename = file_info.filename.encode('cp437').decode('utf-8')
-                    except UnicodeDecodeError:
-                        # Если cp437 не подходит, пробуем другую кодировку (например, cp866)
-                        file_info.filename = file_info.filename.encode('cp437').decode('cp866')
-
-                    # Распаковываем файл с исправленным именем
-                    zip_ref.extract(file_info, extract_dir)
-            return True
-        except Exception as e:
-            debug_logger.error(f"Не удалось распаковать архив: {str(e)}")
-            self.assistant.show_message(f"Не удалось распаковать архив: {str(e)}", "Ошибка", "error")
-            return False
-
-    def create_scheduler_task(self, archive_path, new_version_dir):
-        """Создание задачи в планировщике для обновления"""
-        # Команда для выполнения обновления
-        correct_archive_path = os.path.normpath(archive_path)
-        update_script = f"""
-@echo off
-timeout /t 5 /nobreak >nul
-
-:: Удаляем все файлы и папки в старой папке, кроме user_settings
-for /d %%i in ("{self.CURRENT_DIR}\\*") do (
-    if not "%%~nxi"=="_internal" (
-        rmdir /s /q "%%i"
-    )
-)
-for %%i in ("{self.CURRENT_DIR}\\*.*") do (
-    if not "%%~nxi"=="update.bat" (
-        del /q "%%i"
-    )
-)
-
-:: Удаляем содержимое папки _internal, кроме user_settings
-for /d %%i in ("{self.CURRENT_DIR}\\_internal\\*") do (
-    if not "%%~nxi"=="user_settings" (
-        rmdir /s /q "%%i"
-    )
-)
-for %%i in ("{self.CURRENT_DIR}\\_internal\\*.*") do (
-    if not "%%~nxi"=="update.bat" (
-        del /q "%%i"
-    )
-)
-
-set "exclude_folder=_internal\\user_settings"
-
-:: Создаем временный файл exclude.txt
-echo %exclude_folder% > exclude.txt
-
-:: Копируем файлы из новой папки в старую, исключая user_settings
-xcopy "{new_version_dir.replace(os.sep, '/')}" "{self.CURRENT_DIR.replace(os.sep, '/')}" /E /I /H /-Y /EXCLUDE:exclude.txt
-
-:: Удаляем временный файл exclude.txt
-del exclude.txt
-
-:: Удаляем задачу из планировщика
-schtasks /delete /tn AssistantUpdate /f
-
-:: Ждем 2 секунды перед запуском новой версии
-timeout /t 2 /nobreak >nul
-
-:: Запускаем новую версию программы
-start "" "{os.path.join(self.CURRENT_DIR, "Assistant.exe").replace(os.sep, '/')}"
-
-:: Удаляем архив и временную папку с новой версией
-if exist "{new_version_dir.replace(os.sep, '/')}" (
-    rmdir /s /q "{new_version_dir.replace(os.sep, '/')}"
-)
-
-if exist "{correct_archive_path}" (
-    del /q "{correct_archive_path}"
-)
-"""
-        # Сохраняем команду в bat-файл
-        with open("update.bat", "w") as f:
-            f.write(update_script)
-
-        # Команда для создания задачи в планировщике
-        command = [
-            "schtasks", "/create", "/tn", "AssistantUpdate", "/tr",
-            f'"{os.path.abspath("update.bat")}"', "/sc", "once", "/st",
-            time.strftime("%H:%M", time.localtime(time.time() + 60)), "/f", "/RL", "HIGHEST"
-        ]
-
-        try:
-            # Выполняем команду с флагом CREATE_NO_WINDOW
-            result = subprocess.run(command, check=True, stdout=subprocess.PIPE,
-                                    stderr=subprocess.PIPE, creationflags=subprocess.CREATE_NO_WINDOW)
-            output = result.stdout.decode('cp866')  # Декодируем вывод
-            debug_logger.info(f"Вывод в методе create_scheduler_task: {output}")
-            self.assistant.show_message(f"После завершения программы будет установлена новая версия")
-        except subprocess.CalledProcessError as e:
-            error_output = e.stderr.decode('cp866')  # Декодируем ошибку
-            self.assistant.show_message(f"Не удалось создать задачу: {error_output}", "Ошибка", "error")
+        self.type_version = type_version
+        self.update_file_path = self.find_update_file()
+        self.extract_dir = get_path("update_pack")
+        os.makedirs(self.extract_dir, exist_ok=True)
 
     def main(self):
-        """Основная логика обновления"""
-        # Выбираем ZIP-архив с новой версией
-        archive_path = self.select_new_version_archive()
-        if not archive_path:
-            self.assistant.show_message(f"Архив с новой версией не выбран.", "Предупреждение", "warning")
+        if not self.update_file_path:
+            debug_logger.error("Не найден файл обновления (*.zip)")
             return
 
-        # Создаем временную директорию для распаковки
-        temp_extract_dir = os.path.join(os.path.dirname(archive_path), "temp_extract")
-        os.makedirs(temp_extract_dir, exist_ok=True)
-
-        # Распаковываем архив
-        if not self.extract_archive(archive_path, temp_extract_dir):
+        if not self.extract_archive(self.update_file_path):
             return
+        debug_logger.info(f"Архив с новой версией распакован по пути {self.extract_dir}")
+        subprocess.Popen([get_path("Update.exe")], shell=True)
 
-        # Создаем задачу в планировщике
-        self.create_scheduler_task(archive_path, temp_extract_dir)
+    def find_update_file(self):
+        update_dir = get_path("update")
+        pattern = f"{self.type_version}_Assistant_*.zip"
+        # Ищем самый свежий файл по дате изменения
+        files = []
+        for file in os.listdir(update_dir):
+            if file.lower().startswith(self.type_version.lower()) and file.lower().endswith('.zip'):
+                file_path = os.path.join(update_dir, file)
+                files.append((file_path, os.path.getmtime(file_path)))
 
+        if files:
+            # Сортируем по дате изменения (новые сначала)
+            files.sort(key=lambda x: x[1], reverse=True)
+            return files[0][0]
+        return None
+
+    def extract_archive(self, archive_path):
+        """Безопасная распаковка архива с обработкой кодировок"""
         try:
-            subprocess.run(['tasklist', '/FI', 'IMAGENAME eq Assistant.exe'], check=True, stdout=subprocess.PIPE)
-            audio_paths = self.audio_paths
-            restart_file = audio_paths.get('restart_file')
-            thread_react_detail(restart_file)
-            subprocess.run(['taskkill', '/IM', 'Assistant.exe', '/F'], check=True)
-        except subprocess.CalledProcessError:
-            self.assistant.show_message(f"Процесс Assistant.exe не найден.", "Предупреждение", "warning")
+            # Очищаем папку перед распаковкой
+            for item in os.listdir(self.extract_dir):
+                item_path = os.path.join(self.extract_dir, item)
+                if os.path.isfile(item_path):
+                    os.unlink(item_path)
+                else:
+                    shutil.rmtree(item_path)
+
+            with zipfile.ZipFile(archive_path, 'r') as zip_ref:
+                for file_info in zip_ref.infolist():
+                    # Безопасное извлечение имени файла
+                    file_name = self._safe_decode_filename(file_info.filename)
+
+                    # Защита от Zip Slip
+                    target_path = os.path.join(self.extract_dir, file_name)
+                    if not os.path.abspath(target_path).startswith(os.path.abspath(self.extract_dir)):
+                        raise ValueError(f"Попытка распаковки вне целевой папки: {file_name}")
+
+                    # Создаем папки если нужно
+                    if file_name.endswith('/'):
+                        os.makedirs(target_path, exist_ok=True)
+                    else:
+                        os.makedirs(os.path.dirname(target_path), exist_ok=True)
+                        with open(target_path, 'wb') as f:
+                            f.write(zip_ref.read(file_info))
+            return True
+
+        except Exception as e:
+            debug_logger.error(f"Ошибка распаковки: {str(e)}", exc_info=True)
+            self.assistant.show_message(f"Ошибка распаковки: {str(e)}", "Ошибка", "error")
+            return False
+
+    def _safe_decode_filename(self, filename):
+        """Безопасное декодирование имени файла из архива с поддержкой русского"""
+        # Список кодировок для попытки декодирования (в порядке приоритета)
+        encodings = [
+            'cp866',  # DOS/Windows Russian
+            'cp1251',  # Windows Cyrillic
+            'utf-8',  # Unicode
+            'cp437',  # DOS English
+            'iso-8859-1',  # Latin-1
+            'koi8-r'  # Russian KOI8-R
+        ]
+
+        # Сначала пробуем стандартное декодирование (для современных ZIP)
+        try:
+            return filename.encode('cp437').decode('utf-8')
+        except UnicodeError:
+            pass
+
+        # Если не получилось, пробуем все кодировки по очереди
+        for enc in encodings:
+            try:
+                return filename.encode('cp437').decode(enc)
+            except (UnicodeEncodeError, UnicodeDecodeError):
+                continue
+
+        # Если ничего не помогло, возвращаем как есть и логируем проблему
+        debug_logger.warning(f"Не удалось декодировать имя файла: {filename}")
+        return filename
 
 
 class ChangelogWindow(QDialog):
@@ -2626,6 +2597,46 @@ class SystemScreenshot:
         logger.error("Таймаут: скриншот не обнаружен")
         debug_logger.error("Таймаут: скриншот не обнаружен")
         return None
+
+
+class DownloadThread(QThread):
+    download_complete = pyqtSignal(str, bool, bool, str)  # file_path, success, skipped, error
+    progress_signal = pyqtSignal(str)
+
+    def __init__(self, type_version, parent=None):
+        super().__init__(parent)
+        self.type_version = type_version
+
+    def run(self):
+        download_update(self.type_version, on_complete=self._handle_complete)
+        self.progress_signal.emit("Начинаем загрузку...")
+
+    def _handle_complete(self, file_path, success=True, skipped=False, error=None):
+        self.download_complete.emit(file_path, success, skipped, error)
+
+
+class DotAnimation(QObject):
+    update_signal = pyqtSignal(str)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.timer = QTimer(self)
+        self.timer.timeout.connect(self.update_text)
+        self.counter = 0
+        self.base_text = "Ищу свежую версию"
+
+    def start(self):
+        self.counter = 0
+        self.timer.start(500)  # Обновление каждые 500 мс
+
+    def stop(self):
+        self.timer.stop()
+
+    def update_text(self):
+        dots = '.' * (self.counter % 4)
+        self.update_signal.emit(f"{self.base_text}{dots}")
+        self.counter += 1
+
 
 
 if __name__ == '__main__':
