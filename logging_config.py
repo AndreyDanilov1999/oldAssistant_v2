@@ -19,6 +19,8 @@ else:
 
 # Определяем путь к файлу логов
 log_file_path = os.path.join(internal_dir, 'assistant.log')
+if not os.path.exists(os.path.join(internal_dir, "log")):
+    os.makedirs(os.path.join(internal_dir, "log"))
 debug_file_path = os.path.join(internal_dir, "log", "debug_assist.log")
 
 logger = logging.getLogger("assistant")

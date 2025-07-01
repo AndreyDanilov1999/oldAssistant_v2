@@ -103,7 +103,7 @@ class Assistant(QMainWindow):
 
     def __init__(self):
         super().__init__()
-        self.version = "1.3.2"
+        self.version = "1.3.3"
         self.ps = "Powered by theoldman"
         self.label_version = QLabel(f"Версия: {self.version} {self.ps}", self)
         self.label_message = QLabel('', self)
@@ -1571,21 +1571,15 @@ class Assistant(QMainWindow):
                                         thread_react(what_folder)
                                     reaction_triggered = True
                                 else:
-                                    # Поиск и другие команды (без изменений)
-                                    if "поищи" in command or 'найди' in command:
-                                        query = (command.replace("поищи", "").replace("найди", "")
-                                                 .replace(self.assistant_name, "")
-                                                 .replace(self.assist_name2, "")
-                                                 .replace("в интернете", "")
-                                                 .replace("в инете", "")
-                                                 .replace(self.assist_name3, "").strip())
+                                    if any(word in command for word in ["найди", "поищи", "посмотри", "гугли"]):
+                                        search_yandex(command, self.assistant_name,
+                                                      self.assist_name2,
+                                                      self.assist_name3)
                                         approve_folder = self.audio_paths.get('approve_folder')
-                                        if approve_folder:
-                                            thread_react(approve_folder)
-                                        search_yandex(query)
-                                    elif "фулл скрин" in command:
+                                        thread_react(approve_folder)
+                                    elif any(word in command for word in ["фулл скрин", "весь экран", "сфоткай"]):
                                         self.capture_fullscreen()
-                                    elif "скрин" in command:
+                                    elif any(word in command for word in ["скрин", "область"]):
                                         self.capture_area()
                                     # elif 'игровой режим' in command:
                                     #     if action_type == 'open':

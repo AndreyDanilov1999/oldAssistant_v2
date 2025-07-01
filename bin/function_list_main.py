@@ -13,11 +13,28 @@ from path_builder import get_path
 
 settings_file = get_path('user_settings', "settings.json")
 
-def search_yandex(query):
+def search_yandex(command, name=None, name_2=None, name_3=None):
     """
     Поиск в инете по запросу
-    :param query: запрос
+    :param name: имя ассистента
+    :param name_2: доп. имя
+    :param name_3: доп. имя
+    :param command: сырая команда
     """
+    exclude_words = [word for word in [name, name_2, name_3] if word is not None and word.strip()]
+    exclude_list = ["в инете", "в интернете", "в браузере", "найди", "поищи", "посмотри", "гугли"]
+
+    for phrase in exclude_list:
+        command = command.replace(phrase, "")
+
+    words = command.split()
+
+    for i, word in enumerate(words):
+        if any(ex_word in word.lower() for ex_word in exclude_words):
+            words.pop(i)  # Удаляем только первое совпадение
+            break  # Выходим из цикла после удаления
+
+    query = ' '.join(words)
     url = f"https://www.ya.ru/search?text={query}"
     debug_logger.info(f"Поиск по значению: {query}")
     webbrowser.open(url)
