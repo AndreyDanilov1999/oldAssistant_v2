@@ -18,7 +18,8 @@ class CommandSettingsWindow(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.assistant = parent
-        self.current_commands = parent.commands.copy() if hasattr(parent, 'commands') else {}  # Центральное хранилище команд
+        self.current_commands = parent.commands.copy() if hasattr(parent,
+                                                                  'commands') else {}  # Центральное хранилище команд
         self.load_commands()
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.Dialog)
         self.setFixedSize(parent.width(), parent.height())
@@ -344,7 +345,7 @@ class AppCommandForm(QWidget):
         self.settings_window.current_commands[key] = selected_name
         self.settings_window.save_commands()
         self.settings_window.commands_updated.emit(self.settings_window.current_commands)
-        self.assistant.show_message(f"Команда '{key}' добавлена!")
+        self.assistant.show_notification_message(message=f"Команда '{key}' добавлена!")
         self.key_input.clear()
 
 
@@ -400,7 +401,7 @@ class FolderCommandForm(QWidget):
         self.settings_window.current_commands[key] = folder
         self.settings_window.save_commands()
         self.settings_window.commands_updated.emit(self.settings_window.current_commands)
-        self.assistant.show_message(f"Команда '{key}' добавлена!")
+        self.assistant.show_notification_message(message=f"Команда '{key}' добавлена!")
         self.key_input.clear()
         self.folder_path.clear()
 

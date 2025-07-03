@@ -1,5 +1,7 @@
 import json
 import os
+
+from bin.speak_functions import thread_react
 from path_builder import get_path
 from logging_config import logger, debug_logger
 from PyQt5.QtCore import QSettings, pyqtSignal, Qt, QPoint, QPropertyAnimation, QEasingCurve
@@ -452,7 +454,7 @@ class InterfaceWidget(QWidget):
                 self.assistant.styles = styles
                 self.assistant.load_and_apply_styles()
                 self.assistant.check_start_win()
-                logger.info(f"Применён стиль из файла: {filename}")
+                self.assistant.show_notification_message(message=f"Применён стиль из файла: {filename}")
                 debug_logger.info(f"Применён стиль из файла: {filename}")
 
         except json.JSONDecodeError:
@@ -1379,6 +1381,9 @@ class SettingsWidget(QWidget):
         layout.addWidget(self.minimize_check)
 
         layout.addStretch()
+        self.check_voice = QPushButton("Тест голоса")
+        self.check_voice.clicked.connect(self.check_new_voice)
+        layout.addWidget(self.check_voice)
 
         # Кнопка применения
         apply_button = QPushButton("Применить", self)
@@ -1415,6 +1420,18 @@ class SettingsWidget(QWidget):
         if new_voice_key in speakers:
             self.voice_changed.emit(speakers[new_voice_key])
 
+    def check_new_voice(self):
+        """
+        Метод для озвучивания выбранного голоса (в качестве проверки)
+        """
+        try:
+            path = self.assistant.audio_paths
+            get_path = path.get("echo_folder")
+            thread_react(get_path)
+        except Exception as e:
+            logger.error(f"При тесте голоса произошла ошибка:{e}")
+            debug_logger.error(f"При тесте голоса произошла ошибка:{e}")
+
     def apply_settings(self):
         new_name = self.name_input.text().strip().lower()
         if not new_name:
@@ -1438,5 +1455,5 @@ class SettingsWidget(QWidget):
 
         self.assistant.save_settings()
         self.hide_method()
-        self.assistant.show_message(f"Настройки применены!")
+        self.assistant.show_notification_message(message="Настройки применены!")
 

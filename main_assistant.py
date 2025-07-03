@@ -51,8 +51,9 @@ from PyQt5.QtGui import QIcon, QCursor, QFont, QColor, QPixmap
 from PyQt5.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout, \
                              QPushButton, QCheckBox, QSystemTrayIcon, QAction, qApp, QMenu, QMessageBox, \
                              QTextEdit, QDialog, QLabel, QTextBrowser, QMainWindow, QStyle, QSizePolicy,
-                             QGraphicsColorizeEffect)
-from PyQt5.QtCore import Qt, QFileSystemWatcher, QTimer, QEvent, pyqtSignal, QThread, QObject
+                             QGraphicsColorizeEffect, QFrame)
+from PyQt5.QtCore import Qt, QFileSystemWatcher, QTimer, QEvent, pyqtSignal, QThread, QObject, QPropertyAnimation, \
+    QEasingCurve, QPoint
 
 MUTEX_NAME = "Assistant_123456789AB"
 
@@ -103,7 +104,7 @@ class Assistant(QMainWindow):
 
     def __init__(self):
         super().__init__()
-        self.version = "1.3.3"
+        self.version = "1.3.4"
         self.ps = "Powered by theoldman"
         self.label_version = QLabel(f"Версия: {self.version} {self.ps}", self)
         self.label_message = QLabel('', self)
@@ -450,6 +451,18 @@ class Assistant(QMainWindow):
         screen = QApplication.primaryScreen().availableGeometry()
         frame_geo.moveCenter(screen.center())
         self.move(frame_geo.topLeft())
+
+    def show_notification_message(self, message):
+        try:
+
+            toast = ToastNotification(
+                parent=self,
+                message=message,
+                timeout=3000
+            )
+            toast.show()
+        except Exception as e:
+            debug_logger.error(f"Ошибка при показе всплывающего уведомления: {e}")
 
     def show_message(self, text, title="Уведомление", message_type="info", buttons=QMessageBox.Ok):
         """
@@ -1577,9 +1590,9 @@ class Assistant(QMainWindow):
                                                       self.assist_name3)
                                         approve_folder = self.audio_paths.get('approve_folder')
                                         thread_react(approve_folder)
-                                    elif any(word in command for word in ["фулл скрин", "весь экран", "сфоткай"]):
+                                    elif any(word in command for word in ["фулл скрин", "весь экран", "сфотк"]):
                                         self.capture_fullscreen()
-                                    elif any(word in command for word in ["скрин", "область"]):
+                                    elif any(word in command for word in ["скрин", "област"]):
                                         self.capture_area()
                                     # elif 'игровой режим' in command:
                                     #     if action_type == 'open':
@@ -2076,6 +2089,7 @@ class Assistant(QMainWindow):
             success_msg = f"Программа добавлена в автозапуск"
             logger.info(success_msg)
             debug_logger.info(success_msg)
+            self.show_notification_message(message=f"Программа добавлена в автозапуск")
 
         except subprocess.CalledProcessError as e:
             error_msg = f"Ошибка при добавлении в автозапуск: {e.stderr}"
@@ -2109,7 +2123,7 @@ class Assistant(QMainWindow):
             )
             success_msg = f"Задача '{task_name}' удалена из автозапуска"
             debug_logger.info(success_msg)
-            self.log_area.append(success_msg)
+            self.show_notification_message(message=f"Задача '{task_name}' удалена из автозапуска")
         except subprocess.CalledProcessError as e:
             if "не существует" not in e.stderr:
                 error_msg = f"Ошибка при удалении задачи '{task_name}': {e.stderr}"
@@ -2562,7 +2576,7 @@ class SystemScreenshot:
 
         return None
 
-    def _wait_and_save_screenshot(self, timeout=5):
+    def _wait_and_save_screenshot(self, timeout=10):
         """Улучшенная версия с проверкой последовательности буфера"""
         start_time = time.time()
         last_sequence = -1
@@ -2631,6 +2645,188 @@ class DotAnimation(QObject):
         self.update_signal.emit(f"{self.base_text}{dots}")
         self.counter += 1
 
+
+class ToastNotification(QDialog):
+    """
+    Окно всплывающего уведомления
+    """
+    _active_toast = None
+
+    def __init__(self, parent=None, message="", timeout=3000):
+        super().__init__(parent)
+        if ToastNotification._active_toast:
+            ToastNotification._active_toast.close_immediately()
+
+            # Сохраняем ссылку на текущее уведомление
+        ToastNotification._active_toast = self
+        self.parent = parent
+        self.timeout = timeout
+        self.message = message
+        self.svg_path = get_path("bin", "owl_start.svg")
+        self.style_path = get_path('user_settings', 'color_settings.json')
+        self.init_ui()
+        self.load_and_apply_styles()
+
+    def init_ui(self):  # Переименовал в init_ui(), чтобы не путать с __init__
+        # Настройки окна
+        self.setWindowFlags(Qt.FramelessWindowHint | Qt.Tool | Qt.WindowStaysOnTopHint)
+        self.setAttribute(Qt.WA_ShowWithoutActivating)
+        self.setFixedSize(300, 100)  # Расширим немного размеры
+        self.setStyleSheet("""
+                    ToastNotification {
+                        border-radius: 8px;
+                        padding: 12px 20px;
+                    }
+                    QLabel {
+                        font-size: 14px;
+                        border: none;
+                    }
+                """)  # Для применения стилей из JSON
+
+        # Основной layout
+        main_layout = QVBoxLayout()
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
+
+        # --- Заголовок (TitleBar) ---
+        self.title_bar = QWidget()
+        self.title_bar.setObjectName("TitleBar")  # Это ключ для стиля из JSON
+        self.title_bar.setFixedHeight(15)  # Высота полоски
+        main_layout.addWidget(self.title_bar)
+
+        # --- Контент: иконка + текст ---
+        content_widget = QWidget()
+        content_layout = QHBoxLayout(content_widget)
+        content_layout.setContentsMargins(10, 10, 10, 10)
+        content_layout.setSpacing(10)
+
+        # Иконка
+        self.svg_image = QSvgWidget()
+        self.svg_image.load(self.svg_path)
+        self.svg_image.setFixedSize(50, 50)
+        self.svg_image.setStyleSheet("background: transparent; border: none;")
+        self.color_svg = QGraphicsColorizeEffect()
+        self.svg_image.setGraphicsEffect(self.color_svg)
+        content_layout.addWidget(self.svg_image, alignment=Qt.AlignCenter | Qt.AlignRight)
+
+        # Текст
+        self.label = QLabel(self.message)
+        self.label.setWordWrap(True)
+        self.label.setAlignment(Qt.AlignVCenter)
+        content_layout.addWidget(self.label, stretch=1)
+
+        main_layout.addWidget(content_widget)
+
+        self.setLayout(main_layout)
+
+        # --- Анимация и таймер ---
+        self.animation = QPropertyAnimation(self, b"pos")
+        self.animation.setEasingCurve(QEasingCurve.OutQuad)
+        self.animation.setDuration(500)
+
+        self.timer = QTimer()
+        self.timer.setSingleShot(True)
+        self.timer.timeout.connect(self.hide_animated)
+
+    def showEvent(self, event):
+        screen_geo = QApplication.primaryScreen().geometry()
+        x = screen_geo.width()
+        y = screen_geo.height() - self.height() - 50
+        self.move(x, y)
+
+        end_pos = QPoint(screen_geo.width() - self.width() - 20, y)
+        self.animation.setStartValue(self.pos())
+        self.animation.setEndValue(end_pos)
+        self.animation.start()
+
+        self.timer.start(self.timeout)
+
+    def close_immediately(self):
+        """Немедленное закрытие без анимации"""
+        # Отключаем таймер и анимацию
+        if hasattr(self, 'timer'):
+            self.timer.stop()
+        if hasattr(self, 'animation'):
+            self.animation.stop()
+
+        # Закрываем окно
+        self.close()
+
+        # Если это текущее активное уведомление - очищаем ссылку
+        if ToastNotification._active_toast is self:
+            ToastNotification._active_toast = None
+
+    def hide_animated(self):
+        """Анимированное закрытие с последующим удалением"""
+        screen_geo = QApplication.primaryScreen().geometry()
+        end_pos = QPoint(screen_geo.width(), self.y())
+
+        self.animation.setStartValue(self.pos())
+        self.animation.setEndValue(end_pos)
+        self.animation.finished.connect(self.close_immediately)  # Используем close_immediately
+        self.animation.start()
+
+    def load_and_apply_styles(self):
+        """
+        Загружает стили из файла и применяет их к элементам интерфейса.
+        Если файл не найден или поврежден, устанавливает значения по умолчанию.
+        """
+        try:
+            with open(self.style_path, 'r') as file:
+                self.styles = json.load(file)
+        except (FileNotFoundError, json.JSONDecodeError):
+            try:
+                with open(self.default_preset_style, 'r') as default_file:
+                    self.styles = json.load(default_file)
+            except (FileNotFoundError, json.JSONDecodeError):
+                self.styles = {}
+
+        # Применяем загруженные или значения по умолчанию
+        self.apply_styles()
+        self.apply_color_svg(self.style_path, self.svg_image)
+
+    def apply_styles(self):
+        # Устанавливаем objectName для виджетов
+        if hasattr(self, 'central_widget'):
+            self.central_widget.setObjectName("CentralWidget")
+        if hasattr(self, 'title_bar_widget'):
+            self.title_bar_widget.setObjectName("TitleBar")
+        if hasattr(self, 'container'):
+            self.title_bar_widget.setObjectName("ConfirmDialogContainer")
+        # Применяем стили к текущему окну
+        style_sheet = ""
+        for widget, styles in self.styles.items():
+            if widget.startswith("Q"):  # Для стандартных виджетов (например, QMainWindow, QPushButton)
+                selector = widget
+            else:  # Для виджетов с objectName (например, TitleBar, CentralWidget)
+                selector = f"#{widget}"
+
+            style_sheet += f"{selector} {{\n"
+            for prop, value in styles.items():
+                style_sheet += f"    {prop}: {value};\n"
+            style_sheet += "}\n"
+
+        # Устанавливаем стиль для текущего окна
+        self.setStyleSheet(style_sheet)
+
+    def format_style(self, style_dict):
+        """Форматируем словарь стиля в строку для setStyleSheet"""
+        return '; '.join(f"{key}: {value}" for key, value in style_dict.items())
+
+    def apply_color_svg(self, style_file: str, svg_widget: QSvgWidget, strength: float = 0.99) -> None:
+        """Читает цвет из JSON-файла стилей"""
+        with open(style_file) as f:
+            styles = json.load(f)
+
+        if "TitleBar" in styles and "border-bottom" in styles["TitleBar"]:
+            border_parts = styles["TitleBar"]["border-bottom"].split()
+            for part in border_parts:
+                if part.startswith('#'):
+                    color_effect = QGraphicsColorizeEffect()
+                    color_effect.setColor(QColor(part))
+                    svg_widget.setGraphicsEffect(color_effect)
+                    color_effect.setStrength(strength)
+                    break
 
 
 if __name__ == '__main__':
