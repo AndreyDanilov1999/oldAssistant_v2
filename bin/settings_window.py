@@ -396,8 +396,8 @@ class InterfaceWidget(QWidget):
         btn_white_blue.clicked.connect(lambda: self.apply_style_file("white_blue.json"))
         right_col.addWidget(btn_white_blue)
 
-        btn_orange_purple = QPushButton("Violet&Orange")
-        btn_orange_purple.clicked.connect(lambda: self.apply_style_file("dark_orange_purple.json"))
+        btn_orange_purple = QPushButton("Закат")
+        btn_orange_purple.clicked.connect(lambda: self.apply_style_file("sunset.json"))
         right_col.addWidget(btn_orange_purple)
 
         cols.addLayout(left_col)
@@ -454,7 +454,7 @@ class InterfaceWidget(QWidget):
                 self.assistant.styles = styles
                 self.assistant.load_and_apply_styles()
                 self.assistant.check_start_win()
-                self.assistant.show_notification_message(message=f"Применён стиль из файла: {filename}")
+                self.assistant.show_notification_message(message=f"Стиль успешно применен!")
                 debug_logger.info(f"Применён стиль из файла: {filename}")
 
         except json.JSONDecodeError:
@@ -1351,6 +1351,10 @@ class SettingsWidget(QWidget):
         self.volume_slider.valueChanged.connect(self.update_volume)
         layout.addWidget(self.volume_slider)
 
+        self.check_voice = QPushButton("Тест голоса")
+        self.check_voice.clicked.connect(self.check_new_voice)
+        layout.addWidget(self.check_voice)
+
         # Путь к Steam
         steam_label = QLabel("Укажите полный путь к файлу steam.exe", self)
         layout.addWidget(steam_label, alignment=Qt.AlignLeft)
@@ -1375,15 +1379,18 @@ class SettingsWidget(QWidget):
         layout.addWidget(self.update_check)
 
         # Чекбокс для сворачивания в трей
+        self.start_win_check = QCheckBox("Запуск с Windows", self)
+        self.start_win_check.setChecked(self.assistant.toggle_start)
+        self.start_win_check.stateChanged.connect(self.assistant.toggle_start_win)
+        layout.addWidget(self.start_win_check)
+
+        # Чекбокс для сворачивания в трей
         self.minimize_check = QCheckBox("Сворачивать в трей при запуске", self)
         self.minimize_check.setChecked(self.assistant.is_min_tray)
         self.minimize_check.stateChanged.connect(self.toggle_minimize)
         layout.addWidget(self.minimize_check)
 
         layout.addStretch()
-        self.check_voice = QPushButton("Тест голоса")
-        self.check_voice.clicked.connect(self.check_new_voice)
-        layout.addWidget(self.check_voice)
 
         # Кнопка применения
         apply_button = QPushButton("Применить", self)

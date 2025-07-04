@@ -10,6 +10,8 @@ from PyQt5.QtGui import QColor
 from PyQt5.QtSvg import QSvgWidget
 from PyQt5.QtWidgets import QVBoxLayout, QLabel, QWidget, QProgressBar, QApplication, QMessageBox, QPushButton, \
     QGraphicsColorizeEffect, QHBoxLayout, QStyle, QDialog
+
+from logging_config import debug_logger
 from path_builder import get_path
 
 

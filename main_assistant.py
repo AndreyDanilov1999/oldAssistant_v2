@@ -53,9 +53,10 @@ from PyQt5.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout, \
                              QTextEdit, QDialog, QLabel, QTextBrowser, QMainWindow, QStyle, QSizePolicy,
                              QGraphicsColorizeEffect, QFrame)
 from PyQt5.QtCore import Qt, QFileSystemWatcher, QTimer, QEvent, pyqtSignal, QThread, QObject, QPropertyAnimation, \
-    QEasingCurve, QPoint
+    QEasingCurve, QPoint, QParallelAnimationGroup, QMetaObject, QCoreApplication
 
 MUTEX_NAME = "Assistant_123456789AB"
+
 
 def activate_existing_window():
     hwnd = win32gui.FindWindow(None, "Ассистент")
@@ -104,7 +105,7 @@ class Assistant(QMainWindow):
 
     def __init__(self):
         super().__init__()
-        self.version = "1.3.4"
+        self.version = "1.3.5"
         self.ps = "Powered by theoldman"
         self.label_version = QLabel(f"Версия: {self.version} {self.ps}", self)
         self.label_message = QLabel('', self)
@@ -120,6 +121,7 @@ class Assistant(QMainWindow):
         self._update_dialog = None
         self.changelog_file_path = None
         self.is_assistant_running = False
+        self.microphone_available = True
         self.first_run = True
         self.assistant_thread = None
         self.censored_thread = None
@@ -328,9 +330,9 @@ class Assistant(QMainWindow):
         right_layout = QVBoxLayout()
 
         # Левая панель (кнопки)
-        self.start_button = QPushButton("Старт ассистента")
-        self.start_button.clicked.connect(self.start_assist_toggle)
-        left_layout.addWidget(self.start_button)
+        self.settings_button = QPushButton("Настройки")
+        self.settings_button.clicked.connect(self.open_main_settings)
+        left_layout.addWidget(self.settings_button)
 
         self.open_folder_button = QPushButton("Ваши ярлыки")
         self.open_folder_button.clicked.connect(self.open_folder_shortcuts)
@@ -339,10 +341,6 @@ class Assistant(QMainWindow):
         self.open_folder_button = QPushButton("Скриншоты")
         self.open_folder_button.clicked.connect(self.open_folder_screenshots)
         left_layout.addWidget(self.open_folder_button)
-
-        self.settings_button = QPushButton("Настройки")
-        self.settings_button.clicked.connect(self.open_main_settings)
-        left_layout.addWidget(self.settings_button)
 
         self.commands_button = QPushButton("Ваши команды")
         self.commands_button.clicked.connect(self.open_commands_settings)
@@ -355,6 +353,15 @@ class Assistant(QMainWindow):
         self.guide_button = QPushButton("Обучение")
         self.guide_button.clicked.connect(self.guide_options)
         left_layout.addWidget(self.guide_button)
+
+        self.start_button = QPushButton("Старт ассистента")
+        self.start_button.clicked.connect(self.start_assist_toggle)
+        left_layout.addWidget(self.start_button)
+
+        self.check_micro_btn = QPushButton("Нажмите для поиска микрофона")
+        self.check_micro_btn.clicked.connect(self._check_microphone_wrapper)
+        left_layout.addWidget(self.check_micro_btn)
+        self.check_micro_btn.hide()
 
         left_layout.addStretch()
 
@@ -401,6 +408,9 @@ class Assistant(QMainWindow):
         self.tray_icon.setIcon(QIcon(get_path('icon_assist.ico')))
         self.tray_icon.setToolTip("Ассистент")
 
+        check_micro = QAction("Найти микрофон", self)
+        check_micro.triggered.connect(self._check_microphone_wrapper)
+
         show_action = QAction("Развернуть", self)
         show_action.triggered.connect(self.show)
 
@@ -411,6 +421,7 @@ class Assistant(QMainWindow):
         quit_action.triggered.connect(self.close_app)
 
         tray_menu = QMenu()
+        tray_menu.addAction(check_micro)
         tray_menu.addAction(show_action)
         tray_menu.addAction(hide_action)
         tray_menu.addAction(quit_action)
@@ -633,8 +644,6 @@ class Assistant(QMainWindow):
                 audio_paths = self.audio_paths
                 update_button = audio_paths.get('update_button')
                 thread_react_detail(update_button)
-            else:
-                print("error")
         except Exception as e:
             debug_logger.error(f"Ошибка при запуске программы обновления: {e}")
 
@@ -1267,16 +1276,29 @@ class Assistant(QMainWindow):
     def stop_assist(self):
         """Остановка ассистента"""
         self.is_assistant_running = False
-        self.start_button.setText("Старт ассистента")  # Меняем текст кнопки
-        self.log_area.append("Ассистент остановлен...")  # Добавляем запись в лог
+        self.start_button.setText("Старт ассистента")
+        self.log_area.append("Ассистент остановлен...")
 
+        # Остановка звуковой реакции
         audio_paths = get_audio_paths(self.speaker)
         close_assist_folder = audio_paths.get('close_assist_folder')
-        react(close_assist_folder)
+        if close_assist_folder:
+            react(close_assist_folder)
 
-        # Остановка ассистента
-        if self.assistant_thread and self.assistant_thread.is_alive():
-            self.assistant_thread.join()  # Ожидание завершения потока
+        # Безопасная остановка потока
+        if hasattr(self, 'assistant_thread') and self.assistant_thread is not None:
+            try:
+                if self.assistant_thread.is_alive() and self.assistant_thread != threading.current_thread():
+                    self.assistant_thread.join(timeout=1.0)  # Уменьшаем таймаут
+                    if self.assistant_thread.is_alive():
+                        logger.warning("Поток ассистента не завершился в течение таймаута")
+            except Exception as e:
+                logger.error(f"Ошибка при остановке потока: {e}")
+            finally:
+                self.assistant_thread = None
+
+        # Очистка аудиоресурсов
+        self.cleanup_audio_resources()
 
     def censor_counter(self):
         # Путь к CSV-файлу
@@ -1345,7 +1367,6 @@ class Assistant(QMainWindow):
         last_activity_time = time.time()  # Время последней активности
         name_mentioned_time = None  # Время последнего упоминания имени ассистента
         name_mentioned = False  # Флаг, что имя было упомянуто
-
         if not self.initialize_audio():
             return
 
@@ -1649,7 +1670,6 @@ class Assistant(QMainWindow):
             self.show_message(f"Ошибка в основном цикле ассистента: {e}", "Ошибка",
                               "warning")
 
-
     # "Основной цикл ассистента(конец)"
     # "--------------------------------------------------------------------------------------------------"
     # "Основной цикл ассистента(конец)"
@@ -1687,6 +1707,7 @@ class Assistant(QMainWindow):
 
     def initialize_audio(self):
         """Инициализация моделей и аудиопотока."""
+        self.cleanup_audio_resources()
         logger.info("Загрузка моделей для распознавания...")
         debug_logger.debug("Загрузка моделей для распознавания...")
         model_path_ru = get_path("bin", "model_ru")
@@ -1708,68 +1729,195 @@ class Assistant(QMainWindow):
             logger.error(f"Ошибка при загрузке модели: {e}. Возможно путь содержит кириллицу.")
             debug_logger.error(f"Ошибка при загрузке модели: {e}. Возможно путь содержит кириллицу.")
             return False
+        try:
+            # Инициализация распознавателей
+            self.rec_ru = KaldiRecognizer(self.model_ru, 16000)
+            self.rec_en = KaldiRecognizer(self.model_en, 16000)
 
-        # Инициализация распознавателей
-        self.rec_ru = KaldiRecognizer(self.model_ru, 16000)
-        self.rec_en = KaldiRecognizer(self.model_en, 16000)
-
-        # Инициализация аудиопотока
-        self.p = pyaudio.PyAudio()
-        self.stream = self.p.open(format=pyaudio.paInt16, channels=1, rate=16000, input=True, frames_per_buffer=512)
-        self.stream.start_stream()
-
+            # Инициализация аудиопотока
+            self.p = pyaudio.PyAudio()
+            self.stream = self.p.open(format=pyaudio.paInt16, channels=1, rate=16000, input=True, frames_per_buffer=512)
+            self.stream.start_stream()
+        except IOError as e:
+            if e.errno == -9999:  # Unanticipated host error
+                logger.error("Ошибка аудиоустройства: микрофон недоступен")
+                debug_logger.error("Ошибка аудиоустройства: микрофон недоступен")
+                self.handle_microphone_disconnected()
+                return False
+        self.microphone_available = True
         return True
 
     def get_audio(self):
         """Преобразование речи с микрофона в текст."""
         try:
             while self.is_assistant_running:
-                data = self.stream.read(512, exception_on_overflow=False)
-                if len(data) == 0:
+                try:
+                    # Проверка состояния потока
+                    if not hasattr(self, 'stream') or self.stream is None or not self.stream.is_active():
+                        logger.warning("Аудиопоток неактивен, попытка переинициализации")
+                        self.cleanup_audio_resources()
+                        if not self.initialize_audio():
+                            break
+                    data = self.stream.read(512, exception_on_overflow=False)
+                    if len(data) == 0:
+                        break
+
+                    # Сбрасываем промежуточные результаты
+                    ru_text = ""
+                    en_text = ""
+
+                    # Обрабатываем через русскую модель
+                    if self.rec_ru.AcceptWaveform(data):
+                        result = json.loads(self.rec_ru.Result())
+                        ru_text = result.get("text", "").strip().lower()
+
+                    # Обрабатываем через английскую модель
+                    if self.rec_en.AcceptWaveform(data):
+                        result = json.loads(self.rec_en.Result())
+                        temp_en = result.get("text", "").strip().lower()
+                        if temp_en and temp_en != "huh":
+                            en_text = temp_en
+
+                    # Определяем приоритетный результат
+                    final_text = ""
+                    if ru_text:  # Русский текст имеет высший приоритет
+                        final_text = ru_text
+                        logger.info(f"Распознано [RU]: {ru_text}")
+                        debug_logger.info(f"Распознано [RU]: {ru_text}")
+                    elif en_text:  # Если русского нет, используем английский
+                        final_text = en_text
+                        logger.info(f"Распознано [EN]: {en_text}")
+                        debug_logger.info(f"Распознано [EN]: {en_text}")
+
+                    if final_text:
+                        yield final_text
+
+                except IOError as e:
+                    if e.errno == -9999:  # Unanticipated host error
+                        logger.error("Ошибка аудиоустройства: микрофон недоступен")
+                        debug_logger.error("Ошибка аудиоустройства: микрофон недоступен")
+                        self.microphone_available = False
+                        self.handle_microphone_disconnected()
+                        break
+                    raise
+                except Exception as e:
+                    logger.error(f"Ошибка в аудиопотоке: {e}")
                     break
 
-                # Сбрасываем промежуточные результаты
-                ru_text = ""
-                en_text = ""
+        except Exception as e:
+            logger.error(f"Критическая ошибка в аудиопотоке: {e}")
+            debug_logger.error(f"Критическая ошибка в аудиопотоке: {e}\n{traceback.format_exc()}")
+            self.handle_microphone_disconnected()
+        finally:
+            self.cleanup_audio_resources()
 
-                # Обрабатываем через русскую модель
-                if self.rec_ru.AcceptWaveform(data):
-                    result = json.loads(self.rec_ru.Result())
-                    ru_text = result.get("text", "").strip().lower()
+    def _check_microphone_wrapper(self):
+        """Обертка для безопасной проверки микрофона"""
+        try:
+            self.check_microphone()
+            # Если микрофон доступен и ассистент не работает - запускаем
+            if self.microphone_available and not self.is_assistant_running:
+                self.show_notification_message(message="Микрофон обнаружен!")
+                self.run_assist()
+                self.check_micro_btn.hide()
+            elif self.microphone_available and self.is_assistant_running:
+                self.show_notification_message(message="Микрофон подключен!")
+            else:
+                self.show_notification_message(message="Микрофон не найден!")
+        except Exception as e:
+            logger.error(f"Ошибка в _check_microphone_wrapper: {e}")
 
-                # Обрабатываем через английскую модель
-                if self.rec_en.AcceptWaveform(data):
-                    result = json.loads(self.rec_en.Result())
-                    temp_en = result.get("text", "").strip().lower()
-                    if temp_en and temp_en != "huh":
-                        en_text = temp_en
+    def check_microphone(self):
+        """Проверка состояния микрофона с попыткой реального доступа"""
+        debug_logger.info("Полная проверка микрофона...")
+        try:
+            p = pyaudio.PyAudio()
 
-                # Определяем приоритетный результат
-                final_text = ""
-                if ru_text:  # Русский текст имеет высший приоритет
-                    final_text = ru_text
-                    logger.info(f"Распознано [RU]: {ru_text}")
-                    debug_logger.info(f"Распознано [RU]: {ru_text}")
-                elif en_text:  # Если русского нет, используем английский
-                    final_text = en_text
-                    logger.info(f"Распознано [EN]: {en_text}")
-                    debug_logger.info(f"Распознано [EN]: {en_text}")
+            # 1. Проверка наличия устройств вообще
+            devices = [p.get_device_info_by_index(i)
+                       for i in range(p.get_device_count())]
 
-                if final_text:
-                    yield final_text
+            # 2. Фильтрация виртуальных устройств
+            active_mics = []
+            for device in devices:
+                if device.get('maxInputChannels', 0) > 0:
+                    try:
+                        stream = p.open(
+                            format=pyaudio.paInt16,
+                            channels=1,
+                            rate=44100,
+                            input=True,
+                            input_device_index=device['index'],
+                            frames_per_buffer=1024,
+                            start=False
+                        )
+                        stream.start_stream()
+                        stream.stop_stream()
+                        stream.close()
+                        active_mics.append(device)
+                    except:
+                        continue
+
+            p.terminate()
+
+            # Итоговая проверка
+            if active_mics:
+                self.microphone_available = True
+                debug_logger.info(f"Рабочие микрофоны: {[d['name'] for d in active_mics]}")
+                return True
+            else:
+                self.microphone_available = False
+                logger.info("Нет рабочих микрофонов (все отключены или недоступны)")
+                return False
+
+        except IOError as e:
+            self.microphone_available = False
+            if e.errno == -9999:
+                debug_logger.error("Аудиосистема недоступна (код -9999)")
+            else:
+                debug_logger.error(f"Ошибка ввода-вывода: {e}")
+            return False
+        except Exception as e:
+            self.microphone_available = False
+            debug_logger.error(f"Общая ошибка проверки: {e}")
+            return False
+
+    def handle_microphone_disconnected(self):
+        """Обработка отключения микрофона"""
+        if self.is_assistant_running:
+            logger.warning("Останавливаем ассистент из-за отключения микрофона")
+            self.stop_assist()
+            self.check_micro_btn.show()
+
+    def cleanup_audio_resources(self):
+        """Безопасное освобождение ресурсов аудио"""
+        try:
+            # Остановка потока
+            if hasattr(self, 'stream') and self.stream is not None:
+                try:
+                    if self.stream.is_active():
+                        self.stream.stop_stream()
+                except Exception as stop_error:
+                    logger.error(f"Ошибка при остановке потока: {stop_error}")
+                try:
+                    self.stream.close()
+                except Exception as close_error:
+                    logger.error(f"Ошибка при закрытии потока: {close_error}")
+                finally:
+                    self.stream = None
+
+            # Очистка PyAudio
+            if hasattr(self, 'p') and self.p is not None:
+                try:
+                    self.p.terminate()
+                except Exception as term_error:
+                    logger.error(f"Ошибка при завершении PyAudio: {term_error}")
+                finally:
+                    self.p = None
 
         except Exception as e:
-            error_file = self.audio_paths.get('error_file')
-            thread_react_detail(error_file)
-            logger.error(f"Ошибка при обработке аудиоданных: {e}")
-            debug_logger.error(f"Ошибка при обработке аудиоданных: {e}")
-            debug_logger.error(traceback.format_exc())
-        finally:
-            logger.info("Остановка аудиопотока...")
-            debug_logger.info("Остановка аудиопотока...")
-            self.stream.stop_stream()
-            self.stream.close()
-            self.p.terminate()
+            logger.error(f"Критическая ошибка при очистке ресурсов: {e}")
+            debug_logger.error(f"Критическая ошибка при очистке ресурсов: {e}", exc_info=True)
 
     def handle_app_command(self, text, action):
         """Обработка команд для приложений"""
@@ -2123,7 +2271,7 @@ class Assistant(QMainWindow):
             )
             success_msg = f"Задача '{task_name}' удалена из автозапуска"
             debug_logger.info(success_msg)
-            self.show_notification_message(message=f"Задача '{task_name}' удалена из автозапуска")
+            self.show_notification_message(message=f"Программа удалена из автозапуска")
         except subprocess.CalledProcessError as e:
             if "не существует" not in e.stderr:
                 error_msg = f"Ошибка при удалении задачи '{task_name}': {e.stderr}"
@@ -2667,7 +2815,18 @@ class ToastNotification(QDialog):
         self.init_ui()
         self.load_and_apply_styles()
 
-    def init_ui(self):  # Переименовал в init_ui(), чтобы не путать с __init__
+        self.opacity_animation = QPropertyAnimation(self, b"windowOpacity")
+        self.opacity_animation.setDuration(300)  # Продолжительность анимации прозрачности
+        self.opacity_animation.setKeyValueAt(0.0, 0.0)
+        self.opacity_animation.setKeyValueAt(0.7, 0.0)
+        self.opacity_animation.setKeyValueAt(1.0, 1.0)
+
+        # Модифицируем анимацию позиции для движения сверху вниз
+        self.animation = QPropertyAnimation(self, b"pos")
+        self.animation.setEasingCurve(QEasingCurve.OutQuad)
+        self.animation.setDuration(700)
+
+    def init_ui(self):
         # Настройки окна
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.Tool | Qt.WindowStaysOnTopHint)
         self.setAttribute(Qt.WA_ShowWithoutActivating)
@@ -2691,7 +2850,7 @@ class ToastNotification(QDialog):
         # --- Заголовок (TitleBar) ---
         self.title_bar = QWidget()
         self.title_bar.setObjectName("TitleBar")  # Это ключ для стиля из JSON
-        self.title_bar.setFixedHeight(15)  # Высота полоски
+        self.title_bar.setFixedHeight(1)  # Высота полоски
         main_layout.addWidget(self.title_bar)
 
         # --- Контент: иконка + текст ---
@@ -2728,19 +2887,6 @@ class ToastNotification(QDialog):
         self.timer.setSingleShot(True)
         self.timer.timeout.connect(self.hide_animated)
 
-    def showEvent(self, event):
-        screen_geo = QApplication.primaryScreen().geometry()
-        x = screen_geo.width()
-        y = screen_geo.height() - self.height() - 50
-        self.move(x, y)
-
-        end_pos = QPoint(screen_geo.width() - self.width() - 20, y)
-        self.animation.setStartValue(self.pos())
-        self.animation.setEndValue(end_pos)
-        self.animation.start()
-
-        self.timer.start(self.timeout)
-
     def close_immediately(self):
         """Немедленное закрытие без анимации"""
         # Отключаем таймер и анимацию
@@ -2756,15 +2902,67 @@ class ToastNotification(QDialog):
         if ToastNotification._active_toast is self:
             ToastNotification._active_toast = None
 
-    def hide_animated(self):
-        """Анимированное закрытие с последующим удалением"""
-        screen_geo = QApplication.primaryScreen().geometry()
-        end_pos = QPoint(screen_geo.width(), self.y())
+    def showEvent(self, event):
+        # Устанавливаем начальную прозрачность
+        self.setWindowOpacity(0.0)
 
-        self.animation.setStartValue(self.pos())
-        self.animation.setEndValue(end_pos)
-        self.animation.finished.connect(self.close_immediately)  # Используем close_immediately
+        if self.parent:
+            parent_geo = self.parent.geometry()
+            # Начальная позиция - выше верхнего края окна
+            start_x = parent_geo.right() - self.width()
+            start_y = parent_geo.top() - self.height()
+            # Конечная позиция - у верхнего края окна с небольшим отступом
+            end_x = start_x
+            end_y = parent_geo.top() + 34
+        else:
+            screen_geo = QApplication.primaryScreen().geometry()
+            # Начальная позиция - выше верхнего края экрана
+            start_x = screen_geo.width() - self.width()
+            start_y = -self.height()
+            # Конечная позиция - у верхнего края экрана с небольшим отступом
+            end_x = start_x
+            end_y = 0
+
+        self.move(start_x, start_y)
+        self.show()
+
+        # Настраиваем анимацию позиции
+        self.animation.setStartValue(QPoint(start_x, start_y))
+        self.animation.setEndValue(QPoint(end_x, end_y))
+
+        # Запускаем обе анимации параллельно
         self.animation.start()
+        self.opacity_animation.start()
+
+        # Таймер для автоматического скрытия
+        self.timer.start(self.timeout)
+
+    def hide_animated(self):
+        """Анимация скрытия с изменением прозрачности"""
+        # Создаем анимацию для исчезновения
+        hide_opacity_animation = QPropertyAnimation(self, b"windowOpacity")
+        hide_opacity_animation.setDuration(500)
+        hide_opacity_animation.setKeyValueAt(0.0, 1.0)
+        hide_opacity_animation.setKeyValueAt(0.1, 0.8)
+        hide_opacity_animation.setKeyValueAt(0.4, 0.0)
+        hide_opacity_animation.setKeyValueAt(1.0, 0.0)
+
+        current_pos = self.pos()
+        end_pos = QPoint(current_pos.x(), -self.height())
+
+        # Настраиваем анимацию движения вверх
+        move_animation = QPropertyAnimation(self, b"pos")
+        move_animation.setDuration(500)
+        move_animation.setStartValue(current_pos)
+        move_animation.setEndValue(end_pos)
+        move_animation.setEasingCurve(QEasingCurve.InQuad)
+
+        # Группируем анимации
+        self.animation_group = QParallelAnimationGroup()
+        self.animation_group.addAnimation(hide_opacity_animation)
+        self.animation_group.addAnimation(move_animation)
+        self.animation_group.finished.connect(self.close_immediately)
+        self.animation_group.start()
 
     def load_and_apply_styles(self):
         """
