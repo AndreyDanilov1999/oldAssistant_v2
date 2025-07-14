@@ -69,62 +69,80 @@ def get_filename_from_cd(cd):
     match = re.search(r'filename="?([^"]+)"?', cd)
     return match.group(1) if match else None
 
+
 def download_update(type_version, on_complete=None):
-    """Загрузка файла с сохранением оригинального имени и очисткой старых версий"""
+    """Загрузка файла с сохранением оригинального имени, очисткой старых версий и обработкой прерываний"""
     if type_version not in ["stable", "exp"]:
         debug_logger.error("Недопустимый тип версии")
         return None
 
     domain = "https://owl-app.ru"
-    dev_domain = "http://127.0.0.1:8000"
+    dev_domain = "http://127.0.0.1:5000"
     download_url = f"{domain}/download/{type_version}"
+    temp_suffix = ".tempdownload"  # Суффикс для временных файлов
+    file_path = None
 
     try:
         download_dir = get_path("update")
         os.makedirs(download_dir, exist_ok=True)
 
-        # Заголовок Content-Disposition и имя файла
+        # Получаем имя файла из заголовков
         with requests.head(download_url, allow_redirects=True) as r:
             r.raise_for_status()
             content_disposition = r.headers.get('Content-Disposition')
-            filename = get_filename_from_cd(content_disposition)
-
-            if not filename:
-                filename = f"{type_version}_update.zip"
+            filename = get_filename_from_cd(content_disposition) or f"{type_version}_update.zip"
 
         file_path = os.path.join(download_dir, filename)
+        temp_file_path = file_path + temp_suffix
 
-        # Проверяем, существует ли такой файл уже
+        # Если уже есть полная версия файла
         if os.path.exists(file_path):
             debug_logger.info(f"Файл уже существует: {file_path}")
             if callable(on_complete):
                 on_complete(file_path, success=True, skipped=True)
             return file_path
 
-        # Скачиваем, только если файла нет
+        # Удаляем старые временные файлы (если есть)
+        if os.path.exists(temp_file_path):
+            os.remove(temp_file_path)
+
+        # Скачиваем во временный файл
         debug_logger.info(f"Начинаю загрузку: {filename}")
         with requests.get(download_url, stream=True, allow_redirects=True) as r:
             r.raise_for_status()
-            with open(file_path, 'wb') as f:
+
+            # Получаем ожидаемый размер файла
+            total_size = int(r.headers.get('content-length', 0))
+
+            with open(temp_file_path, 'wb') as f:
                 for chunk in r.iter_content(chunk_size=8192):
-                    f.write(chunk)
+                    if chunk:  # Фильтруем keep-alive chunks
+                        f.write(chunk)
 
-        debug_logger.info(f"Файл успешно загружен: {file_path}")
+        # Проверяем целостность скачанного файла
+        if os.path.getsize(temp_file_path) == total_size or total_size == 0:
+            # Переименовываем временный файл в постоянный
+            os.rename(temp_file_path, file_path)
+            debug_logger.info(f"Файл успешно загружен: {file_path}")
 
-        if callable(on_complete):
-            on_complete(file_path, success=True, skipped=False)
+            if callable(on_complete):
+                on_complete(file_path, success=True, skipped=False)
+            return file_path
+        else:
+            raise Exception("Размер скачанного файла не соответствует ожидаемому")
 
-        return file_path
-
-    except requests.exceptions.RequestException as e:
-        error_msg = f"Ошибка сети при загрузке: {str(e)}"
-        debug_logger.error(error_msg)
-        if callable(on_complete):
-            on_complete(None, success=False, error=error_msg)
-        return None
-    except Exception as e:
-        error_msg = f"Неожиданная ошибка: {str(e)}"
+    except (requests.exceptions.RequestException, Exception) as e:
+        error_msg = f"Ошибка при загрузке: {str(e)}"
         debug_logger.error(error_msg, exc_info=True)
+
+        # Удаляем временный файл при ошибке
+        if 'temp_file_path' in locals() and os.path.exists(temp_file_path):
+            try:
+                os.remove(temp_file_path)
+                debug_logger.info(f"Удален неполный файл: {temp_file_path}")
+            except Exception as cleanup_error:
+                debug_logger.error(f"Ошибка при удалении временного файла: {str(cleanup_error)}")
+
         if callable(on_complete):
             on_complete(None, success=False, error=error_msg)
         return None

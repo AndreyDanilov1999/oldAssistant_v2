@@ -1,11 +1,11 @@
 {
     "QWidget": {
-        "background-color": "#11110f",
+        "background-color": "#130403",
         "color": "#e5e5e5",
         "font-size": "13px"
     },
     "QPushButton": {
-        "background-color": "#241101",
+        "background-color": "qlineargradient(x1:1.0, y1:1.0, x2:0.1, y2:0.1, stop:0 #000000, stop:1 #380C07)",
         "color": "#e5e5e5",
         "height": "30px",
         "border": "1px solid #d05000",
@@ -23,7 +23,7 @@
         "padding-top": "3px"
     },
     "QTextEdit": {
-        "background-color": "#11110f",
+        "background-color": "qlineargradient(x1:1.0, y1:1.0, x2:0.1, y2:0.1, stop:0 #000000, stop:1 #1D0503)",
         "color": "#e57417",
         "border": "1px solid",
         "border-radius": "4px",
@@ -45,7 +45,7 @@
         "border-bottom": "1px solid #d05000"
     },
     "TrayButton": {
-        "background-color": "#241101",
+        "background-color": "qlineargradient(x1:1.0, y1:1.0, x2:0.1, y2:0.1, stop:0 #000000, stop:1 #380C07)",
         "color": "#e5e5e5",
         "height": "30px",
         "border": "1px solid #d05000",
@@ -58,7 +58,7 @@
         "border": "1px solid #0790EC"
     },
     "CloseButton": {
-        "background-color": "#241101",
+        "background-color": "qlineargradient(x1:1.0, y1:1.0, x2:0.1, y2:0.1, stop:0 #000000, stop:1 #380C07)",
         "color": "#e5e5e5",
         "height": "30px",
         "border": "1px solid #d05000",

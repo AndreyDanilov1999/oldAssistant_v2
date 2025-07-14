@@ -13,6 +13,8 @@ from PIL import ImageGrab, Image
 from bin.check_update import check_version, load_changelog, download_update
 from bin.guide_window import GuideWindow
 from bin.init import InitScreen
+from bin.signals import gui_signals
+from bin.widget_window import SmartWidget
 
 ctypes.windll.user32.SetProcessDPIAware()
 import io
@@ -105,7 +107,7 @@ class Assistant(QMainWindow):
 
     def __init__(self):
         super().__init__()
-        self.version = "1.3.5"
+        self.version = "1.3.6"
         self.ps = "Powered by theoldman"
         self.label_version = QLabel(f"Версия: {self.version} {self.ps}", self)
         self.label_message = QLabel('', self)
@@ -125,6 +127,9 @@ class Assistant(QMainWindow):
         self.first_run = True
         self.assistant_thread = None
         self.censored_thread = None
+        self.widget_window = None
+        gui_signals.open_widget_signal.connect(self.open_widget)
+        gui_signals.close_widget_signal.connect(self.close_widget)
         self.last_position = 0
         self.MEMORY_LIMIT_MB = 1024
         self.log_file_path = get_path('assistant.log')
@@ -150,6 +155,7 @@ class Assistant(QMainWindow):
         self.is_censored = self.settings.get('is_censored', False)
         self.show_upd_msg = self.settings.get("show_upd_msg", False)
         self.is_min_tray = self.settings.get("minimize_to_tray", True)
+        self.is_widget = self.settings.get("is_widget", True)
         self.type_version = "stable"
         self.commands = self.load_commands()
         self.audio_paths = get_audio_paths(self.speaker)
@@ -165,6 +171,7 @@ class Assistant(QMainWindow):
         # Проверка автозапуска при старте программы
         self.check_autostart()
         self.check_start_win()
+        self.check_start_widget()
         # Прятать ли программу в трей
         if self.is_min_tray:
             # Показ окна при первом запуске(для отладки)
@@ -278,7 +285,7 @@ class Assistant(QMainWindow):
         self.title_bar_layout.addStretch()
 
         self.update_btn = QPushButton()
-        self.update_btn.setCursor(QCursor(Qt.PointingHandCursor))  # Курсор в виде руки
+        self.update_btn.setCursor(QCursor(Qt.PointingHandCursor))
         self.update_btn.setFixedSize(25, 25)
         self.update_btn.setStyleSheet("background: transparent;")
         self.update_btn.clicked.connect(self.open_update_app)
@@ -286,8 +293,8 @@ class Assistant(QMainWindow):
 
         # Добавляем SVG на кнопку
         self.update_svg = QSvgWidget(self.icon_update, self.update_btn)
-        self.update_svg.setFixedSize(24, 24)
-        self.update_svg.move(2, 3)  # Центрирование
+        self.update_svg.setFixedSize(20, 20)
+        self.update_svg.move(2, 2)
         self.title_bar_layout.addWidget(self.update_btn)
 
         self.start_win_btn = QPushButton()
@@ -299,7 +306,7 @@ class Assistant(QMainWindow):
         # Добавляем SVG на кнопку
         self.start_svg = QSvgWidget(self.icon_start_win, self.start_win_btn)
         self.start_svg.setFixedSize(13, 13)
-        self.start_svg.move(6, 6)  # Центрирование
+        self.start_svg.move(6, 6)
         self.title_bar_layout.addWidget(self.start_win_btn)
 
         # Кнопка "Свернуть"
@@ -363,10 +370,15 @@ class Assistant(QMainWindow):
         left_layout.addWidget(self.check_micro_btn)
         self.check_micro_btn.hide()
 
+        # self.sta_button = QPushButton("open widget")
+        # self.sta_button.clicked.connect(self.open_widget)
+        # left_layout.addWidget(self.sta_button)
+
         left_layout.addStretch()
 
         self.svg_image = QSvgWidget()
         self.svg_image.load(self.svg_file_path)
+        self.svg_image.setFixedSize(180, 180)
         self.svg_image.setStyleSheet("""
             background: transparent;
             border: none;
@@ -374,7 +386,7 @@ class Assistant(QMainWindow):
         """)
         self.color_svg = QGraphicsColorizeEffect()
         self.svg_image.setGraphicsEffect(self.color_svg)
-        left_layout.addWidget(self.svg_image)
+        left_layout.addWidget(self.svg_image, alignment=Qt.AlignCenter)
 
         # Текст "Доступно обновление"
         self.update_label = QLabel("")
@@ -707,8 +719,6 @@ class Assistant(QMainWindow):
             self.changelog_file_path = get_path('update', 'changelog.md')
 
             if latest_version > current_ver:
-                # download_update(type_version,
-                #                 on_complete=self.handle_download_complete)
                 self.download_thread = DownloadThread(type_version)
                 self.download_thread.download_complete.connect(self.handle_download_complete)
                 self.download_thread.finished.connect(self.dot_animation.stop)
@@ -719,18 +729,22 @@ class Assistant(QMainWindow):
                 self.check_update_label()
                 self.update_complete()
         except requests.Timeout:
+            self.dot_animation.stop()
             logger.warning("Таймаут при проверке обновлений")
             debug_logger.warning("Таймаут при проверке обновлений")
             self.update_label.setText("Ошибка соединения")
         except requests.RequestException as e:
+            self.dot_animation.stop()
             logger.error(f"Ошибка сети: {str(e)}")
             debug_logger.warning(f"Ошибка сети: {str(e)}")
             self.update_label.setText("Нет соединения")
         except ValueError as e:
+            self.dot_animation.stop()
             logger.error(f"Ошибка формата данных: {str(e)}")
             debug_logger.warning(f"Ошибка формата данных: {str(e)}")
             self.update_label.setText("Ошибка данных")
         except Exception as e:
+            self.dot_animation.stop()
             logger.error(f"Неожиданная ошибка")
             debug_logger.error(f"Неожиданная ошибка: {str(e)}", exc_info=True)
             self.update_label.setText("Ошибка обновления")
@@ -764,7 +778,7 @@ class Assistant(QMainWindow):
         self.showNormal()
         self.raise_()
         self.activateWindow()
-        QTimer.singleShot(100, lambda: self.update_app)
+        QTimer.singleShot(3000, lambda: self.update_app)
 
     def show_update_notice(self, version):
         """Показ уведомления о новой версии"""
@@ -1080,7 +1094,8 @@ class Assistant(QMainWindow):
             "volume_assist": self.volume_assist,
             "show_upd_msg": self.show_upd_msg,
             "minimize_to_tray": self.is_min_tray,
-            "start_win": self.toggle_start
+            "start_win": self.toggle_start,
+            "is_widget": self.is_widget
         }
         try:
             # Проверяем, существует ли папка user_settings
@@ -1147,6 +1162,11 @@ class Assistant(QMainWindow):
                 self.hide()
             else:
                 # Если окно скрыто - разворачиваем
+                screen_geometry = self.screen().availableGeometry()
+                self.move(
+                    (screen_geometry.width() - self.width()) // 2,
+                    (screen_geometry.height() - self.height()) // 2
+                )
                 self.showNormal()
                 self.show()
                 self.activateWindow()
@@ -1458,6 +1478,7 @@ class Assistant(QMainWindow):
                             'диспетчер': (open_taskmgr, close_taskmgr),
                             'корзин': (open_recycle_bin, close_recycle_bin),
                             'дат': (open_appdata, close_appdata),
+                            'панел': (self._open_widget_signal, self._close_widget_signal),
                         }
 
                         # Ищем совпадение со специальными командами
@@ -1578,6 +1599,11 @@ class Assistant(QMainWindow):
                                     open_appdata()
                                 else:
                                     close_appdata()
+                            elif 'панел' in command:
+                                if action_type == 'open':
+                                    self._open_widget_signal()
+                                elif action_type == 'close':
+                                    self._close_widget_signal()
                             else:
                                 # Пытаемся обработать команду
                                 app_processed = self.handle_app_command(command, action_type)
@@ -1939,6 +1965,64 @@ class Assistant(QMainWindow):
                 return True  # Возвращаем True, если команда была успешно обработана
         return False  # Возвращаем False, если команда не была найдена
 
+    def _open_widget_signal(self):
+        try:
+            gui_signals.open_widget_signal.emit()
+        except Exception as e:
+            debug_logger.error(f"Ошибка при запуске сигнала виджета: {e}")
+
+    def _close_widget_signal(self):
+        try:
+            gui_signals.close_widget_signal.emit()
+        except Exception as e:
+            debug_logger.error(f"Ошибка при запуске сигнала виджета (на закрытие): {e}")
+
+    def open_widget(self):
+        QTimer.singleShot(200, self._show_smart_widget)
+
+    def _show_smart_widget(self):
+        try:
+            # Полная проверка существующего виджета
+            widget_exists = (
+                    hasattr(self, 'widget_window') and
+                    self.widget_window is not None and
+                    isinstance(self.widget_window, SmartWidget))
+
+            if widget_exists and self.widget_window.isVisible():
+                return  # Виджет уже видим - ничего не делаем
+
+            if widget_exists:
+                # Виджет существует, но скрыт - показываем
+                self.widget_window.show()
+            else:
+                # Создаем новый виджет
+                self.widget_window = SmartWidget(self)
+                self.widget_window.show()
+
+        except Exception as e:
+            debug_logger.error(f"Ошибка при открытии виджета: {str(e)}")
+            self.show_notification_message(f"Ошибка при открытии виджета: {str(e)}")
+
+    def close_widget(self):
+        try:
+            if hasattr(self, "widget_window"):
+                self.widget_window.close()
+                self.show()
+                self.hide()
+        except Exception as e:
+            error_message = self.audio_paths("error_file")
+            thread_react_detail(error_message)
+            self.show_notification_message(f"Ошибка при закрытии виджета (close_widget): {e}")
+            debug_logger.error(f"Ошибка при закрытии виджета (close_widget): {e}")
+
+    def restore_and_hide(self):
+        """Показываем окно и сразу скрываем — чтобы оно стало 'живым'"""
+        self.move(-2000, -2000)
+        self.showNormal()  # Восстанавливаем из минимизации/скрытия
+        self.raise_()  # Поднимаем поверх всех
+        self.activateWindow()  # Делаем активным
+        QTimer.singleShot(50, self.hide)
+
     def open_folder_shortcuts(self):
         """Обработка нажатия кнопки 'Открыть папку с ярлыками'"""
         folder_path = get_path('user_settings', "links for assist")
@@ -2092,6 +2176,10 @@ class Assistant(QMainWindow):
         else:
             self.update_svg_contrast_color(self.start_svg)
 
+    def check_start_widget(self):
+        if self.is_widget:
+            self.open_widget()
+
     def toggle_start_win(self):
         """Переключает состояние и меняет цвет иконки"""
         self.toggle_start = not self.toggle_start
@@ -2114,7 +2202,6 @@ class Assistant(QMainWindow):
             border_bottom = styles.get("TitleBar", {}).get("border-bottom", "")
             new_color = next((p for p in border_bottom.split() if p.startswith("#")), "#FFFFFF")
 
-            # Ищем цвет в border-bottom свойствах TitleBar
             bg_color = styles.get("QWidget", {}).get("background-color", "")
             base_bg_color = next((p for p in bg_color.split() if p.startswith("#")), "#FFFFFF")
             base_bg_color = QColor(base_bg_color)

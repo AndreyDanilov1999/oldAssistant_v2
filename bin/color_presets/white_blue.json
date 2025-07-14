@@ -1,29 +1,29 @@
 {
     "QWidget": {
-        "background-color": "#d2e2f1",
+        "background-color": "#BCDAF6",
         "color": "#000000",
         "font-size": "13px"
     },
     "QPushButton": {
-        "background-color": "#2ec1ce",
+        "background-color": "qlineargradient(x1:1.0, y1:1.0, x2:0.1, y2:0.1, stop:0 #ffffff, stop:1 #429FF3)",
         "color": "#000000",
         "height": "30px",
-        "border": "1px solid #2ec1ce",
+        "border": "1px solid #3EA3FF",
         "border-radius": "3px",
         "font-size": "13px"
     },
     "QPushButton:hover": {
-        "background-color": "#24b7c4",
+        "background-color": "#7FBEF7",
         "color": "#000000",
         "font-size": "13px"
     },
     "QPushButton:pressed": {
-        "background-color": "#10a3b0",
+        "background-color": "#2590F1",
         "padding-left": "3px",
         "padding-top": "3px"
     },
     "QTextEdit": {
-        "background-color": "#d2e2f1",
+        "background-color": "qlineargradient(x1:1.0, y1:1.0, x2:0.1, y2:0.1, stop:0 #ffffff, stop:1 #A2D0F9)",
         "color": "#04047a",
         "border": "1px solid",
         "border-radius": "4px",
@@ -42,13 +42,13 @@
         "font-size": "12px"
     },
     "TitleBar": {
-        "border-bottom": "1px solid #2ec1ce"
+        "border-bottom": "1px solid #3EA3FF"
     },
     "TrayButton": {
-        "background-color": "#2ec1ce",
+        "background-color": "qlineargradient(x1:1.0, y1:1.0, x2:0.1, y2:0.1, stop:0 #ffffff, stop:1 #429FF3)",
         "color": "#000000",
         "height": "30px",
-        "border": "1px solid #2ec1ce",
+        "border": "1px solid #3EA3FF",
         "border-radius": "3px",
         "font-size": "13px"
     },
@@ -58,10 +58,10 @@
         "border": "1px solid #0790EC"
     },
     "CloseButton": {
-        "background-color": "#2ec1ce",
+        "background-color": "qlineargradient(x1:1.0, y1:1.0, x2:0.1, y2:0.1, stop:0 #ffffff, stop:1 #429FF3)",
         "color": "#000000",
         "height": "30px",
-        "border": "1px solid #2ec1ce",
+        "border": "1px solid #3EA3FF",
         "border-radius": "3px",
         "font-size": "13px"
     },

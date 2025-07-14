@@ -1,12 +1,13 @@
 {
-    "voice": "persik",
+    "voice": "sanboy",
     "assistant_name": "сан",
     "assist_name2": "сан",
     "assist_name3": "сан",
-    "steam_path": "D:/Steam/steam.exe",
+    "steam_path": "D:\\Steam\\steam.exe",
     "is_censored": true,
     "volume_assist": 0.2,
     "show_upd_msg": true,
     "minimize_to_tray": false,
-    "start_win": true
+    "start_win": true,
+    "is_widget": true
 }

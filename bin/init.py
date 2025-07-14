@@ -24,6 +24,7 @@ class InitScreen(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.styles = None
+        self.default_preset_style = get_path("bin", "color_presets", "default.json")
         self.style_path = get_path('user_settings', 'color_settings.json')
         self.svg_path = get_path("bin", "owl_start.svg")
         self.init()

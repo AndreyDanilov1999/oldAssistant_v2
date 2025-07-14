@@ -1,14 +1,13 @@
 import json
 import os
-
+from bin.signals import color_signal
 from bin.speak_functions import thread_react
 from path_builder import get_path
 from logging_config import logger, debug_logger
 from PyQt5.QtCore import QSettings, pyqtSignal, Qt, QPoint, QPropertyAnimation, QEasingCurve
 from PyQt5.QtGui import QColor
 from PyQt5.QtWidgets import QFileDialog, QMessageBox, QPushButton, QCheckBox, QLineEdit, QLabel, QSlider, QComboBox, \
-    QVBoxLayout, QWidget, QDialog, QColorDialog, QFrame, QStackedWidget, QHBoxLayout, QGraphicsDropShadowEffect, \
-    QDialogButtonBox, QButtonGroup, QApplication
+    QVBoxLayout, QWidget, QDialog, QColorDialog, QFrame, QStackedWidget, QHBoxLayout, QApplication
 
 speakers = dict(Персик="persik", Джарвис="jarvis", Пласид='placide', Бестия='rogue',
                 Джонни='johnny', СанСаныч='sanych', Санбой='sanboy', Тигрица='tigress', Стейтем='stathem')
@@ -454,6 +453,7 @@ class InterfaceWidget(QWidget):
                 self.assistant.styles = styles
                 self.assistant.load_and_apply_styles()
                 self.assistant.check_start_win()
+                color_signal.color_changed.emit()
                 self.assistant.show_notification_message(message=f"Стиль успешно применен!")
                 debug_logger.info(f"Применён стиль из файла: {filename}")
 
@@ -1378,7 +1378,6 @@ class SettingsWidget(QWidget):
         self.update_check.stateChanged.connect(self.toggle_update)
         layout.addWidget(self.update_check)
 
-        # Чекбокс для сворачивания в трей
         self.start_win_check = QCheckBox("Запуск с Windows", self)
         self.start_win_check.setChecked(self.assistant.toggle_start)
         self.start_win_check.stateChanged.connect(self.assistant.toggle_start_win)
@@ -1389,6 +1388,12 @@ class SettingsWidget(QWidget):
         self.minimize_check.setChecked(self.assistant.is_min_tray)
         self.minimize_check.stateChanged.connect(self.toggle_minimize)
         layout.addWidget(self.minimize_check)
+
+        self.widget_check = QCheckBox("Запускать виджет", self)
+        self.widget_check.setToolTip("Открытие виджета при запуске программы")
+        self.widget_check.setChecked(self.assistant.is_widget)
+        self.widget_check.stateChanged.connect(self.toggle_widget)
+        layout.addWidget(self.widget_check)
 
         layout.addStretch()
 
@@ -1409,6 +1414,10 @@ class SettingsWidget(QWidget):
     def toggle_minimize(self):
         """Обработка чекбокса 'Сворачивать в трей'"""
         self.assistant.is_min_tray = self.minimize_check.isChecked()
+
+    def toggle_widget(self):
+        """Обработка чекбокса 'Запускать виджет'"""
+        self.assistant.is_widget = self.widget_check.isChecked()
 
     def select_steam_folder(self):
         folder_path = QFileDialog.getExistingDirectory(

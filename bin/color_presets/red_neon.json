@@ -1,14 +1,14 @@
 {
     "QWidget": {
-        "background-color": "#191819",
+        "background-color": "#120E0E",
         "color": "#ffffff",
         "font-size": "13px"
     },
     "QPushButton": {
-        "background-color": "#340c0e",
+        "background-color": "qlineargradient(x1:1.0, y1:1.0, x2:0.1, y2:0.1, stop:0 #000000, stop:1 #411215)",
         "color": "#ffffff",
         "height": "30px",
-        "border": "1px solid #ff2222",
+        "border": "1px solid #D62D2D",
         "border-radius": "3px",
         "font-size": "13px"
     },
@@ -23,14 +23,14 @@
         "padding-top": "3px"
     },
     "QTextEdit": {
-        "background-color": "#191819",
-        "color": "#ff4548",
+        "background-color": "qlineargradient(x1:1.0, y1:1.0, x2:0.1, y2:0.1, stop:0 #000000, stop:1 #230A0B)",
+        "color": "#F18E90",
         "border": "1px solid",
         "border-radius": "4px",
         "font-size": "15px"
     },
     "label_version": {
-        "color": "#ff4548",
+        "color": "#F18E90",
         "font-size": "10px"
     },
     "label_message": {
@@ -38,17 +38,17 @@
         "font-size": "13px"
     },
     "update_label": {
-        "color": "#ff4548",
+        "color": "#F18E90",
         "font-size": "12px"
     },
     "TitleBar": {
-        "border-bottom": "1px solid #ff2222"
+        "border-bottom": "1px solid #D62D2D"
     },
     "TrayButton": {
-        "background-color": "#340c0e",
+        "background-color": "qlineargradient(x1:1.0, y1:1.0, x2:0.1, y2:0.1, stop:0 #000000, stop:1 #411215)",
         "color": "#ffffff",
         "height": "30px",
-        "border": "1px solid #ff2222",
+        "border": "1px solid #D62D2D",
         "border-radius": "3px",
         "font-size": "13px"
     },
@@ -58,10 +58,10 @@
         "border": "1px solid #0790EC"
     },
     "CloseButton": {
-        "background-color": "#340c0e",
+        "background-color": "qlineargradient(x1:1.0, y1:1.0, x2:0.1, y2:0.1, stop:0 #000000, stop:1 #411215)",
         "color": "#ffffff",
         "height": "30px",
-        "border": "1px solid #ff2222",
+        "border": "1px solid #D62D2D",
         "border-radius": "3px",
         "font-size": "13px"
     },
@@ -71,6 +71,6 @@
         "border": "1px solid #E04F4F"
     },
     "MessageContainer": {
-        "border": "1px solid #2ad0ca"
+        "border": "1px solid #D62D2D"
     }
 }
