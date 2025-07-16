@@ -37,6 +37,7 @@ a = Analysis(
         ('G:/PycharmProjects/oldAssistant_v2/bin/icons/settings.svg', 'bin/icons'),
         ('G:/PycharmProjects/oldAssistant_v2/bin/icons/shortcut.svg', 'bin/icons'),
         ('G:/PycharmProjects/oldAssistant_v2/bin/icons/start-win.svg', 'bin/icons'),
+        ('G:/PycharmProjects/oldAssistant_v2/bin/OHM', 'bin/OHM'),
         ('G:/PycharmProjects/oldAssistant_v2/bin/audio_control.py', 'bin'),
         ('G:/PycharmProjects/oldAssistant_v2/bin/init.py', 'bin'),
         ('G:/PycharmProjects/oldAssistant_v2/bin/check_update.py', 'bin'),

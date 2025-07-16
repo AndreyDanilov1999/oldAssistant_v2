@@ -1103,8 +1103,10 @@ class SmartWidget(QWidget):
                 "powershell",
                 "-Command",
                 f'Start-Process "{self.ohm_path}" -WindowStyle Hidden -Verb runAs'
+
             ],
                 shell=True,
+                creationflags=subprocess.CREATE_NO_WINDOW,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE)
 
@@ -1135,6 +1137,7 @@ class SmartWidget(QWidget):
                 check=True,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
+                creationflags=subprocess.CREATE_NO_WINDOW,
                 text=True,
                 encoding='cp866'
             )
