@@ -1,8 +1,7 @@
 import os
 from PyQt5.QtCore import Qt, QPropertyAnimation, QEasingCurve, QUrl, QPoint
 from PyQt5.QtGui import QDesktopServices
-from PyQt5.QtWidgets import QDialog, QWidget, QVBoxLayout, QPushButton, QLabel, QHBoxLayout, QFrame, QSizePolicy, \
-    QStackedWidget
+from PyQt5.QtWidgets import QDialog, QWidget, QVBoxLayout, QPushButton, QLabel, QHBoxLayout, QFrame, QSizePolicy
 from path_builder import get_path
 from logging_config import debug_logger
 
@@ -31,7 +30,6 @@ class GuideWindow(QDialog):
         self.video_files = {
             "Создание команд": f"{path_guides}/new_commands.mp4",
             "Настройки и опции": f"{path_guides}/settings.mp4",
-            "Скачивание и установка обновления": f"{path_guides}/update.mp4"
         }
 
         self.init_ui()
@@ -239,7 +237,8 @@ class CommandsWindow(QDialog):
         self._create_section(
             main_layout,
             "Встроенные команды (относятся к запуску или выключению)",
-            "'Пейнт', 'Калькулятор', 'Корзина', 'АппДата', 'Переменные окружения', 'Диспетчер задач', 'Микшер'"
+            "'Пейнт', 'Калькулятор', 'Корзина', 'АппДата', 'Переменные окружения', 'Диспетчер задач', 'Микшер',"
+            "'Панель(для вызова виджета)'"
         )
 
         self._create_section(
@@ -254,8 +253,8 @@ class CommandsWindow(QDialog):
             "(Плеер) + (Действие)\n\n" +
             "Пауза, врубай, включи, запусти\n" +
             "Стоп, выключи, отключи, останови\n" +
-            "Следующий дальше вперед\n" +
-            "Предыдущий назад"
+            "Следующий, дальше, вперед\n" +
+            "Предыдущий, назад"
         )
 
         main_layout.addStretch()

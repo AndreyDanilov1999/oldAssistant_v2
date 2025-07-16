@@ -7,7 +7,7 @@ from logging_config import logger, debug_logger
 from PyQt5.QtCore import QSettings, pyqtSignal, Qt, QPoint, QPropertyAnimation, QEasingCurve
 from PyQt5.QtGui import QColor
 from PyQt5.QtWidgets import QFileDialog, QMessageBox, QPushButton, QCheckBox, QLineEdit, QLabel, QSlider, QComboBox, \
-    QVBoxLayout, QWidget, QDialog, QColorDialog, QFrame, QStackedWidget, QHBoxLayout, QApplication
+    QVBoxLayout, QWidget, QDialog, QColorDialog, QFrame, QStackedWidget, QHBoxLayout, QApplication, QScrollArea
 
 speakers = dict(Персик="persik", Джарвис="jarvis", Пласид='placide', Бестия='rogue',
                 Джонни='johnny', СанСаныч='sanych', Санбой='sanboy', Тигрица='tigress', Стейтем='stathem')
@@ -205,6 +205,7 @@ class MainSettingsWindow(QDialog):
 
         # Добавляем вкладки
         self.add_tab("Основные", SettingsWidget(self.assistant, self))
+        self.add_tab("Дополнительно", OtherSettingsWidget(self.assistant, self))
         self.add_tab("Интерфейс", InterfaceWidget(self.assistant))
 
     def keyPressEvent(self, event):
@@ -446,12 +447,12 @@ class InterfaceWidget(QWidget):
                 styles = json.load(json_file)
 
                 # Сохраняем стили в основной файл настроек
-                with open(self.assistant.color_settings_path, 'w') as f:
+                with open(self.assistant.color_path, 'w') as f:
                     json.dump(styles, f, indent=4)
 
                 # Применяем стили
                 self.assistant.styles = styles
-                self.assistant.load_and_apply_styles()
+                self.assistant.apply_styles()
                 self.assistant.check_start_win()
                 color_signal.color_changed.emit()
                 self.assistant.show_notification_message(message=f"Стиль успешно применен!")
@@ -494,7 +495,7 @@ class InterfaceWidget(QWidget):
         """Открывает диалоговое окно для настройки цветов."""
         try:
             color_dialog = ColorSettingsWindow(assistant=self.assistant, parent=self)
-            color_dialog.colorChanged.connect(self.assistant.load_and_apply_styles)
+            color_dialog.colorChanged.connect(self.assistant.apply_styles)
             color_dialog.exec_()
         except Exception as e:
             logger.error(f"Ошибка при открытии окна настроек цветов: {e}")
@@ -511,7 +512,7 @@ class ColorSettingsWindow(QDialog):
         super().__init__(parent)
         self.assistant = assistant
         self.styles = self.assistant.styles
-        self.color_settings_path = self.assistant.color_settings_path
+        self.color_settings_path = self.assistant.color_path
         self.base_presets = get_path('bin', 'color_presets')
         self.custom_presets = get_path('user_settings', 'presets')
         os.makedirs(self.custom_presets, exist_ok=True)
@@ -1296,7 +1297,6 @@ class SettingsWidget(QWidget):
         self.current_name3 = self.assistant.assist_name3
         self.current_steam_path = self.assistant.steam_path
         self.current_volume = self.assistant.volume_assist
-        self.settings = QSettings("Настройки", "Общие")
         self.main_settings_window = parent
         self.init_ui()
 
@@ -1305,7 +1305,17 @@ class SettingsWidget(QWidget):
             self.main_settings_window.hide_with_animation()
 
     def init_ui(self):
-        layout = QVBoxLayout(self)
+        # # Создаем главный контейнер с прокруткой
+        # scroll_area = QScrollArea()
+        # scroll_area.setWidgetResizable(True)
+        # scroll_area.setFrameShape(QFrame.NoFrame)
+
+        # Создаем виджет-контейнер для содержимого
+        content_widget = QWidget()
+        self.setLayout(QVBoxLayout())
+        self.layout().addWidget(content_widget)
+
+        layout = QVBoxLayout(content_widget)
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(10)
 
@@ -1351,7 +1361,7 @@ class SettingsWidget(QWidget):
         self.volume_slider.valueChanged.connect(self.update_volume)
         layout.addWidget(self.volume_slider)
 
-        self.check_voice = QPushButton("Тест голоса")
+        self.check_voice = QPushButton("Тест голоса", self)
         self.check_voice.clicked.connect(self.check_new_voice)
         layout.addWidget(self.check_voice)
 
@@ -1364,36 +1374,21 @@ class SettingsWidget(QWidget):
         layout.addWidget(self.steam_path_input)
 
         select_steam_button = QPushButton("Выбрать папку", self)
+        select_steam_button.setStyleSheet("padding: 5px;")
         select_steam_button.clicked.connect(self.select_steam_folder)
-        layout.addWidget(select_steam_button)
+        layout.addWidget(select_steam_button, alignment=Qt.AlignRight)
 
-        # Чекбоксы
-        self.censor_check = QCheckBox("Реагировать на мат", self)
-        self.censor_check.setChecked(self.assistant.is_censored)
-        self.censor_check.stateChanged.connect(self.toggle_censor)
-        layout.addWidget(self.censor_check)
-
-        self.update_check = QCheckBox("Уведомлять о новой версии", self)
-        self.update_check.setChecked(self.assistant.show_upd_msg)
-        self.update_check.stateChanged.connect(self.toggle_update)
-        layout.addWidget(self.update_check)
-
-        self.start_win_check = QCheckBox("Запуск с Windows", self)
-        self.start_win_check.setChecked(self.assistant.toggle_start)
-        self.start_win_check.stateChanged.connect(self.assistant.toggle_start_win)
-        layout.addWidget(self.start_win_check)
-
-        # Чекбокс для сворачивания в трей
-        self.minimize_check = QCheckBox("Сворачивать в трей при запуске", self)
-        self.minimize_check.setChecked(self.assistant.is_min_tray)
-        self.minimize_check.stateChanged.connect(self.toggle_minimize)
-        layout.addWidget(self.minimize_check)
-
-        self.widget_check = QCheckBox("Запускать виджет", self)
-        self.widget_check.setToolTip("Открытие виджета при запуске программы")
-        self.widget_check.setChecked(self.assistant.is_widget)
-        self.widget_check.stateChanged.connect(self.toggle_widget)
-        layout.addWidget(self.widget_check)
+        # ohm_label = QLabel("Укажите путь к OpenHardwareMonitor.exe", self)
+        # layout.addWidget(ohm_label, alignment=Qt.AlignLeft)
+        #
+        # self.ohm_path_input = QLineEdit(self)
+        # self.ohm_path_input.setText(self.assistant.ohm_path)
+        # layout.addWidget(self.ohm_path_input)
+        #
+        # select_ohm_button = QPushButton("Выбрать папку", self)
+        # select_ohm_button.setStyleSheet("padding: 5px;")
+        # select_ohm_button.clicked.connect(self.select_ohm_file)
+        # layout.addWidget(select_ohm_button, alignment=Qt.AlignRight)
 
         layout.addStretch()
 
@@ -1402,22 +1397,15 @@ class SettingsWidget(QWidget):
         apply_button.clicked.connect(self.apply_settings)
         layout.addWidget(apply_button, alignment=Qt.AlignBottom)
 
+        # # Устанавливаем контент в scroll area
+        # scroll_area.setWidget(content_widget)
+        #
+        # # Настройки скролла
+        # scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        # scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+
     def update_volume(self, value):
         self.assistant.volume_assist = value / 100.0
-
-    def toggle_censor(self):
-        self.assistant.is_censored = self.censor_check.isChecked()
-
-    def toggle_update(self):
-        self.assistant.show_upd_msg = self.update_check.isChecked()
-
-    def toggle_minimize(self):
-        """Обработка чекбокса 'Сворачивать в трей'"""
-        self.assistant.is_min_tray = self.minimize_check.isChecked()
-
-    def toggle_widget(self):
-        """Обработка чекбокса 'Запускать виджет'"""
-        self.assistant.is_widget = self.widget_check.isChecked()
 
     def select_steam_folder(self):
         folder_path = QFileDialog.getExistingDirectory(
@@ -1430,6 +1418,18 @@ class SettingsWidget(QWidget):
                 self.steam_path_input.setText(steam_exe_path)
             else:
                 self.assistant.show_message("Файл steam.exe не найден в выбранной папке!", "Предупреждение", "warning")
+
+    # def select_ohm_file(self):
+    #     folder_path = QFileDialog.getExistingDirectory(
+    #         self, "Выберите папку с steam.exe")
+    #
+    #     if folder_path:
+    #         ohm_exe_path = os.path.normpath(os.path.join(folder_path, "OpenHardwareMonitor.exe"))
+    #         if os.path.exists(ohm_exe_path):
+    #             self.ohm_path_input.setText(ohm_exe_path)
+    #         else:
+    #             self.assistant.show_message(
+    #                 "Файл OpenHardwareMonitor.exe не найден в выбранной папке!", "Предупреждение", "warning")
 
     def on_voice_change(self, index):
         new_voice_key = self.voice_combo.currentText()
@@ -1473,3 +1473,81 @@ class SettingsWidget(QWidget):
         self.hide_method()
         self.assistant.show_notification_message(message="Настройки применены!")
 
+
+class OtherSettingsWidget(QWidget):
+    """ Виджет с дополнительными настройками (перенёс сюда чекбоксы) """
+
+    def __init__(self, assistant, parent=None):
+        super().__init__(parent)
+        self.assistant = assistant
+        self.main_settings_window = parent
+        self.init_ui()
+
+    def init_ui(self):
+        content_widget = QWidget()
+        self.setLayout(QVBoxLayout())
+        self.layout().addWidget(content_widget)
+
+        layout = QVBoxLayout(content_widget)
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(10)
+
+        # Чекбоксы
+        self.censor_check = QCheckBox("Реагировать на мат", self)
+        self.censor_check.setChecked(self.assistant.is_censored)
+        self.censor_check.stateChanged.connect(self.toggle_censor)
+        layout.addWidget(self.censor_check)
+
+        self.update_check = QCheckBox("Уведомлять о новой версии", self)
+        self.update_check.setChecked(self.assistant.show_upd_msg)
+        self.update_check.stateChanged.connect(self.toggle_update)
+        layout.addWidget(self.update_check)
+
+        self.start_win_check = QCheckBox("Запуск с Windows", self)
+        self.start_win_check.setChecked(self.assistant.toggle_start)
+        self.start_win_check.stateChanged.connect(self.assistant.toggle_start_win)
+        layout.addWidget(self.start_win_check)
+
+        # Чекбокс для сворачивания в трей
+        self.minimize_check = QCheckBox("Сворачивать в трей при запуске", self)
+        self.minimize_check.setChecked(self.assistant.is_min_tray)
+        self.minimize_check.stateChanged.connect(self.toggle_minimize)
+        layout.addWidget(self.minimize_check)
+
+        self.widget_check = QCheckBox("Запускать виджет", self)
+        self.widget_check.setToolTip("Открытие виджета при запуске программы")
+        self.widget_check.setChecked(self.assistant.is_widget)
+        self.widget_check.stateChanged.connect(self.toggle_widget)
+        layout.addWidget(self.widget_check)
+
+        self.get_widget_btn = QPushButton("Открыть виджет", self)
+        self.get_widget_btn.clicked.connect(self.get_widget)
+        layout.addWidget(self.get_widget_btn)
+
+        layout.addStretch()
+
+    def toggle_censor(self):
+        self.assistant.is_censored = self.censor_check.isChecked()
+
+    def toggle_update(self):
+        self.assistant.show_upd_msg = self.update_check.isChecked()
+
+    def toggle_minimize(self):
+        """Обработка чекбокса 'Сворачивать в трей'"""
+        self.assistant.is_min_tray = self.minimize_check.isChecked()
+
+    def toggle_widget(self):
+        """Обработка чекбокса 'Запускать виджет'"""
+        self.assistant.is_widget = self.widget_check.isChecked()
+
+    def get_widget(self):
+        self.assistant.open_widget()
+
+    def apply_settings(self):
+        self.assistant.save_settings()
+        self.hide_method()
+        self.assistant.show_notification_message(message="Настройки применены!")
+
+    def hide_method(self):
+        if self.main_settings_window:
+            self.main_settings_window.hide_with_animation()

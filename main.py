@@ -10,12 +10,12 @@ import ctypes
 import shutil
 import win32clipboard
 from PIL import ImageGrab, Image
+from bin.apply_color_methods import ApplyColor
 from bin.check_update import check_version, load_changelog, download_update
 from bin.guide_window import GuideWindow
 from bin.init import InitScreen
 from bin.signals import gui_signals
 from bin.widget_window import SmartWidget
-
 ctypes.windll.user32.SetProcessDPIAware()
 import io
 import json
@@ -53,9 +53,9 @@ from PyQt5.QtGui import QIcon, QCursor, QFont, QColor, QPixmap
 from PyQt5.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout, \
                              QPushButton, QCheckBox, QSystemTrayIcon, QAction, qApp, QMenu, QMessageBox, \
                              QTextEdit, QDialog, QLabel, QTextBrowser, QMainWindow, QStyle, QSizePolicy,
-                             QGraphicsColorizeEffect, QFrame)
+                             QGraphicsColorizeEffect)
 from PyQt5.QtCore import Qt, QFileSystemWatcher, QTimer, QEvent, pyqtSignal, QThread, QObject, QPropertyAnimation, \
-    QEasingCurve, QPoint, QParallelAnimationGroup, QMetaObject, QCoreApplication
+    QEasingCurve, QPoint, QParallelAnimationGroup
 
 MUTEX_NAME = "Assistant_123456789AB"
 
@@ -107,7 +107,7 @@ class Assistant(QMainWindow):
 
     def __init__(self):
         super().__init__()
-        self.version = "1.3.6"
+        self.version = "1.3.7"
         self.ps = "Powered by theoldman"
         self.label_version = QLabel(f"Версия: {self.version} {self.ps}", self)
         self.label_message = QLabel('', self)
@@ -119,7 +119,6 @@ class Assistant(QMainWindow):
         self.tray_icon = None
         self.toggle_start = None
         self.start_button = None
-        self.styles = None
         self._update_dialog = None
         self.changelog_file_path = None
         self.is_assistant_running = False
@@ -138,8 +137,10 @@ class Assistant(QMainWindow):
         self.icon_start_win = get_path("bin", "icons", "start-win.svg")
         self.icon_update = get_path("bin", "icons", "install-btn.svg")
         self.process_names = get_path('user_settings', 'process_names.json')
-        self.color_settings_path = get_path('user_settings', 'color_settings.json')
-        self.default_preset_style = get_path('bin', 'color_presets', 'default.json')
+        self.ohm_path = get_path("bin", "OHM", "OpenHardwareMonitor.exe")
+        self.style_manager = ApplyColor(self)
+        self.color_path = self.style_manager.color_path
+        self.styles = self.style_manager.load_styles()
         self.settings_file_path = get_path('user_settings', 'settings.json')
         self.screenshot_tool = SystemScreenshot()
         # self.game_mode = None
@@ -167,7 +168,7 @@ class Assistant(QMainWindow):
 
     def check_up(self):
         self.check_or_create_folder()
-        self.load_and_apply_styles()
+        self.apply_styles()
         # Проверка автозапуска при старте программы
         self.check_autostart()
         self.check_start_win()
@@ -475,13 +476,50 @@ class Assistant(QMainWindow):
         frame_geo.moveCenter(screen.center())
         self.move(frame_geo.topLeft())
 
+    def apply_styles(self):
+        """Применяет все стили к окну"""
+        try:
+            self.styles = self.style_manager.load_styles()
+            # Применение к конкретным виджетам
+            self.style_manager.apply_to_widget(self.label_version, 'label_version')
+            self.style_manager.apply_to_widget(self.label_message, 'label_message')
+            self.style_manager.apply_to_widget(self.update_label, 'update_label')
+
+            # Применение к SVG
+            self.style_manager.apply_color_svg(self.svg_image, strength=0.95)
+
+            # Применение общего стиля окна
+            if hasattr(self, 'central_widget'):
+                self.central_widget.setObjectName("CentralWidget")
+            if hasattr(self, 'title_bar_widget'):
+                self.title_bar_widget.setObjectName("TitleBar")
+            if hasattr(self, 'container'):
+                self.title_bar_widget.setObjectName("ConfirmDialogContainer")
+            # Применяем стили к текущему окну
+            style_sheet = ""
+            for widget, styles in self.styles.items():
+                if widget.startswith("Q"):  # Для стандартных виджетов (например, QMainWindow, QPushButton)
+                    selector = widget
+                else:  # Для виджетов с objectName (например, TitleBar, CentralWidget)
+                    selector = f"#{widget}"
+
+                style_sheet += f"{selector} {{\n"
+                for prop, value in styles.items():
+                    style_sheet += f"    {prop}: {value};\n"
+                style_sheet += "}\n"
+
+            # Устанавливаем стиль для текущего окна
+            self.setStyleSheet(style_sheet)
+        except Exception as e:
+            debug_logger.error(f"Ошибка в методе apply_styles: {e}")
+
     def show_notification_message(self, message):
         try:
 
             toast = ToastNotification(
                 parent=self,
                 message=message,
-                timeout=3000
+                timeout=4000
             )
             toast.show()
         except Exception as e:
@@ -971,78 +1009,6 @@ class Assistant(QMainWindow):
                 logger.error(f'Ошибка при создании папки для хранения ярлыков: {e}')
                 debug_logger.error(f'Ошибка при создании папки для хранения ярлыков: {e}')
 
-    def load_and_apply_styles(self):
-        """
-        Загружает стили из файла и применяет их к элементам интерфейса.
-        Если файл не найден или поврежден, устанавливает значения по умолчанию.
-        """
-        try:
-            with open(self.color_settings_path, 'r') as file:
-                self.styles = json.load(file)
-        except (FileNotFoundError, json.JSONDecodeError):
-            try:
-                with open(self.default_preset_style, 'r') as default_file:
-                    self.styles = json.load(default_file)
-            except (FileNotFoundError, json.JSONDecodeError):
-                self.styles = {}
-
-        # Применяем загруженные или значения по умолчанию
-        self.apply_styles()
-        self.apply_color_svg(self.color_settings_path, self.svg_image)
-
-    def apply_styles(self):
-        # Устанавливаем objectName для виджетов
-        if hasattr(self, 'central_widget'):
-            self.central_widget.setObjectName("CentralWidget")
-        if hasattr(self, 'title_bar_widget'):
-            self.title_bar_widget.setObjectName("TitleBar")
-        if hasattr(self, 'container'):
-            self.title_bar_widget.setObjectName("ConfirmDialogContainer")
-        # Применяем стили к текущему окну
-        style_sheet = ""
-        for widget, styles in self.styles.items():
-            if widget.startswith("Q"):  # Для стандартных виджетов (например, QMainWindow, QPushButton)
-                selector = widget
-            else:  # Для виджетов с objectName (например, TitleBar, CentralWidget)
-                selector = f"#{widget}"
-
-            style_sheet += f"{selector} {{\n"
-            for prop, value in styles.items():
-                style_sheet += f"    {prop}: {value};\n"
-            style_sheet += "}\n"
-
-        # Устанавливаем стиль для текущего окна
-        self.setStyleSheet(style_sheet)
-
-        # Применяем стили для label_version и label_message
-        if 'label_version' in self.styles:
-            self.label_version.setStyleSheet(self.format_style(self.styles['label_version']))
-
-        if 'label_message' in self.styles:
-            self.label_message.setStyleSheet(self.format_style(self.styles['label_message']))
-
-        if 'update_label' in self.styles:
-            self.update_label.setStyleSheet(self.format_style(self.styles['update_label']))
-
-    def format_style(self, style_dict):
-        """Форматируем словарь стиля в строку для setStyleSheet"""
-        return '; '.join(f"{key}: {value}" for key, value in style_dict.items())
-
-    def apply_color_svg(self, style_file: str, svg_widget: QSvgWidget, strength: float = 0.93) -> None:
-        """Читает цвет из JSON-файла стилей"""
-        with open(style_file) as f:
-            styles = json.load(f)
-
-        if "TitleBar" in styles and "border-bottom" in styles["TitleBar"]:
-            border_parts = styles["TitleBar"]["border-bottom"].split()
-            for part in border_parts:
-                if part.startswith('#'):
-                    color_effect = QGraphicsColorizeEffect()
-                    color_effect.setColor(QColor(part))
-                    svg_widget.setGraphicsEffect(color_effect)
-                    color_effect.setStrength(strength)
-                    break
-
     def close_app(self):
         """Закрытие приложения."""
         self.stop_assist()
@@ -1127,7 +1093,9 @@ class Assistant(QMainWindow):
                 "is_censored": True,
                 "volume_assist": 0.2,
                 "show_upd_msg": True,
-                "minimize_to_tray": True
+                "minimize_to_tray": True,
+                "start_win": True,
+                "is_widget": True,
             }
 
         # Загружаем текущие настройки
@@ -2172,7 +2140,7 @@ class Assistant(QMainWindow):
     def check_start_win(self):
         """Переключает состояние и меняет цвет иконки"""
         if self.toggle_start:
-            self.update_svg_color(self.start_svg, self.color_settings_path)
+            self.update_svg_color(self.start_svg, self.color_path)
         else:
             self.update_svg_contrast_color(self.start_svg)
 
@@ -2186,7 +2154,7 @@ class Assistant(QMainWindow):
 
         if self.toggle_start:
             self.add_to_autostart()
-            self.update_svg_color(self.start_svg, self.color_settings_path)
+            self.update_svg_color(self.start_svg, self.color_path)
         else:
             self.remove_from_autostart()
             self.update_svg_contrast_color(self.start_svg)
@@ -2899,8 +2867,10 @@ class ToastNotification(QDialog):
         self.message = message
         self.svg_path = get_path("bin", "owl_start.svg")
         self.style_path = get_path('user_settings', 'color_settings.json')
+        self.style_manager = ApplyColor(self)
+        self.styles = self.style_manager.load_styles()
         self.init_ui()
-        self.load_and_apply_styles()
+        self.apply_styles()
 
         self.opacity_animation = QPropertyAnimation(self, b"windowOpacity")
         self.opacity_animation.setDuration(300)  # Продолжительность анимации прозрачности
@@ -2917,17 +2887,17 @@ class ToastNotification(QDialog):
         # Настройки окна
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.Tool | Qt.WindowStaysOnTopHint)
         self.setAttribute(Qt.WA_ShowWithoutActivating)
-        self.setFixedSize(300, 100)  # Расширим немного размеры
+        self.setFixedSize(300, 100)
         self.setStyleSheet("""
                     ToastNotification {
                         border-radius: 8px;
                         padding: 12px 20px;
                     }
                     QLabel {
-                        font-size: 14px;
+                        font-size: 13px;
                         border: none;
                     }
-                """)  # Для применения стилей из JSON
+                """)
 
         # Основной layout
         main_layout = QVBoxLayout()
@@ -2936,8 +2906,8 @@ class ToastNotification(QDialog):
 
         # --- Заголовок (TitleBar) ---
         self.title_bar = QWidget()
-        self.title_bar.setObjectName("TitleBar")  # Это ключ для стиля из JSON
-        self.title_bar.setFixedHeight(1)  # Высота полоски
+        self.title_bar.setObjectName("TitleBar")
+        self.title_bar.setFixedHeight(1)
         main_layout.addWidget(self.title_bar)
 
         # --- Контент: иконка + текст ---
@@ -2973,6 +2943,31 @@ class ToastNotification(QDialog):
         self.timer = QTimer()
         self.timer.setSingleShot(True)
         self.timer.timeout.connect(self.hide_animated)
+
+    def adjust_height(self):
+        """Динамически подстраивает высоту под содержимое текста"""
+        # 1. Рассчитываем оптимальную высоту текста
+        text_width = self.width() - 20 - 50 - 20  # (ширина окна - отступы - иконка - дополнительные padding)
+        font_metrics = self.label.fontMetrics()
+        text_height = font_metrics.boundingRect(
+            0, 0, text_width, 0,
+            Qt.TextWordWrap,
+            self.label.text()
+        ).height()
+
+        # 2. Добавляем высоту остальных элементов (иконка, отступы, заголовок)
+        total_height = (
+                1 +  # title_bar
+                max(text_height, 50) +  # текст или иконка (что больше)
+                20  # вертикальные отступы
+        )
+
+        # 3. Устанавливаем минимальную высоту 100px и ограничиваем максимальную (например, 300px)
+        clamped_height = max(100, min(total_height, 300))
+        self.setFixedHeight(clamped_height)
+
+        # 4. Обновляем геометрию
+        self.updateGeometry()
 
     def close_immediately(self):
         """Немедленное закрытие без анимации"""
@@ -3051,67 +3046,37 @@ class ToastNotification(QDialog):
         self.animation_group.finished.connect(self.close_immediately)
         self.animation_group.start()
 
-    def load_and_apply_styles(self):
-        """
-        Загружает стили из файла и применяет их к элементам интерфейса.
-        Если файл не найден или поврежден, устанавливает значения по умолчанию.
-        """
-        try:
-            with open(self.style_path, 'r') as file:
-                self.styles = json.load(file)
-        except (FileNotFoundError, json.JSONDecodeError):
-            try:
-                with open(self.default_preset_style, 'r') as default_file:
-                    self.styles = json.load(default_file)
-            except (FileNotFoundError, json.JSONDecodeError):
-                self.styles = {}
-
-        # Применяем загруженные или значения по умолчанию
-        self.apply_styles()
-        self.apply_color_svg(self.style_path, self.svg_image)
-
     def apply_styles(self):
-        # Устанавливаем objectName для виджетов
-        if hasattr(self, 'central_widget'):
-            self.central_widget.setObjectName("CentralWidget")
-        if hasattr(self, 'title_bar_widget'):
-            self.title_bar_widget.setObjectName("TitleBar")
-        if hasattr(self, 'container'):
-            self.title_bar_widget.setObjectName("ConfirmDialogContainer")
-        # Применяем стили к текущему окну
-        style_sheet = ""
-        for widget, styles in self.styles.items():
-            if widget.startswith("Q"):  # Для стандартных виджетов (например, QMainWindow, QPushButton)
-                selector = widget
-            else:  # Для виджетов с objectName (например, TitleBar, CentralWidget)
-                selector = f"#{widget}"
+        try:
+            self.styles = self.style_manager.load_styles()
+            # Применение к SVG
+            self.style_manager.apply_color_svg(self.svg_image, strength=0.95)
 
-            style_sheet += f"{selector} {{\n"
-            for prop, value in styles.items():
-                style_sheet += f"    {prop}: {value};\n"
-            style_sheet += "}\n"
+            # Применение общего стиля окна
+            if hasattr(self, 'central_widget'):
+                self.central_widget.setObjectName("CentralWidget")
+            if hasattr(self, 'title_bar_widget'):
+                self.title_bar_widget.setObjectName("TitleBar")
+            if hasattr(self, 'container'):
+                self.title_bar_widget.setObjectName("ConfirmDialogContainer")
+            # Применяем стили к текущему окну
+            style_sheet = ""
+            for widget, styles in self.styles.items():
+                if widget.startswith("Q"):  # Для стандартных виджетов (например, QMainWindow, QPushButton)
+                    selector = widget
+                else:  # Для виджетов с objectName (например, TitleBar, CentralWidget)
+                    selector = f"#{widget}"
 
-        # Устанавливаем стиль для текущего окна
-        self.setStyleSheet(style_sheet)
+                style_sheet += f"{selector} {{\n"
+                for prop, value in styles.items():
+                    style_sheet += f"    {prop}: {value};\n"
+                style_sheet += "}\n"
 
-    def format_style(self, style_dict):
-        """Форматируем словарь стиля в строку для setStyleSheet"""
-        return '; '.join(f"{key}: {value}" for key, value in style_dict.items())
+            # Устанавливаем стиль для текущего окна
+            self.setStyleSheet(style_sheet)
 
-    def apply_color_svg(self, style_file: str, svg_widget: QSvgWidget, strength: float = 0.99) -> None:
-        """Читает цвет из JSON-файла стилей"""
-        with open(style_file) as f:
-            styles = json.load(f)
-
-        if "TitleBar" in styles and "border-bottom" in styles["TitleBar"]:
-            border_parts = styles["TitleBar"]["border-bottom"].split()
-            for part in border_parts:
-                if part.startswith('#'):
-                    color_effect = QGraphicsColorizeEffect()
-                    color_effect.setColor(QColor(part))
-                    svg_widget.setGraphicsEffect(color_effect)
-                    color_effect.setStrength(strength)
-                    break
+        except Exception as e:
+            debug_logger.error(f"Ошибка в методе apply_styles: {e}")
 
 
 if __name__ == '__main__':
