@@ -1,5 +1,6 @@
 import os
 import re
+from typing import Tuple, Optional, Dict
 import requests
 from logging_config import debug_logger
 from path_builder import get_path
@@ -8,7 +9,7 @@ from path_builder import get_path
 def check_version():
     try:
         domain = "https://owl-app.ru"
-        dev_domain = "http://127.0.0.1:8000"
+        dev_domain = "http://127.0.0.1:5000"
         version_url = f"{domain}/version"
         response = requests.get(version_url, timeout=5)  # Добавляем таймаут
 
@@ -36,9 +37,54 @@ def check_version():
         return None, None
 
 
+def check_all_versions() -> Tuple[Optional[Dict], Optional[Dict]]:
+    """
+    Получает все версии с сервера
+    Возвращает кортеж: (стабильные_версии, экспериментальные_версии)
+    """
+    try:
+        domain = "https://owl-app.ru"
+        dev_domain = "http://127.0.0.1:5000"
+        versions_url = f"{domain}/versions"
+
+        response = requests.get(versions_url, timeout=5)
+        response.raise_for_status()  # Генерирует исключение для HTTP-ошибок
+
+        data = response.json()
+
+        # Проверяем структуру ответа
+        if not isinstance(data, dict):
+            raise ValueError("Некорректный формат ответа сервера")
+
+        # Получаем списки всех версий
+        stable_versions = data.get("stable", [])
+        experimental_versions = data.get("experimental", [])
+
+        # Проверяем, что это действительно списки
+        if not isinstance(stable_versions, list):
+            stable_versions = []
+        if not isinstance(experimental_versions, list):
+            experimental_versions = []
+
+        # Логируем информацию
+        debug_logger.info(f"Получено стабильных версий: {len(stable_versions)}")
+        debug_logger.info(f"Получено экспериментальных версий: {len(experimental_versions)}")
+
+        return stable_versions, experimental_versions
+
+    except requests.exceptions.RequestException as e:
+        debug_logger.error(f"Ошибка соединения: {str(e)}")
+        return None, None
+    except ValueError as e:
+        debug_logger.error(f"Ошибка формата данных: {str(e)}")
+        return None, None
+    except Exception as e:
+        debug_logger.error(f"Неожиданная ошибка: {str(e)}")
+        return None, None
+
 def load_changelog():
     domain = "https://owl-app.ru"
-    dev_domain = "http://127.0.0.1:8000"
+    dev_domain = "http://127.0.0.1:5000"
     download_url = f"{domain}/getchangelog"
     changelog_path = get_path('update', 'changelog.md')
 
@@ -70,7 +116,7 @@ def get_filename_from_cd(cd):
     return match.group(1) if match else None
 
 
-def download_update(type_version, on_complete=None):
+def download_update(type_version, on_complete=None, version=None):
     """Загрузка файла с сохранением оригинального имени, очисткой старых версий и обработкой прерываний"""
     if type_version not in ["stable", "exp"]:
         debug_logger.error("Недопустимый тип версии")
@@ -78,9 +124,15 @@ def download_update(type_version, on_complete=None):
 
     domain = "https://owl-app.ru"
     dev_domain = "http://127.0.0.1:5000"
-    download_url = f"{domain}/download/{type_version}"
+    download_url = None
     temp_suffix = ".tempdownload"  # Суффикс для временных файлов
     file_path = None
+    temp_file_path = None
+
+    if version is None:
+        download_url = f"{domain}/download/{type_version}"
+    else:
+        download_url = f"{domain}/load/{type_version}/{version}"
 
     try:
         download_dir = get_path("update")
@@ -146,3 +198,5 @@ def download_update(type_version, on_complete=None):
         if callable(on_complete):
             on_complete(None, success=False, error=error_msg)
         return None
+
+

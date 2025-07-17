@@ -11,6 +11,7 @@ from PyQt5.QtSvg import QSvgWidget
 from PyQt5.QtWidgets import QVBoxLayout, QLabel, QWidget, QProgressBar, QApplication, QMessageBox, QPushButton, \
     QGraphicsColorizeEffect, QHBoxLayout, QStyle, QDialog
 
+from bin.apply_color_methods import ApplyColor
 from logging_config import debug_logger
 from path_builder import get_path
 
@@ -24,11 +25,14 @@ class InitScreen(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.styles = None
+        self.style_manager = ApplyColor(self)
+        self.color_path = self.style_manager.color_path
+        self.styles = self.style_manager.load_styles()
         self.default_preset_style = get_path("bin", "color_presets", "default.json")
         self.style_path = get_path('user_settings', 'color_settings.json')
         self.svg_path = get_path("bin", "owl_start.svg")
         self.init()
-        self.load_and_apply_styles()
+        self.apply_styles()
 
     def init(self):
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
@@ -233,94 +237,38 @@ class InitScreen(QWidget):
         self.init_complete.emit(success)
         self.close()
 
-    def load_and_apply_styles(self):
-        """
-        Загружает стили из файла и применяет их к элементам интерфейса.
-        Если файл не найден или поврежден, устанавливает значения по умолчанию.
-        """
-        try:
-            with open(self.style_path, 'r') as file:
-                self.styles = json.load(file)
-        except (FileNotFoundError, json.JSONDecodeError):
-            try:
-                with open(self.default_preset_style, 'r') as default_file:
-                    self.styles = json.load(default_file)
-            except (FileNotFoundError, json.JSONDecodeError):
-                self.styles = {}
-
-        # Применяем загруженные или значения по умолчанию
-        self.apply_styles()
-        self.apply_color_svg(self.style_path, self.svg_image)
-        self.apply_progressbar()
-
-    def get_color_from_border(self, widget_key):
-        if widget_key in self.styles:
-            style = self.styles[widget_key]
-            border_value = style.get("border", "")
-            import re
-            match = re.search(r'#(?:[0-9a-fA-F]{3}){2}|rgb$.*?$|rgba$.*?$',
-                              border_value)
-            if match:
-                return match.group(0)
-        return "#cccccc"
-
-    def apply_progressbar(self):
-        color = self.get_color_from_border("QPushButton")
-
-        progress_style = f"""
-            QProgressBar {{
-                border-radius: 5px;
-                text-align:center
-            }}
-            QProgressBar::chunk {{
-                background-color: {color}
-            }}
-        """
-
-        self.progress.setStyleSheet(progress_style)
-
     def apply_styles(self):
-        # Устанавливаем objectName для виджетов
-        if hasattr(self, 'central_widget'):
-            self.central_widget.setObjectName("CentralWidget")
-        if hasattr(self, 'title_bar_widget'):
-            self.title_bar_widget.setObjectName("TitleBar")
-        if hasattr(self, 'container'):
-            self.title_bar_widget.setObjectName("ConfirmDialogContainer")
-        # Применяем стили к текущему окну
-        style_sheet = ""
-        for widget, styles in self.styles.items():
-            if widget.startswith("Q"):  # Для стандартных виджетов (например, QMainWindow, QPushButton)
-                selector = widget
-            else:  # Для виджетов с objectName (например, TitleBar, CentralWidget)
-                selector = f"#{widget}"
+        try:
+            self.styles = self.style_manager.load_styles()
 
-            style_sheet += f"{selector} {{\n"
-            for prop, value in styles.items():
-                style_sheet += f"    {prop}: {value};\n"
-            style_sheet += "}\n"
+            # Применение к SVG
+            self.style_manager.apply_color_svg(self.svg_image, strength=0.95)
+            self.style_manager.apply_progressbar(key="QPushButton", widget=self.progress)
 
-        # Устанавливаем стиль для текущего окна
-        self.setStyleSheet(style_sheet)
+            # Применение общего стиля окна
+            if hasattr(self, 'central_widget'):
+                self.central_widget.setObjectName("CentralWidget")
+            if hasattr(self, 'title_bar_widget'):
+                self.title_bar_widget.setObjectName("TitleBar")
+            if hasattr(self, 'container'):
+                self.title_bar_widget.setObjectName("ConfirmDialogContainer")
+            # Применяем стили к текущему окну
+            style_sheet = ""
+            for widget, styles in self.styles.items():
+                if widget.startswith("Q"):  # Для стандартных виджетов (например, QMainWindow, QPushButton)
+                    selector = widget
+                else:  # Для виджетов с objectName (например, TitleBar, CentralWidget)
+                    selector = f"#{widget}"
 
-    def format_style(self, style_dict):
-        """Форматируем словарь стиля в строку для setStyleSheet"""
-        return '; '.join(f"{key}: {value}" for key, value in style_dict.items())
+                style_sheet += f"{selector} {{\n"
+                for prop, value in styles.items():
+                    style_sheet += f"    {prop}: {value};\n"
+                style_sheet += "}\n"
 
-    def apply_color_svg(self, style_file: str, svg_widget: QSvgWidget, strength: float = 0.99) -> None:
-        """Читает цвет из JSON-файла стилей"""
-        with open(style_file) as f:
-            styles = json.load(f)
-
-        if "TitleBar" in styles and "border-bottom" in styles["TitleBar"]:
-            border_parts = styles["TitleBar"]["border-bottom"].split()
-            for part in border_parts:
-                if part.startswith('#'):
-                    color_effect = QGraphicsColorizeEffect()
-                    color_effect.setColor(QColor(part))
-                    svg_widget.setGraphicsEffect(color_effect)
-                    color_effect.setStrength(strength)
-                    break
+            # Устанавливаем стиль для текущего окна
+            self.setStyleSheet(style_sheet)
+        except Exception as e:
+            debug_logger.error(f"Ошибка в методе apply_styles: {e}")
 
 
 class CheckThread(QThread):

@@ -44,6 +44,7 @@ a = Analysis(
         ('G:/PycharmProjects/oldAssistant_v2/bin/apply_color_methods.py', 'bin'),
         ('G:/PycharmProjects/oldAssistant_v2/bin/speak_functions.py', 'bin'),
         ('G:/PycharmProjects/oldAssistant_v2/bin/speak_voice', 'bin/speak_voice'),
+        ('G:/PycharmProjects/oldAssistant_v2/bin/download_thread.py', 'bin'),
         ('G:/PycharmProjects/oldAssistant_v2/bin/model_ru', 'bin/model_ru'),
         ('G:/PycharmProjects/oldAssistant_v2/bin/model_en', 'bin/model_en'),
         ('G:/PycharmProjects/oldAssistant_v2/bin/commands_settings_window.py', 'bin'),

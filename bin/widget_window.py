@@ -114,7 +114,6 @@ class SmartWidget(QWidget):
         # Менеджер состояния окна
         self.state_manager = WindowStateManager()
         self.apply_styles()
-        # self.load_and_apply_styles()
 
         saved_state = self.state_manager.apply_state(self)
 
@@ -208,6 +207,10 @@ class SmartWidget(QWidget):
 
         self.timer_clock.start(1000)
         self.update_time()
+
+        # self.tick = QPushButton("nbr")
+        # self.tick.clicked.connect(self.assistant.on_shutdown)
+        # title_layout.addWidget(self.tick)
 
         # Добавляем кнопки в заголовок
         self.pin_btn = QPushButton()
@@ -800,7 +803,7 @@ class SmartWidget(QWidget):
                 new_width, new_height = 240, 300  # Normal размер
 
             # Вычисляем новую позицию (сохраняем правый край)
-            new_x = old_geometry.right() - new_width
+            new_x = old_geometry.right() - new_width + 1
             new_y = old_geometry.top()
 
             # Полностью очищаем текущий UI
@@ -929,15 +932,27 @@ class SmartWidget(QWidget):
             debug_logger.error(f"Ошибка диалога: {e}")
 
     def open_settings(self):
+        """Переключатель для основного окна и настроек"""
         try:
-            self.assistant.show()
-            self.assistant.open_main_settings()
+            if self.assistant.isVisible():
+                # Если основное окно видимо - закрываем его и настройки
+                self.assistant.custom_hide()
+            else:
+                # Если основное окно скрыто - показываем его
+                self.assistant.show()
+
+                # Открываем настройки, только если они еще не открыты
+                if not (hasattr(self.assistant, 'settings_window') and self.assistant.settings_window.isVisible()):
+                    self.assistant.open_main_settings()
         except Exception as e:
-            debug_logger.error(f"Ошибка при открытии окна настроек через виджет {e}")
+            debug_logger.error(f"Ошибка при переключении окна настроек: {e}")
 
     def open_main_window(self):
         try:
-            self.assistant.show()
+            if self.assistant.isVisible():
+                self.assistant.custom_hide()
+            else:
+                self.assistant.show()
         except Exception as e:
             debug_logger.error(f"Ошибка при открытии основного окна через виджет {e}")
 

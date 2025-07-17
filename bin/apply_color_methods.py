@@ -4,6 +4,7 @@ from PyQt5.QtGui import QColor
 from PyQt5.QtSvg import QSvgWidget
 from PyQt5.QtWidgets import QGraphicsColorizeEffect
 
+from logging_config import debug_logger
 from path_builder import get_path
 
 
@@ -48,82 +49,104 @@ class ApplyColor():
         """Форматирует стиль в строку"""
         return '; '.join(f"{key}: {value}" for key, value in style_dict.items())
 
-# class ApplyColor():
-#     def __init__(self):
-#         self.color_path = get_path('user_settings', 'color_settings.json')
-#         self.default_color_path = get_path('bin', 'color_presets', 'default.json')
-#         self.title_bar_widget = None
-#         self.setStyleSheet = None
-#         self.styles = {}
-#
-#     def load_and_apply_styles(self):
-#         """
-#         Загружает стили из файла и применяет их к элементам интерфейса.
-#         Если файл не найден или поврежден, устанавливает значения по умолчанию.
-#         """
-#         try:
-#             with open(self.color_path, 'r') as file:
-#                 self.styles = json.load(file)
-#         except (FileNotFoundError, json.JSONDecodeError):
-#             try:
-#                 with open(self.default_color_path, 'r') as default_file:
-#                     self.styles = json.load(default_file)
-#             except (FileNotFoundError, json.JSONDecodeError):
-#                 self.styles = {}
-#
-#         # Применяем загруженные или значения по умолчанию
-#         self.apply_styles()
-#
-#     def apply_styles(self):
-#         # Устанавливаем objectName для виджетов
-#         if hasattr(self, 'central_widget'):
-#             self.central_widget.setObjectName("CentralWidget")
-#         if hasattr(self, 'title_bar_widget'):
-#             self.title_bar_widget.setObjectName("TitleBar")
-#         if hasattr(self, 'container'):
-#             self.title_bar_widget.setObjectName("ConfirmDialogContainer")
-#         # Применяем стили к текущему окну
-#         style_sheet = ""
-#         for widget, styles in self.styles.items():
-#             if widget.startswith("Q"):  # Для стандартных виджетов (например, QMainWindow, QPushButton)
-#                 selector = widget
-#             else:  # Для виджетов с objectName (например, TitleBar, CentralWidget)
-#                 selector = f"#{widget}"
-#
-#             style_sheet += f"{selector} {{\n"
-#             for prop, value in styles.items():
-#                 style_sheet += f"    {prop}: {value};\n"
-#             style_sheet += "}\n"
-#
-#         # Устанавливаем стиль для текущего окна
-#         self.setStyleSheet(style_sheet)
-#
-#         # Применяем стили для label_version и label_message
-#         if hasattr(self, 'label_version') and hasattr(self, 'styles') and 'label_version' in self.styles:
-#             self.label_version.setStyleSheet(self.format_style(self.styles['label_version']))
-#
-#         if hasattr(self, 'label_message') and hasattr(self, 'styles') and 'label_message' in self.styles:
-#             self.label_message.setStyleSheet(self.format_style(self.styles['label_message']))
-#
-#         if hasattr(self, 'update_label') and hasattr(self, 'styles') and 'update_label' in self.styles:
-#             self.update_label.setStyleSheet(self.format_style(self.styles['update_label']))
-#
-#     def format_style(self, style_dict):
-#         """Форматируем словарь стиля в строку для setStyleSheet"""
-#         return '; '.join(f"{key}: {value}" for key, value in style_dict.items())
-#
-#     def apply_color_svg(self, svg_widget: QSvgWidget, strength: float) -> None:
-#         """Читает цвет из JSON-файла стилей"""
-#
-#         with open(self.color_path) as f:
-#             styles = json.load(f)
-#
-#         if "TitleBar" in styles and "border-bottom" in styles["TitleBar"]:
-#             border_parts = styles["TitleBar"]["border-bottom"].split()
-#             for part in border_parts:
-#                 if part.startswith('#'):
-#                     color_effect = QGraphicsColorizeEffect()
-#                     color_effect.setColor(QColor(part))
-#                     svg_widget.setGraphicsEffect(color_effect)
-#                     color_effect.setStrength(strength)
-#                     break
+    def get_color_from_border(self, widget_key):
+        """Извлекает цвет из CSS-свойства border"""
+        try:
+            if widget_key and widget_key in self.styles:
+                style = self.styles[widget_key]
+                border_value = style.get("border", "")
+
+                # Ищем цвет в форматах: #RRGGBB, rgb(), rgba()
+                import re
+                color_match = re.search(
+                    r'#(?:[0-9a-fA-F]{3}){1,2}|rgb\([^)]*\)|rgba\([^)]*\)',
+                    border_value
+                )
+                return color_match.group(0) if color_match else "#05B8CC"  # Цвет по умолчанию
+        except Exception as e:
+            debug_logger.error(f"Ошибка извлечения цвета: {e}")
+        return "#05B8CC"  # Возвращаем синий по умолчанию при ошибках
+
+    def apply_progressbar(self, key=None, widget=None, style="solid"):
+        """
+        Применяет стиль к прогресс-бару
+        :param style: стиль заполнения полоски
+        :param key: Ключ из стилей для извлечения цвета (например "QPushButton")
+        :param widget: Ссылка на виджет QProgressBar
+        """
+        if not widget or not hasattr(widget, 'setStyleSheet'):
+            debug_logger.warning("Не передан виджет или он не поддерживает стилизацию")
+            return
+
+        try:
+            # Получаем цвет из стилей или используем по умолчанию
+            color = self.get_color_from_border(key) if key else "#05B8CC"
+
+            if style == "solid":
+                progress_style = f"""
+                    QProgressBar {{
+                        border: 1px solid {self.adjust_color(color, brightness=-30)};
+                        height: 20px;
+                        text-align: center;
+                    }}
+                    QProgressBar::chunk {{
+                        background: qlineargradient(
+                            x1:0, y1:0, x2:1, y2:0,
+                            stop:0 {self.adjust_color(color, brightness=-10)},
+                            stop:1 {color}
+                        );
+                    }}
+                """
+            else:
+                # Формируем стиль с плавной анимацией
+                progress_style = f"""
+                    QProgressBar {{
+                        border: 1px solid {self.adjust_color(color, brightness=-30)};
+                        border-radius: 5px;
+                        background: {self.adjust_color(color, brightness=-80)};
+                        height: 20px;
+                        text-align: center;
+                    }}
+                    QProgressBar::chunk {{
+                        background: qlineargradient(
+                            x1:0, y1:0, x2:1, y2:0,
+                            stop:0 {self.adjust_color(color, brightness=-10)},
+                            stop:1 {color}
+                        );
+                        border-radius: 2px;
+                        width: 20px;
+                        margin: 1px;
+                    }}
+                """
+            widget.setStyleSheet(progress_style)
+
+        except Exception as e:
+            debug_logger.error(f"Ошибка применения стиля прогресс-бара: {e}")
+            # Применяем минимальный рабочий стиль при ошибках
+            widget.setStyleSheet("""
+                QProgressBar {
+                    border: 1px solid #cccccc;
+                    border-radius: 5px;
+                }
+                QProgressBar::chunk {
+                    background-color: #05B8CC;
+                }
+            """)
+
+    def adjust_color(self, color, brightness=0):
+        """
+        Корректирует яркость цвета
+        :param color: Исходный цвет (hex/rgb/rgba)
+        :param brightness: Значение от -100 до 100
+        :return: Новый цвет в hex-формате
+        """
+        from PyQt5.QtGui import QColor
+        try:
+            qcolor = QColor(color)
+            if brightness > 0:
+                return qcolor.lighter(100 + brightness).name()
+            elif brightness < 0:
+                return qcolor.darker(100 - brightness).name()
+            return qcolor.name()
+        except:
+            return color

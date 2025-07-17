@@ -8,10 +8,17 @@
 import csv
 import ctypes
 import shutil
+
+import pythoncom
 import win32clipboard
+
 from PIL import ImageGrab, Image
+from PyQt5 import sip
+import win32api
+
 from bin.apply_color_methods import ApplyColor
 from bin.check_update import check_version, load_changelog, download_update
+from bin.download_thread import DownloadThread, SliderProgressBar
 from bin.guide_window import GuideWindow
 from bin.init import InitScreen
 from bin.signals import gui_signals
@@ -53,9 +60,9 @@ from PyQt5.QtGui import QIcon, QCursor, QFont, QColor, QPixmap
 from PyQt5.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout, \
                              QPushButton, QCheckBox, QSystemTrayIcon, QAction, qApp, QMenu, QMessageBox, \
                              QTextEdit, QDialog, QLabel, QTextBrowser, QMainWindow, QStyle, QSizePolicy,
-                             QGraphicsColorizeEffect)
+                             QGraphicsColorizeEffect, QProgressBar)
 from PyQt5.QtCore import Qt, QFileSystemWatcher, QTimer, QEvent, pyqtSignal, QThread, QObject, QPropertyAnimation, \
-    QEasingCurve, QPoint, QParallelAnimationGroup
+    QEasingCurve, QPoint, QParallelAnimationGroup, QAbstractAnimation
 
 MUTEX_NAME = "Assistant_123456789AB"
 
@@ -107,7 +114,7 @@ class Assistant(QMainWindow):
 
     def __init__(self):
         super().__init__()
-        self.version = "1.3.7"
+        self.version = "1.3.8"
         self.ps = "Powered by theoldman"
         self.label_version = QLabel(f"Версия: {self.version} {self.ps}", self)
         self.label_message = QLabel('', self)
@@ -389,6 +396,10 @@ class Assistant(QMainWindow):
         self.svg_image.setGraphicsEffect(self.color_svg)
         left_layout.addWidget(self.svg_image, alignment=Qt.AlignCenter)
 
+        self.progress_load = SliderProgressBar(self)
+        self.progress_load.hide()
+        left_layout.addWidget(self.progress_load)
+
         # Текст "Доступно обновление"
         self.update_label = QLabel("")
         self.update_label.setCursor(QCursor(Qt.PointingHandCursor))  # Курсор в виде руки
@@ -485,6 +496,7 @@ class Assistant(QMainWindow):
             self.style_manager.apply_to_widget(self.label_message, 'label_message')
             self.style_manager.apply_to_widget(self.update_label, 'update_label')
 
+            self.style_manager.apply_progressbar(key="QPushButton", widget=self.progress_load, style="parts")
             # Применение к SVG
             self.style_manager.apply_color_svg(self.svg_image, strength=0.95)
 
@@ -515,9 +527,12 @@ class Assistant(QMainWindow):
 
     def show_notification_message(self, message):
         try:
+            # Проверяем, действительно ли окно скрыто/свёрнуто
+            is_window_hidden = self.isMinimized() or not self.isVisible()
 
             toast = ToastNotification(
-                parent=self,
+                parent=None if is_window_hidden else self,
+                # parent=None,
                 message=message,
                 timeout=4000
             )
@@ -683,7 +698,7 @@ class Assistant(QMainWindow):
     def open_update_app(self, event):
         """Запускает скрипт для установки обновления при клике на текст."""
         try:
-            self.update_app()
+            self.update_app(type_version=self.type_version)
         except Exception as e:
             debug_logger.error(f"Ошибка при запуске программы обновления: {e}")
 
@@ -740,11 +755,17 @@ class Assistant(QMainWindow):
         else:
             debug_logger.info(f"Папка не существует: {temp_dir}")
 
+    def animation_start_load(self):
+        self.progress_load.show()
+        self.progress_load.startAnimation()
+
+    def animation_stop_load(self):
+        self.progress_load.hide()
+        self.progress_load.stopAnimation()
+
     def check_update_app(self):
         """Проверяет обновления"""
-        self.dot_animation = DotAnimation()
-        self.dot_animation.update_signal.connect(self.update_label.setText)
-        self.dot_animation.start()
+        self.animation_start_load()
         try:
             self.check_update_label()
             stable_version, exp_version = check_version()
@@ -759,36 +780,36 @@ class Assistant(QMainWindow):
             if latest_version > current_ver:
                 self.download_thread = DownloadThread(type_version)
                 self.download_thread.download_complete.connect(self.handle_download_complete)
-                self.download_thread.finished.connect(self.dot_animation.stop)
+                self.download_thread.finished.connect(self.animation_stop_load)
                 self.download_thread.start()
             else:
-                self.dot_animation.stop()
+                self.animation_stop_load()
                 self.update_label.setText("Установлена последняя версия")
                 self.check_update_label()
                 self.update_complete()
         except requests.Timeout:
-            self.dot_animation.stop()
+            self.animation_stop_load()
             logger.warning("Таймаут при проверке обновлений")
             debug_logger.warning("Таймаут при проверке обновлений")
             self.update_label.setText("Ошибка соединения")
         except requests.RequestException as e:
-            self.dot_animation.stop()
+            self.animation_stop_load()
             logger.error(f"Ошибка сети: {str(e)}")
             debug_logger.warning(f"Ошибка сети: {str(e)}")
             self.update_label.setText("Нет соединения")
         except ValueError as e:
-            self.dot_animation.stop()
+            self.animation_stop_load()
             logger.error(f"Ошибка формата данных: {str(e)}")
             debug_logger.warning(f"Ошибка формата данных: {str(e)}")
             self.update_label.setText("Ошибка данных")
         except Exception as e:
-            self.dot_animation.stop()
+            self.animation_stop_load()
             logger.error(f"Неожиданная ошибка")
             debug_logger.error(f"Неожиданная ошибка: {str(e)}", exc_info=True)
             self.update_label.setText("Ошибка обновления")
 
     def handle_download_complete(self, file_path, success=True, skipped=False, error=None):
-        self.dot_animation.stop()
+        self.animation_stop_load()
         self.update_label.setText("Доступно обновление")
         self.check_update_label()
         try:
@@ -799,6 +820,8 @@ class Assistant(QMainWindow):
                     self.show_update_notice(version)
                 if skipped:
                     debug_logger.info(f"[SKIP] Файл уже существует")
+                    self.handle_message_click()
+                    self.show_notification_message("Сейчас будет установлена новая версия")
                 else:
                     debug_logger.info(f"[OK] Новый файл загружен")
             else:
@@ -816,15 +839,14 @@ class Assistant(QMainWindow):
         self.showNormal()
         self.raise_()
         self.activateWindow()
-        QTimer.singleShot(3000, lambda: self.update_app)
+        QTimer.singleShot(3000, lambda: self.update_app(type_version=self.type_version))
 
     def show_update_notice(self, version):
         """Показ уведомления о новой версии"""
         if not self.isVisible():  # Если окно скрыто в трее
             # Показываем message в трее
             self.tray_icon.showMessage(
-                "Доступно обновление",
-                "Нажмите для перезагрузки",
+                "Обновление загружено",
                 QSystemTrayIcon.Information,
                 3000  # 3 секунды
             )
@@ -911,7 +933,7 @@ class Assistant(QMainWindow):
             self.changelog_window(None)
 
         def on_install():
-            self.update_app()
+            self.update_app(type_version=self.type_version)
             if checkbox.isChecked():
                 self.show_upd_msg = False
                 self.save_settings()
@@ -1153,80 +1175,97 @@ class Assistant(QMainWindow):
     def closeEvent(self, event):
         """Обработка закрытия окна с кастомным диалогом подтверждения"""
         self.close_child_windows.emit()
-        if self.is_assistant_running:
-            dialog = QDialog(self)
-            dialog.setWindowFlags(Qt.FramelessWindowHint | Qt.Dialog)
-            dialog.setAttribute(Qt.WA_TranslucentBackground)
-            dialog.setFixedSize(250, 150)
+        # if self.is_assistant_running:
+        #     dialog = QDialog(self)
+        #     dialog.setWindowFlags(Qt.FramelessWindowHint | Qt.Dialog)
+        #     dialog.setAttribute(Qt.WA_TranslucentBackground)
+        #     dialog.setFixedSize(250, 150)
+        #
+        #     # Основной контейнер с рамкой 1px
+        #     container = QWidget(dialog)
+        #     container.setObjectName("MessageContainer")
+        #     container.setGeometry(0, 0, dialog.width(), dialog.height())
+        #
+        #     # Заголовок
+        #     title_bar = QWidget(container)
+        #     title_bar.setObjectName("TitleBar")
+        #     title_bar.setGeometry(1, 1, dialog.width() - 2, 35)
+        #     title_layout = QHBoxLayout(title_bar)
+        #     title_layout.setContentsMargins(10, 5, 10, 5)
+        #     title_layout.setSpacing(5)
+        #
+        #     title_label = QLabel("Подтверждение")
+        #     title_layout.addWidget(title_label)
+        #     title_layout.addStretch()
+        #
+        #     close_btn = QPushButton("✕")
+        #     close_btn.setFixedSize(25, 25)
+        #     close_btn.setObjectName("CloseButton")
+        #     close_btn.clicked.connect(lambda: self.handle_close_confirmation(False, event, dialog))
+        #     title_layout.addWidget(close_btn)
+        #
+        #     # Основное содержимое
+        #     content_widget = QWidget(container)
+        #     content_widget.setGeometry(1, 36, dialog.width() - 2, dialog.height() - 37)
+        #
+        #     # Вертикальный layout для содержимого
+        #     layout = QVBoxLayout(content_widget)
+        #     layout.setContentsMargins(10, 5, 10, 5)
+        #     layout.setSpacing(10)
+        #
+        #     # Текст сообщения
+        #     message_label = QLabel("Вы уверены, что хотите закрыть?")
+        #     message_label.setAlignment(Qt.AlignCenter)
+        #     layout.addWidget(message_label)
+        #
+        #     # Горизонтальный layout для кнопок
+        #     button_layout = QHBoxLayout()
+        #     button_layout.setSpacing(10)
+        #
+        #     # Кнопки
+        #     yes_button = QPushButton("Да")
+        #     yes_button.setFixedSize(80, 25)
+        #     yes_button.setObjectName("ConfirmButton")
+        #     yes_button.clicked.connect(lambda: self.handle_close_confirmation(True, event, dialog))
+        #
+        #     no_button = QPushButton("Нет")
+        #     no_button.setFixedSize(80, 25)
+        #     no_button.setObjectName("RejectButton")
+        #     no_button.clicked.connect(lambda: self.handle_close_confirmation(False, event, dialog))
+        #
+        #     button_layout.addWidget(yes_button)
+        #     button_layout.addWidget(no_button)
+        #     button_layout.setAlignment(Qt.AlignCenter)
+        #
+        #     layout.addLayout(button_layout)
+        #
+        #     # Позиционируем диалог
+        #     if self.parent():
+        #         parent_rect = self.parent().geometry()
+        #         dialog.move(
+        #             parent_rect.center() - dialog.rect().center()
+        #         )
+        #
+        #     dialog.exec_()
+        # else:
+        self.stop_assist()
+        event.accept()
 
-            # Основной контейнер с рамкой 1px
-            container = QWidget(dialog)
-            container.setObjectName("MessageContainer")
-            container.setGeometry(0, 0, dialog.width(), dialog.height())
+    def on_shutdown(self):
+        try:
+            self.force_close()
+        except Exception as e:
+            debug_logger.error(f"Ошибка при закрытии приложения: {e}")
 
-            # Заголовок
-            title_bar = QWidget(container)
-            title_bar.setObjectName("TitleBar")
-            title_bar.setGeometry(1, 1, dialog.width() - 2, 35)
-            title_layout = QHBoxLayout(title_bar)
-            title_layout.setContentsMargins(10, 5, 10, 5)
-            title_layout.setSpacing(5)
+    def force_close(self):
+        """Принудительное закрытие, игнорируя все подтверждения"""
+        self.close()
 
-            title_label = QLabel("Подтверждение")
-            title_layout.addWidget(title_label)
-            title_layout.addStretch()
-
-            close_btn = QPushButton("✕")
-            close_btn.setFixedSize(25, 25)
-            close_btn.setObjectName("CloseButton")
-            close_btn.clicked.connect(lambda: self.handle_close_confirmation(False, event, dialog))
-            title_layout.addWidget(close_btn)
-
-            # Основное содержимое
-            content_widget = QWidget(container)
-            content_widget.setGeometry(1, 36, dialog.width() - 2, dialog.height() - 37)
-
-            # Вертикальный layout для содержимого
-            layout = QVBoxLayout(content_widget)
-            layout.setContentsMargins(10, 5, 10, 5)
-            layout.setSpacing(10)
-
-            # Текст сообщения
-            message_label = QLabel("Вы уверены, что хотите закрыть?")
-            message_label.setAlignment(Qt.AlignCenter)
-            layout.addWidget(message_label)
-
-            # Горизонтальный layout для кнопок
-            button_layout = QHBoxLayout()
-            button_layout.setSpacing(10)
-
-            # Кнопки
-            yes_button = QPushButton("Да")
-            yes_button.setFixedSize(80, 25)
-            yes_button.setObjectName("ConfirmButton")
-            yes_button.clicked.connect(lambda: self.handle_close_confirmation(True, event, dialog))
-
-            no_button = QPushButton("Нет")
-            no_button.setFixedSize(80, 25)
-            no_button.setObjectName("RejectButton")
-            no_button.clicked.connect(lambda: self.handle_close_confirmation(False, event, dialog))
-
-            button_layout.addWidget(yes_button)
-            button_layout.addWidget(no_button)
-            button_layout.setAlignment(Qt.AlignCenter)
-
-            layout.addLayout(button_layout)
-
-            # Позиционируем диалог
-            if self.parent():
-                parent_rect = self.parent().geometry()
-                dialog.move(
-                    parent_rect.center() - dialog.rect().center()
-                )
-
-            dialog.exec_()
-        else:
-            event.accept()
+        # Гарантированное завершение через 100 мс
+        QTimer.singleShot(100, lambda: [
+            QApplication.closeAllWindows(),
+            QApplication.quit()
+        ])
 
     def cleanup_before_exit(self):
         """Подготовка к выходу"""
@@ -2114,9 +2153,9 @@ class Assistant(QMainWindow):
         dialog = ChangelogWindow(self)
         dialog.exec_()
 
-    def update_app(self):
+    def update_app(self, type_version=None):
         """Обработка нажатия кнопки 'Установить обновление'"""
-        dialog = UpdateApp(self, self.type_version)
+        dialog = UpdateApp(self, type_version)
         dialog.main()
 
     def update_voice(self, new_voice):
@@ -2809,44 +2848,44 @@ class SystemScreenshot:
         debug_logger.error("Таймаут: скриншот не обнаружен")
         return None
 
+#
+# class DownloadThread(QThread):
+#     download_complete = pyqtSignal(str, bool, bool, str)  # file_path, success, skipped, error
+#     progress_signal = pyqtSignal(str)
+#
+#     def __init__(self, type_version, parent=None):
+#         super().__init__(parent)
+#         self.type_version = type_version
+#
+#     def run(self):
+#         download_update(self.type_version, on_complete=self._handle_complete)
+#         self.progress_signal.emit("Начинаем загрузку...")
+#
+#     def _handle_complete(self, file_path, success=True, skipped=False, error=None):
+#         self.download_complete.emit(file_path, success, skipped, error)
 
-class DownloadThread(QThread):
-    download_complete = pyqtSignal(str, bool, bool, str)  # file_path, success, skipped, error
-    progress_signal = pyqtSignal(str)
 
-    def __init__(self, type_version, parent=None):
-        super().__init__(parent)
-        self.type_version = type_version
-
-    def run(self):
-        download_update(self.type_version, on_complete=self._handle_complete)
-        self.progress_signal.emit("Начинаем загрузку...")
-
-    def _handle_complete(self, file_path, success=True, skipped=False, error=None):
-        self.download_complete.emit(file_path, success, skipped, error)
-
-
-class DotAnimation(QObject):
-    update_signal = pyqtSignal(str)
-
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.timer = QTimer(self)
-        self.timer.timeout.connect(self.update_text)
-        self.counter = 0
-        self.base_text = "Ищу свежую версию"
-
-    def start(self):
-        self.counter = 0
-        self.timer.start(500)  # Обновление каждые 500 мс
-
-    def stop(self):
-        self.timer.stop()
-
-    def update_text(self):
-        dots = '.' * (self.counter % 4)
-        self.update_signal.emit(f"{self.base_text}{dots}")
-        self.counter += 1
+# class DotAnimation(QObject):
+#     update_signal = pyqtSignal(str)
+#
+#     def __init__(self, parent=None):
+#         super().__init__(parent)
+#         self.timer = QTimer(self)
+#         self.timer.timeout.connect(self.update_text)
+#         self.counter = 0
+#         self.base_text = "Поиск и загрузка свежей версии"
+#
+#     def start(self):
+#         self.counter = 0
+#         self.timer.start(500)  # Обновление каждые 500 мс
+#
+#     def stop(self):
+#         self.timer.stop()
+#
+#     def update_text(self):
+#         dots = '.' * (self.counter % 4)
+#         self.update_signal.emit(f"{self.base_text}{dots}")
+#         self.counter += 1
 
 
 class ToastNotification(QDialog):
@@ -2863,6 +2902,9 @@ class ToastNotification(QDialog):
             # Сохраняем ссылку на текущее уведомление
         ToastNotification._active_toast = self
         self.parent = parent
+        print(self.parent)
+        if self.parent:
+            self.parent.installEventFilter(self)
         self.timeout = timeout
         self.message = message
         self.svg_path = get_path("bin", "owl_start.svg")
@@ -2888,16 +2930,6 @@ class ToastNotification(QDialog):
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.Tool | Qt.WindowStaysOnTopHint)
         self.setAttribute(Qt.WA_ShowWithoutActivating)
         self.setFixedSize(300, 100)
-        self.setStyleSheet("""
-                    ToastNotification {
-                        border-radius: 8px;
-                        padding: 12px 20px;
-                    }
-                    QLabel {
-                        font-size: 13px;
-                        border: none;
-                    }
-                """)
 
         # Основной layout
         main_layout = QVBoxLayout()
@@ -2944,66 +2976,101 @@ class ToastNotification(QDialog):
         self.timer.setSingleShot(True)
         self.timer.timeout.connect(self.hide_animated)
 
-    def adjust_height(self):
-        """Динамически подстраивает высоту под содержимое текста"""
-        # 1. Рассчитываем оптимальную высоту текста
-        text_width = self.width() - 20 - 50 - 20  # (ширина окна - отступы - иконка - дополнительные padding)
-        font_metrics = self.label.fontMetrics()
-        text_height = font_metrics.boundingRect(
-            0, 0, text_width, 0,
-            Qt.TextWordWrap,
-            self.label.text()
-        ).height()
+    def eventFilter(self, obj, event):
+        """Обработка событий родительского окна"""
+        if ToastNotification._active_toast:
+            if obj == self.parent:
+                if event.type() == QEvent.WindowStateChange:
+                    if self.parent.isActiveWindow():
+                        self.handle_parent_restored()
+                elif event.type() == QEvent.Hide:
+                    if self.parent.isHidden():
+                        self.handle_parent_hidden()
+        return super().eventFilter(obj, event)
 
-        # 2. Добавляем высоту остальных элементов (иконка, отступы, заголовок)
-        total_height = (
-                1 +  # title_bar
-                max(text_height, 50) +  # текст или иконка (что больше)
-                20  # вертикальные отступы
-        )
+    def handle_parent_minimized(self):
+        """Родитель свернут в трей"""
+        if hasattr(self, 'animation_group') and self.animation_group.state() == QAbstractAnimation.Running:
+            self.animation_group.stop()
 
-        # 3. Устанавливаем минимальную высоту 100px и ограничиваем максимальную (например, 300px)
-        clamped_height = max(100, min(total_height, 300))
-        self.setFixedHeight(clamped_height)
+        self.close_immediately()
 
-        # 4. Обновляем геометрию
-        self.updateGeometry()
+    def handle_parent_restored(self):
+        """Родитель восстановлен из трея"""
+        # Можно автоматически показать уведомление снова, если нужно
+        pass
+
+    def handle_parent_hidden(self):
+        """Родитель скрыт (например, закрыт)"""
+        self.close_immediately()
+
+    def recalculate_position(self):
+        """Пересчет позиции уведомления"""
+        if self.parent and not self.parent.isMinimized():
+            parent_geo = self.parent.geometry()
+            end_x = parent_geo.right() - self.width()
+            end_y = parent_geo.top() + 34
+            self.move(end_x, end_y)
+        else:
+            screen_geo = QApplication.primaryScreen().geometry()
+            end_x = screen_geo.width() - self.width()
+            end_y = 0
+            self.move(end_x, end_y)
 
     def close_immediately(self):
-        """Немедленное закрытие без анимации"""
-        # Отключаем таймер и анимацию
-        if hasattr(self, 'timer'):
-            self.timer.stop()
-        if hasattr(self, 'animation'):
-            self.animation.stop()
+        """Безопасное закрытие уведомления без анимации"""
+        try:
+            # 1. Останавливаем все анимации и таймеры
+            if hasattr(self, 'timer') and self.timer.isActive():
+                self.timer.stop()
 
-        # Закрываем окно
-        self.close()
+            if hasattr(self, 'animation') and self.animation.state() == QPropertyAnimation.Running:
+                self.animation.stop()
 
-        # Если это текущее активное уведомление - очищаем ссылку
-        if ToastNotification._active_toast is self:
-            ToastNotification._active_toast = None
+            if hasattr(self, 'animation_group') and self.animation_group.state() == QParallelAnimationGroup.Running:
+                self.animation_group.stop()
+
+            if hasattr(self, 'opacity_animation') and self.opacity_animation.state() == QPropertyAnimation.Running:
+                self.opacity_animation.stop()
+
+            # 2. Проверяем, существует ли еще виджет
+            if not sip.isdeleted(self):
+                # 3. Скрываем вместо закрытия (более безопасно)
+                self.hide()
+
+                # 4. Отсоединяем от родителя, если он существует
+                if self.parent and not sip.isdeleted(self.parent):
+                    self.setParent(None)
+
+                # 5. Планируем реальное удаление
+                self.deleteLater()
+
+            # 6. Очищаем ссылку
+            if ToastNotification._active_toast is self:
+                ToastNotification._active_toast = None
+
+        except Exception as e:
+            debug_logger.error(f"Ошибка при закрытии уведомления: {e}")
 
     def showEvent(self, event):
         # Устанавливаем начальную прозрачность
         self.setWindowOpacity(0.0)
 
-        if self.parent:
+        screen_geo = QApplication.primaryScreen().availableGeometry()
+
+        if self.parent and self.parent.isVisible() and not self.parent.isMinimized():
+            # Если есть видимый родитель - позиционируем относительно него
             parent_geo = self.parent.geometry()
-            # Начальная позиция - выше верхнего края окна
             start_x = parent_geo.right() - self.width()
             start_y = parent_geo.top() - self.height()
-            # Конечная позиция - у верхнего края окна с небольшим отступом
             end_x = start_x
             end_y = parent_geo.top() + 34
         else:
-            screen_geo = QApplication.primaryScreen().geometry()
-            # Начальная позиция - выше верхнего края экрана
-            start_x = screen_geo.width() - self.width()
+            # Иначе - позиционируем в правом верхнем углу экрана
+            start_x = screen_geo.width() - self.width()  # 10px отступ от края
             start_y = -self.height()
-            # Конечная позиция - у верхнего края экрана с небольшим отступом
             end_x = start_x
-            end_y = 0
+            end_y = 21  # 10px отступ сверху
 
         self.move(start_x, start_y)
         self.show()
@@ -3052,13 +3119,6 @@ class ToastNotification(QDialog):
             # Применение к SVG
             self.style_manager.apply_color_svg(self.svg_image, strength=0.95)
 
-            # Применение общего стиля окна
-            if hasattr(self, 'central_widget'):
-                self.central_widget.setObjectName("CentralWidget")
-            if hasattr(self, 'title_bar_widget'):
-                self.title_bar_widget.setObjectName("TitleBar")
-            if hasattr(self, 'container'):
-                self.title_bar_widget.setObjectName("ConfirmDialogContainer")
             # Применяем стили к текущему окну
             style_sheet = ""
             for widget, styles in self.styles.items():

@@ -155,6 +155,10 @@ class MainSettingsWindow(QDialog):
         # Анимация прозрачности
         self.opacity_animation = QPropertyAnimation(self, b"windowOpacity")
         self.opacity_animation.setDuration(300)
+        self.opacity_animation.setKeyValueAt(0.0, 0.0)
+        self.opacity_animation.setKeyValueAt(0.5, 0.1)
+        self.opacity_animation.setKeyValueAt(0.8, 0.8)
+        self.opacity_animation.setKeyValueAt(1.0, 1.0)
 
         self.init_ui()
         self.setup_animation()
@@ -258,8 +262,15 @@ class MainSettingsWindow(QDialog):
 
         # 2. Настраиваем обратную анимацию прозрачности
         self.opacity_animation.stop()
-        self.opacity_animation.setStartValue(1.0)  # От непрозрачного
-        self.opacity_animation.setEndValue(0.0)  # К прозрачному
+        self.opacity_animation = QPropertyAnimation(self, b"windowOpacity")
+        self.opacity_animation.setDuration(300)
+        self.opacity_animation.setKeyValueAt(0.0, 1.0)  # От непрозрачного
+        self.opacity_animation.setKeyValueAt(0.1, 0.8)
+        self.opacity_animation.setKeyValueAt(0.2, 0.6)
+        self.opacity_animation.setKeyValueAt(0.3, 0.3)
+        self.opacity_animation.setKeyValueAt(1.0, 0.0)
+        # self.opacity_animation.setStartValue(1.0)
+        # self.opacity_animation.setEndValue(0.0)
         self.opacity_animation.finished.connect(self.hide)
 
         # 3. Настраиваем обратное движение

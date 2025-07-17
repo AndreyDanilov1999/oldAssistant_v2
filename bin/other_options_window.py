@@ -1,13 +1,18 @@
 import csv
 import os
+from itertools import chain
 from pathlib import Path
 import simpleaudio as sa
 import numpy as np
 import pandas as pd
 from PyQt5.QtCore import Qt, QTimer, QPoint, QPropertyAnimation, QEasingCurve
-from PyQt5.QtGui import QFont, QTextCursor
+from PyQt5.QtGui import QFont, QTextCursor, QColor
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QPushButton, QMessageBox, QLabel, QStackedWidget, \
-    QFrame, QHBoxLayout, QDialog, QLineEdit, QSlider, QCheckBox, QTextEdit, QDesktopWidget
+    QFrame, QHBoxLayout, QDialog, QLineEdit, QSlider, QCheckBox, QTextEdit, QDesktopWidget, QListWidget, QListWidgetItem
+from packaging import version
+from bin.apply_color_methods import ApplyColor
+from bin.check_update import check_all_versions, download_update
+from bin.download_thread import DownloadThread, SliderProgressBar
 from logging_config import logger, debug_logger
 from path_builder import get_path
 
@@ -388,6 +393,11 @@ class CheckUpdateWidget(QWidget):
         super().__init__(parent)
         self.assistant = assistant
         self.init_ui()
+        self.style_manager = ApplyColor(self)
+        self.color_path = self.style_manager.color_path
+        self.styles = self.style_manager.load_styles()
+        self.style_manager.apply_progressbar(key="QPushButton", widget=self.progress, style="parts")
+        self.style_manager.apply_progressbar(key="QPushButton", widget=self.progress_any, style="parts")
 
     def init_ui(self):
         # Основной layout
@@ -402,11 +412,123 @@ class CheckUpdateWidget(QWidget):
         self.update_check.stateChanged.connect(self.toggle_beta_version)  # Подключаем обработчик
         layout.addWidget(self.update_check)
 
+        self.rollback = QPushButton("Откатиться до стабильной версии")
+        self.rollback.clicked.connect(self.rollback_stable_version)
+        layout.addWidget(self.rollback)
+
+        self.progress = SliderProgressBar(self)
+        self.progress.hide()
+        layout.addWidget(self.progress)
+
+        self.load_any_version = QPushButton("Выбрать из доступных версий")
+        self.load_any_version.clicked.connect(self.open_list)
+        layout.addWidget(self.load_any_version)
+
+        self.list_versions = QListWidget()
+        self.list_versions.setFixedHeight(200)
+        self.list_versions.hide()
+        layout.addWidget(self.list_versions)
+
+        self.done_button = QPushButton("Установить выбранную версию")
+        self.done_button.clicked.connect(self.on_button_click)
+        self.done_button.hide()
+        layout.addWidget(self.done_button)
+
+        self.progress_any = SliderProgressBar(self)
+        self.progress_any.hide()
+        layout.addWidget(self.progress_any)
+
+        self.list_versions.itemClicked.connect(self.on_version_click)
+
         layout.addStretch()
 
     def toggle_beta_version(self, state):
         """Включает/отключает проверку экспериментальных версий"""
         self.assistant.beta_version = state == Qt.Checked
+
+    def rollback_stable_version(self):
+        try:
+            self.start_load()
+            # QTimer.singleShot(5000, self.finish_load)
+            self.download_thread = DownloadThread(type_version="stable")
+            self.download_thread.download_complete.connect(
+                lambda: self.assistant.update_app(type_version="stable"))
+            self.download_thread.finished.connect(self.finish_load)
+            self.download_thread.start()
+        except Exception as e:
+            debug_logger.error(f"Ошибка в методе rollback_stable_version: {e}")
+
+    def start_load(self):
+        self.progress.show()
+        self.rollback.hide()
+        self.progress.startAnimation()
+
+    def finish_load(self):
+        self.progress.hide()
+        self.rollback.setText("Ожидайте")
+        self.progress.stopAnimation()
+
+    def open_list(self):
+        self.load_any_version.hide()
+        self.load_versions()
+        self.list_versions.show()
+
+    def load_versions(self):
+        data = check_all_versions()
+        all_versions = list(chain.from_iterable(data))
+        sorted_versions = sorted(all_versions, key=lambda v: version.parse(v), reverse=True)
+
+        self.list_versions.clear()
+
+        for ver in sorted_versions:
+            item = QListWidgetItem(ver)
+            if "alpha" in ver or "beta" in ver or "rc" in ver:
+                item.setForeground(QColor("orange"))  # Нестабильные
+            else:
+                item.setForeground(QColor("green"))  # Стабильные
+            self.list_versions.addItem(item)
+
+    def on_version_click(self, item):
+        """Обработчик клика по версии"""
+        selected_version = item.text()
+        self.done_button.setText(f"Версия {selected_version}. Установить?")
+        self.done_button.show()  # Показываем кнопку
+
+    def on_button_click(self):
+        try:
+            selected_item = self.list_versions.currentItem()
+            if selected_item:
+                selected_version = selected_item.text()
+                self.list_versions.hide()
+                self.done_button.setText(f"Скачивание...")
+                self.progress_any.show()
+                self.progress_any.startAnimation()
+                if any(ver in selected_version for ver in ("alpha", "beta", "rc")):
+                    self.download_thread = DownloadThread(type_version="exp", version=selected_version)
+                    self.download_thread.download_complete.connect(
+                        lambda: self.assistant.update_app(type_version="exp"))
+                else:
+                    self.download_thread = DownloadThread(type_version="stable", version=selected_version)
+                    self.download_thread.download_complete.connect(
+                        lambda: self.assistant.update_app(type_version="stable"))
+
+                self.download_thread.finished.connect(self.finish_load_any_version)
+                self.download_thread.start()
+
+            else:
+                self.assistant.show_notification_message("Версия не выбрана!")
+                debug_logger.error("Версия не выбрана!")
+        except Exception as e:
+            self.done_button.setText(f"Произошла ошибка")
+            self.progress_any.hide()
+            self.progress_any.stopAnimation()
+            logger.error(f"Ошибка в методе one_button_click: {e}")
+            debug_logger.error(f"Ошибка в методе one_button_click: {e}")
+
+    def finish_load_any_version(self):
+        self.done_button.setText(f"Почти готово...")
+        self.progress_any.hide()
+        self.progress_any.stopAnimation()
 
 
 class DebugLoggerWidget(QWidget):
