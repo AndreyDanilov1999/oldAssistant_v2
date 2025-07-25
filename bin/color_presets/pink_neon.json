@@ -1,11 +1,11 @@
 {
     "QWidget": {
-        "background-color": "#0F0E12",
+        "background-color": "qlineargradient(x1:0.91, y1:0.78, x2:0.09, y2:0.22, stop:0 #000000, stop:1 #2a0323)",
         "color": "#ffffff",
         "font-size": "13px"
     },
     "QPushButton": {
-        "background-color": "qlineargradient(x1:1.0, y1:1.0, x2:0.1, y2:0.1, stop:0 #000000, stop:1 #3F0925)",
+        "background-color": "qlineargradient(x1:0.85, y1:0.85, x2:0.15, y2:0.15, stop:0 #000000, stop:1 #3F0925)",
         "color": "#ffffff",
         "height": "30px",
         "border": "1px solid #ee4673",
@@ -13,23 +13,23 @@
         "font-size": "13px"
     },
     "QPushButton:hover": {
-        "background-color": "#1a0b19",
+        "background-color": "qlineargradient(x1:0.85, y1:0.85, x2:0.15, y2:0.15, stop:0 #3F0925, stop:1 #000000)",
         "color": "#ffffff",
         "font-size": "13px"
     },
     "QPushButton:pressed": {
-        "background-color": "#060005",
+        "background-color": "qlineargradient(x1:0.85, y1:0.85, x2:0.15, y2:0.15, stop:0 #000000, stop:1 #210007)",
         "padding-left": "3px",
         "padding-top": "3px"
     },
     "QTextEdit": {
-        "background-color": "qlineargradient(x1:1.0, y1:1.0, x2:0.1, y2:0.1, stop:0 #000000, stop:1 #1D0410)",
+        "background": "transparent",
         "color": "#ffdee6",
-        "border": "1px solid",
-        "border-radius": "4px",
+        "border": "none",
         "font-size": "15px"
     },
     "label_version": {
+        "background": "transparent",
         "color": "#ffdee6",
         "font-size": "10px"
     },
@@ -38,6 +38,7 @@
         "font-size": "13px"
     },
     "update_label": {
+        "background": "transparent",
         "color": "#ffdee6",
         "font-size": "12px"
     },
@@ -45,7 +46,7 @@
         "border-bottom": "1px solid #ee4673"
     },
     "TrayButton": {
-        "background-color": "qlineargradient(x1:1.0, y1:1.0, x2:0.1, y2:0.1, stop:0 #000000, stop:1 #3F0925)",
+        "background-color": "qlineargradient(x1:0.85, y1:0.85, x2:0.15, y2:0.15, stop:0 #000000, stop:1 #3F0925)",
         "color": "#ffffff",
         "height": "30px",
         "border": "1px solid #ee4673",
@@ -58,7 +59,7 @@
         "border": "1px solid #0790EC"
     },
     "CloseButton": {
-        "background-color": "qlineargradient(x1:1.0, y1:1.0, x2:0.1, y2:0.1, stop:0 #000000, stop:1 #3F0925)",
+        "background-color": "qlineargradient(x1:0.85, y1:0.85, x2:0.15, y2:0.15, stop:0 #000000, stop:1 #3F0925)",
         "color": "#ffffff",
         "height": "30px",
         "border": "1px solid #ee4673",
@@ -71,6 +72,7 @@
         "border": "1px solid #E04F4F"
     },
     "MessageContainer": {
-        "border": "1px solid #ee4673"
+        "border": "1px solid #ee4673",
+        "border-radius": "25px"
     }
 }

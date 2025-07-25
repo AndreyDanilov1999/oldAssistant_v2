@@ -1,4 +1,5 @@
 import json
+import re
 
 from PyQt5.QtGui import QColor
 from PyQt5.QtSvg import QSvgWidget
@@ -34,16 +35,28 @@ class ApplyColor():
             widget.setStyleSheet(self.format_style(self.styles[widget_name]))
 
     def apply_color_svg(self, svg_widget: QSvgWidget, strength: float) -> None:
-        """Применяет цвет к SVG виджету"""
         if "TitleBar" in self.styles and "border-bottom" in self.styles["TitleBar"]:
-            border_parts = self.styles["TitleBar"]["border-bottom"].split()
-            for part in border_parts:
-                if part.startswith('#'):
-                    color_effect = QGraphicsColorizeEffect()
-                    color_effect.setColor(QColor(part))
-                    svg_widget.setGraphicsEffect(color_effect)
-                    color_effect.setStrength(strength)
-                    break
+            border_value = self.styles["TitleBar"]["border-bottom"]
+            color = QColor("#000000")  # Fallback
+
+            # Ищем градиент в любой части строки
+            gradient_match = re.search(r"qlineargradient\([^)]+\)", border_value)
+            if gradient_match:
+                gradient_str = gradient_match.group(0)
+                # Ищем первый цвет градиента
+                color_match = re.search(r"stop:0\s+(#[0-9a-fA-F]+)", gradient_str)
+                if color_match:
+                    color = QColor(color_match.group(1))
+            else:
+                # Стандартная обработка HEX-цвета
+                hex_match = re.search(r"#[0-9a-fA-F]{3,6}", border_value)
+                if hex_match:
+                    color = QColor(hex_match.group(0))
+
+            color_effect = QGraphicsColorizeEffect()
+            color_effect.setColor(color)
+            svg_widget.setGraphicsEffect(color_effect)
+            color_effect.setStrength(strength)
 
     def format_style(self, style_dict):
         """Форматирует стиль в строку"""

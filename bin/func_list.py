@@ -363,7 +363,6 @@ def open_url_link(game_id_or_url, filename):
                     start_rust = audio_paths['start_rust']
                     thread_react_detail(start_rust)
                 # Запускаем игру через Steam
-                # subprocess.Popen([steam_path, '-applaunch', game_id_or_url], shell=True)
                 process = subprocess.Popen(
                     [steam_path, '-applaunch', game_id_or_url],
                     stdout=subprocess.PIPE,
@@ -390,7 +389,6 @@ def open_url_link(game_id_or_url, filename):
                 # Если процессов нет, собираем их
                 before_processes = get_all_processes()
                 # Запускаем игру через Steam
-                # subprocess.Popen([steam_path, '-applaunch', game_id_or_url], shell=True)
                 process = subprocess.Popen(
                     [steam_path, '-applaunch', game_id_or_url],
                     stdout=subprocess.PIPE,

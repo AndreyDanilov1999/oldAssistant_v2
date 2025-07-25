@@ -129,6 +129,9 @@ class SmartWidget(QWidget):
         self.setWindowFlags(base_flags)
         # Для перемещения окна
         self.old_pos = None
+        self.is_dragging = False
+        self.is_locked = False
+        self.current_position = {"x": 0, "y": 0}
 
         self.sensor_timer = QTimer()
         self.sensor_timer.timeout.connect(self.update_sensors)
@@ -234,7 +237,7 @@ class SmartWidget(QWidget):
 
         self.lock_btn = QPushButton()
         self.lock_btn.setFixedSize(20, 20)
-        self.lock_btn.setToolTip("Запомнить положение виджета")
+        self.lock_btn.setToolTip("Запретить перетаскивание")
         self.lock_btn.setStyleSheet("""
             QPushButton {
                 background: transparent;
@@ -248,7 +251,7 @@ class SmartWidget(QWidget):
         self.lock_svg.setFixedSize(13, 13)
         self.lock_svg.move(3, 3)
         self.lock_svg.setStyleSheet("background: transparent; border: none;")
-        self.lock_btn.clicked.connect(self.save_state)
+        self.lock_btn.clicked.connect(self.lock_state)
 
         self.resize_btn = QPushButton()
         self.resize_btn.setFixedSize(20, 20)
@@ -576,7 +579,7 @@ class SmartWidget(QWidget):
 
         self.lock_btn = QPushButton()
         self.lock_btn.setFixedSize(20, 20)
-        self.lock_btn.setToolTip("Запомнить положение виджета")
+        self.lock_btn.setToolTip("Запретить перетаскивание")
         self.lock_btn.setStyleSheet("""
                     QPushButton {
                         background: transparent;
@@ -590,7 +593,7 @@ class SmartWidget(QWidget):
         self.lock_svg.setFixedSize(13, 13)
         self.lock_svg.move(3, 3)
         self.lock_svg.setStyleSheet("background: transparent; border: none;")
-        self.lock_btn.clicked.connect(self.save_state)
+        self.lock_btn.clicked.connect(self.lock_state)
 
         self.resize_btn = QPushButton()
         self.resize_btn.setFixedSize(20, 20)
@@ -740,14 +743,28 @@ class SmartWidget(QWidget):
 
     # Методы для перемещения окна
     def mousePressEvent(self, event):
-        if event.button() == Qt.LeftButton:
+        if event.button() == Qt.LeftButton and not getattr(self, 'is_locked', False):
             self.old_pos = event.globalPos()
+            self.is_dragging = False  # Флаг для отслеживания начала перемещения
 
     def mouseMoveEvent(self, event):
-        if self.old_pos:
+        if hasattr(self, 'old_pos') and self.old_pos and not getattr(self, 'is_locked', False):
             delta = event.globalPos() - self.old_pos
-            self.move(self.pos() + delta)
+            new_pos = self.pos() + delta
+            self.move(new_pos)
             self.old_pos = event.globalPos()
+
+            # Сохраняем текущие координаты в переменные (но не в файл)
+            self.current_position = {"x": new_pos.x(), "y": new_pos.y()}
+            self.is_dragging = True
+
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.LeftButton and self.is_dragging:
+            # Сохраняем окончательные координаты в файл
+            state = self.state_manager.load_state()
+            state["window_position"] = self.current_position
+            self.state_manager.save_state(state)
+            self.is_dragging = False
 
     def load_window_state(self):
         """Загружает состояние окна из JSON"""
@@ -955,6 +972,27 @@ class SmartWidget(QWidget):
                 self.assistant.show()
         except Exception as e:
             debug_logger.error(f"Ошибка при открытии основного окна через виджет {e}")
+
+    def lock_state(self):
+        """Переключает возможность перетаскивания виджета"""
+        self.is_locked = not getattr(self, 'is_locked', False)
+
+        # Меняем иконку в зависимости от состояния
+        if hasattr(self, 'lock_svg'):
+            if self.is_locked:
+                # Меняем на иконку "разблокировки" (можно создать отдельный SVG)
+                self.lock_svg.load(get_path("bin", "icons", "unlock.svg"))
+                self.lock_btn.setToolTip("Разблокировать перемещение виджета")
+            else:
+                # Возвращаем стандартную иконку
+                self.lock_svg.load(self.lock_path)
+                self.lock_btn.setToolTip("Заблокировать перемещение виджета")
+
+            # Применяем цвет к SVG
+            self.style_manager.apply_color_svg(self.lock_svg, strength=0.90)
+
+        # Сохраняем состояние блокировки
+        self.save_state()
 
     def save_state(self):
         self.state_manager.save_window_state(self)

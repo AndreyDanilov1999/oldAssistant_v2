@@ -11,7 +11,7 @@ from PyQt5.QtWidgets import QWidget, QVBoxLayout, QPushButton, QMessageBox, QLab
     QFrame, QHBoxLayout, QDialog, QLineEdit, QSlider, QCheckBox, QTextEdit, QDesktopWidget, QListWidget, QListWidgetItem
 from packaging import version
 from bin.apply_color_methods import ApplyColor
-from bin.check_update import check_all_versions, download_update
+from bin.check_update import check_all_versions
 from bin.download_thread import DownloadThread, SliderProgressBar
 from logging_config import logger, debug_logger
 from path_builder import get_path
@@ -67,7 +67,7 @@ class OtherOptionsWindow(QDialog):
         self.title_bar_layout.setContentsMargins(10, 5, 10, 5)
 
         self.title_label = QLabel("Прочие опции", self.title_bar)
-        # self.title_label.setGeometry(15, 5, 200, 30)
+        self.title_label.setStyleSheet("background: transparent;")
         self.title_bar_layout.addWidget(self.title_label)
         self.title_bar_layout.addStretch()
 
@@ -111,6 +111,10 @@ class OtherOptionsWindow(QDialog):
         self.add_tab("Обновления", CheckUpdateWidget(self.assistant))
         self.add_tab("Подробные логи", DebugLoggerWidget(self))
         self.add_tab("Релакс?", RelaxWidget(self))
+
+        self.open_screens = QPushButton("Скриншоты")
+        self.open_screens.clicked.connect(self.assistant.open_folder_screenshots)
+        self.tabs_layout.addWidget(self.open_screens)
 
     def keyPressEvent(self, event):
         if event.key() == Qt.Key_Escape:
@@ -204,6 +208,11 @@ class CensorCounterWidget(QWidget):
         self.week_label = QLabel("За последние 7 дней: 0", self)
         self.month_label = QLabel("За последние 30 дней: 0", self)
         self.total_label = QLabel("Всего: 0", self)
+
+        self.day_label.setStyleSheet("background: transparent;")
+        self.week_label.setStyleSheet("background: transparent;")
+        self.month_label.setStyleSheet("background: transparent;")
+        self.total_label.setStyleSheet("background: transparent;")
 
         # Добавляем метки в layout
         layout.addWidget(self.day_label)
@@ -344,14 +353,13 @@ class CensorCounterWidget(QWidget):
             message_type="warning",
             buttons=QMessageBox.Yes | QMessageBox.No
         )
-
         # Если пользователь нажал "Нет" или закрыл окно, выходим из метода
-        if result == 0:
+        if result == QMessageBox.No:
             logger.info("Сброс счетчика отменен.")
             debug_logger.info("Сброс счетчика отменен.")
             return
 
-        if result == 1:
+        if result == QMessageBox.Yes:
             # Путь к CSV-файлу
             CSV_FILE = get_path('user_settings', 'censor_counter.csv')
 
@@ -408,12 +416,13 @@ class CheckUpdateWidget(QWidget):
         layout.addWidget(self.check_button)
 
         self.update_check = QCheckBox("Уведомлять о бета-версиях", self)
+        self.update_check.setStyleSheet("background: transparent;")
         self.update_check.setChecked(self.assistant.beta_version)  # Устанавливаем текущее значение
         self.update_check.stateChanged.connect(self.toggle_beta_version)  # Подключаем обработчик
         layout.addWidget(self.update_check)
 
         self.rollback = QPushButton("Откатиться до стабильной версии")
-        self.rollback.clicked.connect(self.rollback_stable_version)
+        self.rollback.clicked.connect(self.wait_and_rollback)
         layout.addWidget(self.rollback)
 
         self.progress = SliderProgressBar(self)
@@ -425,6 +434,7 @@ class CheckUpdateWidget(QWidget):
         layout.addWidget(self.load_any_version)
 
         self.list_versions = QListWidget()
+        self.list_versions.setStyleSheet("background: transparent;")
         self.list_versions.setFixedHeight(200)
         self.list_versions.hide()
         layout.addWidget(self.list_versions)
@@ -446,10 +456,24 @@ class CheckUpdateWidget(QWidget):
         """Включает/отключает проверку экспериментальных версий"""
         self.assistant.beta_version = state == Qt.Checked
 
+    def wait_and_rollback(self):
+        # Показываем диалог и получаем результат
+        result = self.assistant.show_message(
+            "Уверены в своих действиях?",
+            "Запрос на откат версии",
+            "question",
+            buttons=QMessageBox.Ok
+        )
+
+        # Обрабатываем результат
+        if result == QMessageBox.Ok:
+            self.rollback_stable_version()
+        else:
+            pass
+
     def rollback_stable_version(self):
         try:
             self.start_load()
-            # QTimer.singleShot(5000, self.finish_load)
             self.download_thread = DownloadThread(type_version="stable")
             self.download_thread.download_complete.connect(
                 lambda: self.assistant.update_app(type_version="stable"))
@@ -592,6 +616,7 @@ class DebuglogWindow(QDialog):
         title_layout.setSpacing(5)
 
         title_label = QLabel("Подробный лог-файл")
+        title_label.setStyleSheet("background: transparent;")
         title_label.setObjectName("TitleLabel")
         title_label.setFixedSize(150, 20)
         title_layout.addWidget(title_label)
@@ -612,6 +637,7 @@ class DebuglogWindow(QDialog):
         layout.setContentsMargins(10, 10, 10, 10)
 
         self.log_area = QTextEdit()
+        self.log_area.setStyleSheet("background: transparent;")
         self.log_area.setReadOnly(True)
         self.log_area.setFont(QFont("Consolas"))
         self.log_area.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
@@ -623,7 +649,6 @@ class DebuglogWindow(QDialog):
         close_button = QPushButton("Закрыть")
         close_button.clicked.connect(self.close)
         layout.addWidget(close_button)
-
 
     def load_debuglog(self):
         path = get_path("log", "debug_assist.log")
@@ -661,9 +686,11 @@ class RelaxWidget(QWidget):
     def init_ui(self):
         # Поля для настройки выходного звука
         self.duration_title = QLabel('Укажите длительность в секундах')
+        self.duration_title.setStyleSheet("background: transparent;")
         self.duration_field = QLineEdit('30')
 
         self.rate_title = QLabel('Укажите частоту (не рекомендую выше 450)')
+        self.rate_title.setStyleSheet("background: transparent;")
         self.rate_field = QLineEdit('60')
 
         self.apply_button = QPushButton('Запустить')
@@ -671,9 +698,11 @@ class RelaxWidget(QWidget):
 
         # Создание QLabel для отображения значения
         self.label = QLabel('Значение: 0.50', self)
+        self.label.setStyleSheet("background: transparent;")
 
         # Создание горизонтального ползунка
         self.slider = QSlider(Qt.Horizontal, self)
+        self.slider.setStyleSheet("background: transparent;")
         self.slider.setMinimum(0)  # Минимальное значение
         self.slider.setMaximum(100)  # Максимальное значение
         self.slider.setValue(50)  # Начальное значение

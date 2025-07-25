@@ -1,77 +1,64 @@
 {
     "QWidget": {
-        "background-color": "#11110f",
-        "color": "#FFFFFF",
+        "background-color": "#0e111e",
+        "color": "#C6DDF8",
         "font-size": "13px"
     },
     "QPushButton": {
-        "background-color": "#180b24",
-        "color": "#FFFFFF",
+        "background-color": "qlineargradient(x1:1.0, y1:1.0, x2:0.1, y2:0.1, stop:0 #000000, stop:1 #18154B)",
+        "color": "#C6DDF8",
         "height": "30px",
-        "border": "1px solid #FFFFFF",
+        "border": "1px solid #7BB3F6",
         "border-radius": "3px",
-        "font-size": "13px",
-        "width": "200px"
+        "font-size": "13px"
     },
     "QPushButton:hover": {
-        "background-color": "#FB3C02",
-        "color": "#FFFFFF",
+        "background-color": "#02001c",
+        "color": "#C6DDF8",
         "font-size": "13px"
     },
     "QPushButton:pressed": {
-        "background-color": "#000006",
+        "background-color": "#000008",
         "padding-left": "3px",
         "padding-top": "3px"
     },
     "QTextEdit": {
-        "background-color": "#11110f",
-        "color": "#8d9efc",
+        "background-color": "qlineargradient(x1:1.0, y1:1.0, x2:0.1, y2:0.1, stop:0 #000000, stop:1 #0F0D31)",
+        "color": "#c2caff",
         "border": "1px solid",
         "border-radius": "4px",
         "font-size": "15px"
     },
-    "label_version": {
-        "color": "#8d9efc",
-        "font-size": "10px"
-    },
-    "label_message": {
-        "color": "#abbdff",
-        "font-size": "13px"
-    },
-    "update_label": {
-        "color": "#8d9efc",
-        "font-size": "12px"
-    },
     "TitleBar": {
-        "border-bottom": "1px solid #FFFFFF"
+        "border-bottom": "1px solid #7BB3F6"
     },
     "TrayButton": {
-        "background-color": "#180b24",
-        "color": "#abbdff",
+        "background-color": "qlineargradient(x1:1.0, y1:1.0, x2:0.1, y2:0.1, stop:0 #000000, stop:1 #18154B)",
+        "color": "#C6DDF8",
         "height": "30px",
-        "border": "1px solid #a364ec",
+        "border": "1px solid #7BB3F6",
         "border-radius": "3px",
         "font-size": "13px"
     },
     "TrayButton:hover": {
-        "color": "#ffffff",
+        "color": "#C6DDF8",
         "background-color": "#0790EC",
         "border": "1px solid #0790EC"
     },
     "CloseButton": {
-        "background-color": "#180b24",
-        "color": "#abbdff",
+        "background-color": "qlineargradient(x1:1.0, y1:1.0, x2:0.1, y2:0.1, stop:0 #000000, stop:1 #18154B)",
+        "color": "#C6DDF8",
         "height": "30px",
-        "border": "1px solid #a364ec",
+        "border": "1px solid #7BB3F6",
         "border-radius": "3px",
         "font-size": "13px"
     },
     "CloseButton:hover": {
-        "color": "#ffffff",
+        "color": "#C6DDF8",
         "background-color": "#E04F4F",
         "border": "1px solid #E04F4F"
     },
     "MessageContainer": {
-        "border": "1px solid #a364ec"
+        "border": "1px solid #7BB3F6"
     }
 }

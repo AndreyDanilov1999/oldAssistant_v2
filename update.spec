@@ -5,8 +5,8 @@ block_cipher = None
 # Главные файлы проекта
 main_script = 'update_app/update.py'
 additional_files = [
-    ('G:/PycharmProjects/oldAssistant_v2/update_app/color.json', '.'),    # Будет помещен рядом с exe
-    ('G:/PycharmProjects/oldAssistant_v2/update_app/owl_start.svg', '.'),  # Будет в папке assets внутри exe
+    ('G:/PycharmProjects/oldAssistant_v2/update_app/color.json', '.'),    # Все будет внутри exe
+    ('G:/PycharmProjects/oldAssistant_v2/update_app/owl_start.svg', '.'),
     ('G:/PycharmProjects/oldAssistant_v2/update_app/icon.ico', '.'),
 ]
 
@@ -44,6 +44,6 @@ exe = EXE(
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,              # Сжатие исполняемого файла
-    console=True,          # True - показывать консоль, False - скрыть
+    console=False,          # True - показывать консоль, False - скрыть
     icon='G:/PycharmProjects/oldAssistant_v2/update_app/icon.ico'
 )

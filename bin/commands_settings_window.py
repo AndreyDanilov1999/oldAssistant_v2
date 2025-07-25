@@ -52,6 +52,7 @@ class CommandSettingsWindow(QDialog):
         self.title_bar_layout.setContentsMargins(10, 5, 10, 5)
 
         self.title_label = QLabel("Настройки команд")
+        self.title_label.setStyleSheet("background: transparent;")
         self.title_bar_layout.addWidget(self.title_label)
         self.title_bar_layout.addStretch()
 
@@ -199,7 +200,7 @@ class CreateCommandsWidget(QWidget):
         # Заголовок
         title = QLabel("Для чего создаем команду?")
         title.setAlignment(Qt.AlignCenter)
-        title.setStyleSheet("font-size: 16px; font-weight: bold;")
+        title.setStyleSheet("background: transparent; font-size: 16px; font-weight: bold;")
         layout.addWidget(title)
 
         # Контейнер для кнопок выбора типа
@@ -237,7 +238,7 @@ class CreateCommandsWidget(QWidget):
         """Поиск ярлыков в стандартном расположении"""
         scan_and_copy_shortcuts()
         search_links()
-        self.assistant.show_message(f"Поиск завершен!")
+        self.assistant.show_notification_message(f"Поиск завершен!")
 
         # Обновляем список в форме
         if hasattr(self.shortcut_form, 'refresh_shortcuts'):
@@ -292,13 +293,17 @@ class AppCommandForm(QWidget):
         self.key_input = QLineEdit(self)
         self.key_input.setPlaceholderText("Введите команду (например: 'браузер')")
         self.key_input.returnPressed.connect(self.apply_command)  # Обработка нажатия Enter
-        layout.addWidget(QLabel("Команда (уникальное слово):"))
+        self.label_command = QLabel("Команда (уникальное слово):")
+        self.label_command.setStyleSheet("background: transparent;")
+        layout.addWidget(self.label_command)
         layout.addWidget(self.key_input)
 
         self.shortcut_combo = SearchComboBox(self)
         self.load_shortcuts()
         self.shortcut_combo.lineEdit().returnPressed.connect(self.apply_command)  # Обработка нажатия Enter
-        layout.addWidget(QLabel("Выберите ярлык:"))
+        self.label_link = QLabel("Выберите ярлык:")
+        self.label_link.setStyleSheet("background: transparent;")
+        layout.addWidget(self.label_link)
         layout.addWidget(self.shortcut_combo)
 
         self.apply_button = QPushButton("Добавить команду", self)
@@ -365,12 +370,16 @@ class FolderCommandForm(QWidget):
         self.key_input = QLineEdit(self)
         self.key_input.setPlaceholderText("Введите команду (например: 'загрузки')")
         self.key_input.returnPressed.connect(self.apply_command)  # Обработка нажатия Enter
-        layout.addWidget(QLabel("Команда (уникальное слово):"))
+        self.label_command_folder = QLabel("Команда (уникальное слово):")
+        self.label_command_folder.setStyleSheet("background: transparent;")
+        layout.addWidget(self.label_command_folder)
         layout.addWidget(self.key_input)
 
         self.folder_path = QLineEdit(self)
         self.folder_path.returnPressed.connect(self.apply_command)  # Обработка нажатия Enter
-        layout.addWidget(QLabel("Путь к папке:"))
+        self.label_folder = QLabel("Путь к папке:")
+        self.label_folder.setStyleSheet("background: transparent;")
+        layout.addWidget(self.label_folder)
         layout.addWidget(self.folder_path)
 
         select_button = QPushButton("Выбрать папку...", self)
@@ -553,28 +562,33 @@ class ProcessLinksWidget(QWidget):
         main_layout.setSpacing(20)
 
         # Заголовок
-        title = QLabel("Список процессов, привязанных к ярлыку\n(нужны для закрытия)")
-        title.setAlignment(Qt.AlignCenter)
-        title.setStyleSheet("font-size: 16px; font-weight: bold;")
-        main_layout.addWidget(title)
+        self.title = QLabel("Список процессов, привязанных к ярлыку\n(нужны для закрытия)")
+
+        self.title.setAlignment(Qt.AlignCenter)
+        self.title.setStyleSheet("background: transparent; font-size: 16px; font-weight: bold;")
+        main_layout.addWidget(self.title)
 
         # Горизонтальный макет для левой и правой колонок
         content_layout = QHBoxLayout()
 
         # Левая колонка: список ярлыков
         left_layout = QVBoxLayout()
-        self.processes_label = QLabel("Ярлыки")
-        left_layout.addWidget(self.processes_label)
+        self.links_label = QLabel("Ярлыки")
+        self.links_label.setStyleSheet("background: transparent;")
+        left_layout.addWidget(self.links_label)
         self.links_list = QListWidget()
+        self.links_list.setStyleSheet("background: transparent;")
         self.links_list.itemClicked.connect(self.on_link_selected)
         left_layout.addWidget(self.links_list)
 
         # Правая колонка: список процессов
         right_layout = QVBoxLayout()
         self.processes_label = QLabel("Список процессов")
+        self.processes_label.setStyleSheet("background: transparent;")
         right_layout.addWidget(self.processes_label)
 
         self.processes_list = QListWidget()
+        self.processes_list.setStyleSheet("background: transparent;")
         right_layout.addWidget(self.processes_list)
 
         # Кнопки для управления процессами
@@ -779,177 +793,3 @@ class SearchComboBox(QComboBox):
         """Возвращает полный путь выбранного файла"""
         return self._items_data.get(self.currentText(), "")
 
-
-
-
-# class AppCommandForm(QWidget):
-#     def __init__(self, assistant, settings_window, parent=None):
-#         super().__init__(parent)
-#         self.assistant = assistant
-#         self.settings_window = settings_window
-#         search_links()
-#         self.init_ui()
-#
-#     def init_ui(self):
-#         layout = QVBoxLayout(self)
-#         layout.setContentsMargins(5, 5, 5, 5)
-#         layout.setSpacing(5)
-#         layout.addStretch()
-#
-#         self.key_input = QLineEdit(self)
-#         self.key_input.setPlaceholderText("Введите команду (например: 'браузер')")
-#         layout.addWidget(QLabel("Команда (уникальное слово):"))
-#         layout.addWidget(self.key_input)
-#
-#         self.shortcut_combo = SearchComboBox(self)
-#         self.load_shortcuts()
-#         layout.addWidget(QLabel("Выберите ярлык:"))
-#         layout.addWidget(self.shortcut_combo)
-#
-#         self.apply_button = QPushButton("Добавить команду", self)
-#         self.apply_button.clicked.connect(self.apply_command)
-#         layout.addWidget(self.apply_button)
-#
-#     def load_shortcuts(self):
-#         links_file = get_path('user_settings', 'links.json')
-#         try:
-#             with open(links_file, 'r', encoding='utf-8') as file:
-#                 links = json.load(file)
-#                 self.shortcut_combo.updateModel(links)
-#         except Exception as e:
-#             logger.error(f"Ошибка загрузки ярлыков: {e}")
-#
-#     def refresh_shortcuts(self):
-#         current_selection = self.shortcut_combo.currentText()
-#         links_file = get_path('user_settings', 'links.json')
-#         try:
-#             with open(links_file, 'r', encoding='utf-8') as file:
-#                 links = json.load(file)
-#                 self.shortcut_combo.updateModel(links)
-#                 if current_selection in links:
-#                     self.shortcut_combo.setCurrentText(current_selection)
-#         except Exception as e:
-#             logger.error(f"Ошибка загрузки ярлыков: {e}")
-#
-#     def apply_command(self):
-#         key = self.key_input.text().strip().lower()
-#         selected_name = self.shortcut_combo.currentFileName()
-#
-#         if not key:
-#             self.assistant.show_message("Команда не может быть пустой!", "Предупреждение", "warning")
-#             return
-#
-#         if key in self.settings_window.current_commands:
-#             self.assistant.show_message(f"Команда '{key}' уже существует!", "Предупреждение", "warning")
-#             return
-#
-#         if not selected_name:
-#             self.assistant.show_message("Пожалуйста, выберите ярлык из списка!", "Предупреждение", "warning")
-#             return
-#
-#         self.settings_window.current_commands[key] = selected_name
-#         self.settings_window.save_commands()
-#         self.settings_window.commands_updated.emit(self.settings_window.current_commands)
-#         self.assistant.show_message(f"Команда '{key}' добавлена!")
-#         self.key_input.clear()
-
-
-# class FolderCommandForm(QWidget):
-#     def __init__(self, assistant, settings_window, parent=None):
-#         super().__init__(parent)
-#         self.assistant = assistant
-#         self.settings_window = settings_window
-#         self.init_ui()
-#
-#     def init_ui(self):
-#         layout = QVBoxLayout(self)
-#         layout.setContentsMargins(5, 5, 5, 5)
-#         layout.setSpacing(5)
-#         layout.addStretch()
-#
-#         self.key_input = QLineEdit(self)
-#         self.key_input.setPlaceholderText("Введите команду (например: 'загрузки')")
-#         layout.addWidget(QLabel("Команда (уникальное слово):"))
-#         layout.addWidget(self.key_input)
-#
-#         self.folder_path = QLineEdit(self)
-#         layout.addWidget(QLabel("Путь к папке:"))
-#         layout.addWidget(self.folder_path)
-#
-#         select_button = QPushButton("Выбрать папку...", self)
-#         select_button.clicked.connect(self.select_folder)
-#         layout.addWidget(select_button)
-#
-#         self.apply_button = QPushButton("Добавить команду", self)
-#         self.apply_button.clicked.connect(self.apply_command)
-#         layout.addWidget(self.apply_button)
-#
-#     def select_folder(self):
-#         folder = QFileDialog.getExistingDirectory(self, "Выберите папку")
-#         if folder:
-#             self.folder_path.setText(folder)
-#
-#     def apply_command(self):
-#         key = self.key_input.text().strip().lower()
-#         folder = self.folder_path.text().strip()
-#
-#         if not key or not folder:
-#             self.assistant.show_message("Заполните все поля!", "Предупреждение", "warning")
-#             return
-#
-#         if key in self.settings_window.current_commands:
-#             self.assistant.show_message(f"Команда '{key}' уже существует!", "Предупреждение", "warning")
-#             return
-#
-#         self.settings_window.current_commands[key] = folder
-#         self.settings_window.save_commands()
-#         self.settings_window.commands_updated.emit(self.settings_window.current_commands)
-#         self.assistant.show_message(f"Команда '{key}' добавлена!")
-#         self.key_input.clear()
-#         self.folder_path.clear()
-
-
-# class CommandsWidget(QWidget):
-#     def __init__(self, assistant, settings_window, parent=None):
-#         super().__init__(parent)
-#         self.assistant = assistant
-#         self.settings_window = settings_window
-#         self.init_ui()
-#         self.update_commands_list()
-#
-#         self.settings_window.commands_updated.connect(self.on_commands_updated)
-#
-#     def on_commands_updated(self, commands):
-#         self.update_commands_list()
-#
-#     def init_ui(self):
-#         layout = QVBoxLayout(self)
-#         layout.setContentsMargins(15, 15, 15, 15)
-#         layout.setSpacing(20)
-#
-#         self.commands_list = QListWidget(self)
-#         layout.addWidget(self.commands_list)
-#
-#         self.delete_button = QPushButton("Удалить выбранную команду", self)
-#         self.delete_button.clicked.connect(self.delete_command)
-#         layout.addWidget(self.delete_button)
-#
-#     def update_commands_list(self):
-#         self.commands_list.clear()
-#         for key, value in self.settings_window.current_commands.items():
-#             self.commands_list.addItem(f"{key} : {value}")
-#
-#     def delete_command(self):
-#         selected_items = self.commands_list.selectedItems()
-#         if not selected_items:
-#             self.assistant.show_message("Пожалуйста, выберите команду для удаления.", "Предупреждение", "warning")
-#             return
-#
-#         for item in selected_items:
-#             key = item.text().split(" : ")[0]
-#             if key in self.settings_window.current_commands:
-#                 del self.settings_window.current_commands[key]
-#                 self.settings_window.save_commands()
-#                 self.settings_window.commands_updated.emit(self.settings_window.current_commands)
-#
-#
