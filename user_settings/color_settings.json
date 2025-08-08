@@ -1,54 +1,73 @@
 {
     "QWidget": {
-        "background-color": "#130403",
-        "color": "#e5e5e5",
+        "background-color": "qlineargradient(x1:0.60, y1:0.99, x2:0.40, y2:0.01, stop:0 #000000, stop:1 #1b012a)",
+        "color": "#abbdff",
         "font-size": "13px"
     },
     "QPushButton": {
-        "background-color": "qlineargradient(x1:1.0, y1:1.0, x2:0.1, y2:0.1, stop:0 #000000, stop:1 #380C07)",
-        "color": "#e5e5e5",
+        "background-color": "qlineargradient(x1:0.85, y1:0.85, x2:0.15, y2:0.15, stop:0 #000000, stop:1 #23034A)",
+        "color": "#abbdff",
         "height": "30px",
-        "border": "1px solid #d05000",
+        "border": "1px solid #a364ec",
         "border-radius": "3px",
         "font-size": "13px"
     },
     "QPushButton:hover": {
-        "background-color": "#1a0700",
-        "color": "#e5e5e5",
+        "background-color": "qlineargradient(x1:0.85, y1:0.85, x2:0.15, y2:0.15, stop:0 #23034A, stop:1 #000000)",
+        "color": "#abbdff",
         "font-size": "13px"
     },
     "QPushButton:pressed": {
-        "background-color": "#060000",
+        "background-color": "qlineargradient(x1:0.85, y1:0.85, x2:0.15, y2:0.15, stop:0 #000000, stop:1 #05002c)",
         "padding-left": "3px",
         "padding-top": "3px"
     },
+    "QTabBar::tab": {
+        "background-color": "qlineargradient(x1:0.85, y1:0.85, x2:0.15, y2:0.15, stop:0 #000000, stop:1 #23034A)",
+        "color": "#abbdff",
+        "height": "30px",
+        "border": "1px solid #a364ec",
+        "border-radius": "3px",
+        "font-size": "13px",
+        "margin": "3px",
+        "padding": "3px"
+    },
+    "QTabBar::tab:selected": {
+        "background-color": "qlineargradient(x1:0.85, y1:0.85, x2:0.15, y2:0.15, stop:0 #23034A, stop:1 #000000)",
+        "color": "#abbdff",
+        "font-size": "13px",
+        "margin": "3px",
+        "padding": "3px",
+        "padding-top": "10px"
+    },
     "QTextEdit": {
-        "background-color": "qlineargradient(x1:1.0, y1:1.0, x2:0.1, y2:0.1, stop:0 #000000, stop:1 #1D0503)",
-        "color": "#e57417",
-        "border": "1px solid",
-        "border-radius": "4px",
+        "background": "transparent",
+        "color": "#8d9efc",
+        "border": "none",
         "font-size": "15px"
     },
     "label_version": {
-        "color": "#e57417",
+        "background": "transparent",
+        "color": "#8d9efc",
         "font-size": "10px"
     },
     "label_message": {
-        "color": "#e5e5e5",
+        "color": "#abbdff",
         "font-size": "13px"
     },
     "update_label": {
-        "color": "#e57417",
+        "background": "transparent",
+        "color": "#8d9efc",
         "font-size": "12px"
     },
     "TitleBar": {
-        "border-bottom": "1px solid #d05000"
+        "border-bottom": "1px solid #a364ec"
     },
     "TrayButton": {
-        "background-color": "qlineargradient(x1:1.0, y1:1.0, x2:0.1, y2:0.1, stop:0 #000000, stop:1 #380C07)",
-        "color": "#e5e5e5",
+        "background-color": "qlineargradient(x1:0.85, y1:0.85, x2:0.15, y2:0.15, stop:0 #000000, stop:1 #23034A)",
+        "color": "#abbdff",
         "height": "30px",
-        "border": "1px solid #d05000",
+        "border": "1px solid #a364ec",
         "border-radius": "3px",
         "font-size": "13px"
     },
@@ -58,10 +77,10 @@
         "border": "1px solid #0790EC"
     },
     "CloseButton": {
-        "background-color": "qlineargradient(x1:1.0, y1:1.0, x2:0.1, y2:0.1, stop:0 #000000, stop:1 #380C07)",
-        "color": "#e5e5e5",
+        "background-color": "qlineargradient(x1:0.85, y1:0.85, x2:0.15, y2:0.15, stop:0 #000000, stop:1 #23034A)",
+        "color": "#abbdff",
         "height": "30px",
-        "border": "1px solid #d05000",
+        "border": "1px solid #a364ec",
         "border-radius": "3px",
         "font-size": "13px"
     },
@@ -71,6 +90,11 @@
         "border": "1px solid #E04F4F"
     },
     "MessageContainer": {
-        "border": "1px solid #d05000"
+        "border": "1px solid #a364ec",
+        "border-radius": "25px"
+    },
+    "WindowContainer": {
+        "border": "1px solid #a364ec",
+        "border-radius": "3px"
     }
 }

@@ -10,7 +10,12 @@ import threading
 import time
 import psutil
 import pygetwindow as gw
+from PyQt5.QtCore import QTimer, QPropertyAnimation, Qt, QThread, pyqtSignal
+from PyQt5.QtSvg import QSvgWidget
+from PyQt5.QtWidgets import QGraphicsColorizeEffect, QWidget, QVBoxLayout, QLabel, QListWidget, QHBoxLayout, QDialog
 from win32com.client import Dispatch
+
+from bin.apply_color_methods import ApplyColor
 from bin.lists import get_audio_paths
 from logging_config import logger, debug_logger
 from bin.speak_functions import thread_react, thread_react_detail
@@ -36,8 +41,6 @@ def load_settings(settings_file):
 def get_current_speaker(settings_file):
     """
     Получение текущего спикера
-    :param settings_file:
-    :return:
     """
     settings = load_settings(settings_file)
     return settings.get("voice", "rogue")  # Возвращаем голос или значение по умолчанию
@@ -46,8 +49,6 @@ def get_current_speaker(settings_file):
 def get_steam_path(settings_file):
     """
     Получение текущего пути к исполняемому файлу Steam
-    :param settings_file:
-    :return:
     """
     settings = load_settings(settings_file)
     return settings.get("steam_path", "")  # Возвращаем путь к стим или пустую строку, если не нашлось
@@ -300,179 +301,215 @@ def handler_folder(folder_path, action):
             debug_logger.error("Окно с указанным заголовком не найдено.")
 
 
+# def open_url_link(game_id_or_url, filename):
+#     """
+#     Функция для открытия ярлыков (.url)
+#     :param game_id_or_url: id игры извлекается из ярлыка
+#     :param filename: Имя файла
+#     """
+#     settings_file = get_path('user_settings', "settings.json")  # Полный путь к файлу настроек
+#     speaker = get_current_speaker(settings_file)  # Получаем текущий голос
+#     steam_path = get_steam_path(settings_file)
+#
+#     try:
+#         # Проверяем, является ли game_id_or_url URL Epic Games
+#         if game_id_or_url.startswith("com.epicgames.launcher://"):
+#             # Проверяем, есть ли уже сохраненные процессы для этой игры
+#             existing_processes = get_process_names_from_file(filename)
+#             audio_paths = get_audio_paths(speaker)
+#             logger.info(f"Запуск {filename} через Epic Games Launcher")
+#             debug_logger.info(f"Запуск {filename} через Epic Games Launcher")
+#             if existing_processes:
+#                 debug_logger.info(f"Используем существующие процессы для игры '{filename}': {existing_processes}")
+#                 # Открываем URL через стандартный механизм
+#                 subprocess.Popen(["start", game_id_or_url], shell=True)
+#                 start_folder = audio_paths['start_folder']
+#                 thread_react(start_folder)
+#             else:
+#                 # Если процессов нет, собираем их
+#                 before_processes = get_all_processes()
+#                 # Открываем URL через стандартный механизм
+#                 subprocess.Popen(["start", game_id_or_url], shell=True)
+#                 # Ждем несколько секунд, чтобы процесс успел запуститься
+#
+#                 audio_paths = get_audio_paths(speaker)
+#                 wait_load_file = audio_paths['wait_load_file']
+#                 thread_react_detail(wait_load_file)
+#
+#                 time.sleep(40)
+#                 # Собираем процессы после запуска
+#                 after_processes = get_all_processes()
+#                 # Находим все новые процессы
+#                 new_processes = find_new_processes(before_processes, after_processes)
+#                 if new_processes:
+#                     debug_logger.info(f"Новые процессы: {new_processes}")
+#                     save_process_names(filename, new_processes)  # Сохраняем все новые процессы
+#                     audio_paths = get_audio_paths(speaker)
+#                     done_load_file = audio_paths['done_load_file']
+#                     thread_react_detail(done_load_file)
+#                 else:
+#                     logger.error("Не удалось определить новые процессы.")
+#                     debug_logger.error("Не удалось определить новые процессы.")
+#         else:
+#             # Иначе считаем, что это Steam-игра
+#             logger.info(f"Запуск игры через Steam: {game_id_or_url}")
+#             debug_logger.info(f"Запуск игры через Steam: {game_id_or_url}")
+#             subprocess.Popen([steam_path, '-applaunch', game_id_or_url], shell=True)
+#             # Проверяем, есть ли уже сохраненные процессы для этой игры
+#             existing_processes = get_process_names_from_file(filename)
+#             audio_paths = get_audio_paths(speaker)
+#             if existing_processes:
+#                 debug_logger.info(f"Нашел процессы '{filename}': {existing_processes}")
+#                 if game_id_or_url == '252490' and speaker == 'sanboy':
+#                     start_rust = audio_paths['start_rust']
+#                     thread_react_detail(start_rust)
+#                 # Запускаем игру через Steam
+#                 process = subprocess.Popen(
+#                     [steam_path, '-applaunch', game_id_or_url],
+#                     stdout=subprocess.PIPE,
+#                     stderr=subprocess.PIPE,
+#                     shell=True
+#                 )
+#
+#                 # Запускаем логирование в отдельных потоках
+#                 threading.Thread(
+#                     target=log_stream,
+#                     args=(process.stdout, debug_logger),
+#                     daemon=True
+#                 ).start()
+#
+#                 threading.Thread(
+#                     target=log_stream,
+#                     args=(process.stderr, debug_logger),
+#                     daemon=True
+#                 ).start()
+#
+#                 start_folder = audio_paths['start_folder']
+#                 thread_react(start_folder)
+#             else:
+#                 # Если процессов нет, собираем их
+#                 before_processes = get_all_processes()
+#                 # Запускаем игру через Steam
+#                 process = subprocess.Popen(
+#                     [steam_path, '-applaunch', game_id_or_url],
+#                     stdout=subprocess.PIPE,
+#                     stderr=subprocess.PIPE,
+#                     shell=True
+#                 )
+#
+#                 # Запускаем логирование в отдельных потоках
+#                 threading.Thread(
+#                     target=log_stream,
+#                     args=(process.stdout, debug_logger),
+#                     daemon=True
+#                 ).start()
+#
+#                 threading.Thread(
+#                     target=log_stream,
+#                     args=(process.stderr, debug_logger),
+#                     daemon=True
+#                 ).start()
+#
+#                 audio_paths = get_audio_paths(speaker)
+#                 wait_load_file = audio_paths['wait_load_file']
+#                 thread_react_detail(wait_load_file)
+#
+#                 time.sleep(40)
+#                 # Собираем процессы после запуска
+#                 after_processes = get_all_processes()
+#                 # Находим все новые процессы
+#                 new_processes = find_new_processes(before_processes, after_processes)
+#                 if new_processes:
+#                     debug_logger.info(f"Новые процессы: {new_processes}")
+#                     save_process_names(filename, new_processes)  # Сохраняем все новые процессы
+#                     audio_paths = get_audio_paths(speaker)
+#                     done_load_file = audio_paths['done_load_file']
+#                     thread_react_detail(done_load_file)
+#                 else:
+#                     logger.error("Не удалось определить новые процессы.")
+#                     debug_logger.error("Не удалось определить новые процессы.")
+#     except Exception as e:
+#         audio_paths = get_audio_paths(speaker)
+#         error_file = audio_paths['error_file']
+#         thread_react_detail(error_file)
+#         logger.error(f"Ошибка при открытии игры через Steam: {e}")
+#         debug_logger.error(f"Ошибка при открытии игры через Steam: {e}")
+
 def open_url_link(game_id_or_url, filename):
-    """
-    Функция для открытия ярлыков (.url)
-    :param game_id_or_url: id игры извлекается из ярлыка
-    :param filename: Имя файла
-    """
-    settings_file = get_path('user_settings', "settings.json")  # Полный путь к файлу настроек
-    speaker = get_current_speaker(settings_file)  # Получаем текущий голос
+    settings_file = get_path('user_settings', "settings.json")
+    speaker = get_current_speaker(settings_file)
     steam_path = get_steam_path(settings_file)
+    audio_paths = get_audio_paths(speaker)
+
+    existing_processes = get_process_names_from_file(filename)
 
     try:
-        # Проверяем, является ли game_id_or_url URL Epic Games
+        if existing_processes:
+            debug_logger.info(f"Используем сохраненные процессы для '{filename}'")
+
+            if game_id_or_url.startswith("com.epicgames.launcher://"):
+                subprocess.Popen(["start", game_id_or_url], shell=True)
+            else:
+                subprocess.Popen([steam_path, '-applaunch', game_id_or_url], shell=True)
+
+            thread_react(audio_paths['start_folder'])
+            return
+
+        # Запускаем игру
         if game_id_or_url.startswith("com.epicgames.launcher://"):
-            # Проверяем, есть ли уже сохраненные процессы для этой игры
-            existing_processes = get_process_names_from_file(filename)
-            audio_paths = get_audio_paths(speaker)
-            logger.info(f"Запуск {filename} через Epic Games Launcher")
-            debug_logger.info(f"Запуск {filename} через Epic Games Launcher")
-            if existing_processes:
-                debug_logger.info(f"Используем существующие процессы для игры '{filename}': {existing_processes}")
-                # Открываем URL через стандартный механизм
-                subprocess.Popen(["start", game_id_or_url], shell=True)
-                start_folder = audio_paths['start_folder']
-                thread_react(start_folder)
-            else:
-                # Если процессов нет, собираем их
-                before_processes = get_all_processes()
-                # Открываем URL через стандартный механизм
-                subprocess.Popen(["start", game_id_or_url], shell=True)
-                # Ждем несколько секунд, чтобы процесс успел запуститься
-
-                audio_paths = get_audio_paths(speaker)
-                wait_load_file = audio_paths['wait_load_file']
-                thread_react_detail(wait_load_file)
-
-                time.sleep(40)
-                # Собираем процессы после запуска
-                after_processes = get_all_processes()
-                # Находим все новые процессы
-                new_processes = find_new_processes(before_processes, after_processes)
-                if new_processes:
-                    debug_logger.info(f"Новые процессы: {new_processes}")
-                    save_process_names(filename, new_processes)  # Сохраняем все новые процессы
-                    audio_paths = get_audio_paths(speaker)
-                    done_load_file = audio_paths['done_load_file']
-                    thread_react_detail(done_load_file)
-                else:
-                    logger.error("Не удалось определить новые процессы.")
-                    debug_logger.error("Не удалось определить новые процессы.")
+            subprocess.Popen(["start", game_id_or_url], shell=True)
         else:
-            # Иначе считаем, что это Steam-игра
-            logger.info(f"Запуск игры через Steam: {game_id_or_url}")
-            debug_logger.info(f"Запуск игры через Steam: {game_id_or_url}")
             subprocess.Popen([steam_path, '-applaunch', game_id_or_url], shell=True)
-            # Проверяем, есть ли уже сохраненные процессы для этой игры
-            existing_processes = get_process_names_from_file(filename)
-            audio_paths = get_audio_paths(speaker)
-            if existing_processes:
-                debug_logger.info(f"Нашел процессы '{filename}': {existing_processes}")
-                if game_id_or_url == '252490' and speaker == 'sanboy':
-                    start_rust = audio_paths['start_rust']
-                    thread_react_detail(start_rust)
-                # Запускаем игру через Steam
-                process = subprocess.Popen(
-                    [steam_path, '-applaunch', game_id_or_url],
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    shell=True
-                )
 
-                # Запускаем логирование в отдельных потоках
-                threading.Thread(
-                    target=log_stream,
-                    args=(process.stdout, debug_logger),
-                    daemon=True
-                ).start()
+        # Запускаем мониторинг в фоне
+        monitor_processes(filename, lambda procs, fname: on_monitoring_done(procs, fname, audio_paths))
 
-                threading.Thread(
-                    target=log_stream,
-                    args=(process.stderr, debug_logger),
-                    daemon=True
-                ).start()
+        thread_react_detail(audio_paths['wait_load_file'])
 
-                start_folder = audio_paths['start_folder']
-                thread_react(start_folder)
-            else:
-                # Если процессов нет, собираем их
-                before_processes = get_all_processes()
-                # Запускаем игру через Steam
-                process = subprocess.Popen(
-                    [steam_path, '-applaunch', game_id_or_url],
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    shell=True
-                )
-
-                # Запускаем логирование в отдельных потоках
-                threading.Thread(
-                    target=log_stream,
-                    args=(process.stdout, debug_logger),
-                    daemon=True
-                ).start()
-
-                threading.Thread(
-                    target=log_stream,
-                    args=(process.stderr, debug_logger),
-                    daemon=True
-                ).start()
-
-                audio_paths = get_audio_paths(speaker)
-                wait_load_file = audio_paths['wait_load_file']
-                thread_react_detail(wait_load_file)
-
-                time.sleep(40)
-                # Собираем процессы после запуска
-                after_processes = get_all_processes()
-                # Находим все новые процессы
-                new_processes = find_new_processes(before_processes, after_processes)
-                if new_processes:
-                    debug_logger.info(f"Новые процессы: {new_processes}")
-                    save_process_names(filename, new_processes)  # Сохраняем все новые процессы
-                    audio_paths = get_audio_paths(speaker)
-                    done_load_file = audio_paths['done_load_file']
-                    thread_react_detail(done_load_file)
-                else:
-                    logger.error("Не удалось определить новые процессы.")
-                    debug_logger.error("Не удалось определить новые процессы.")
     except Exception as e:
-        audio_paths = get_audio_paths(speaker)
-        error_file = audio_paths['error_file']
-        thread_react_detail(error_file)
-        logger.error(f"Ошибка при открытии игры через Steam: {e}")
-        debug_logger.error(f"Ошибка при открытии игры через Steam: {e}")
+        logger.error(f"Ошибка при открытии игры: {e}")
+        thread_react_detail(audio_paths['error_file'])
+
+
+def on_monitoring_done(processes, filename, audio_paths):
+    """Обработчик завершения мониторинга"""
+    if processes:
+        save_process_names(filename, processes)
+        thread_react_detail(audio_paths['done_load_file'])
+    else:
+        thread_react_detail(audio_paths['error_file'])
 
 
 def open_link(filename, target_path, arguments, workdir):
     """
-    Улучшенная функция для открытия ярлыков (.lnk) с проверкой целевого файла
-    :param workdir: Рабочая директория из ярлыка
-    :param filename: Имя файла ярлыка
-    :param target_path: Путь к исполняемому файлу (из ярлыка)
-    :param arguments: Аргументы командной строки (из ярлыка)
+    Улучшенная функция для открытия ярлыков (.lnk) с фоновым мониторингом
     """
     settings_file = get_path('user_settings', "settings.json")
     speaker = get_current_speaker(settings_file)
     audio_paths = get_audio_paths(speaker)
 
     try:
-        # 1. Проверка существования целевого файла
+        # Проверки файла
         if not os.path.exists(target_path):
-            error_msg = f"Целевой файл не существует: {target_path}"
-            logger.error(error_msg)
-            debug_logger.error(error_msg)
+            logger.error(f"Целевой файл не существует: {target_path}")
             thread_react_detail(audio_paths['error_file'])
             return False
 
-        # 2. Проверка доступности файла
         if not os.access(target_path, os.R_OK | os.X_OK):
-            error_msg = f"Нет доступа к файлу: {target_path}"
-            logger.error(error_msg)
-            debug_logger.error(error_msg)
+            logger.error(f"Нет доступа к файлу: {target_path}")
             thread_react_detail(audio_paths['error_file'])
             return False
 
         if not workdir:
             workdir = os.path.dirname(target_path)
 
-            # Формируем команду
+        # Проверяем сохраненные процессы
+        existing_processes = get_process_names_from_file(filename)
+
+        # Формируем команду
         command = [target_path] + arguments
 
-        # 3. Проверка существующих процессов
-        existing_processes = get_process_names_from_file(filename)
-        # 4. Запуск процесса
+        # Запускаем процесс
         process = subprocess.Popen(
             command,
             cwd=workdir,
@@ -481,6 +518,7 @@ def open_link(filename, target_path, arguments, workdir):
             shell=True
         )
 
+        # Логирование в фоне
         threading.Thread(
             target=log_stream,
             args=(process.stdout, debug_logger),
@@ -493,60 +531,146 @@ def open_link(filename, target_path, arguments, workdir):
             daemon=True
         ).start()
 
-        # 6. Обработка разных сценариев
+        # Если процессы известны - просто запускаем
         if existing_processes:
-            debug_logger.info(f"Найдены процессы для '{filename}': {existing_processes}")
-            start_folder = audio_paths['start_folder']
-            thread_react(start_folder)
-        else:
-            thread_react_detail(audio_paths['wait_load_file'])
-            before_processes = get_all_processes()
+            debug_logger.info(f"Используем сохраненные процессы для '{filename}'")
+            thread_react(audio_paths['start_folder'])
+            return True
 
-            # Ждем запуска процессов (с таймаутом)
-            time.sleep(40)
-
-            after_processes = get_all_processes()
-            new_processes = find_new_processes(before_processes, after_processes)
-
-            if new_processes:
-                debug_logger.info(f"Обнаружены новые процессы: {new_processes}")
-                save_process_names(filename, new_processes)
-                thread_react_detail(audio_paths['done_load_file'])
-            else:
-                error_msg = "Не удалось определить новые процессы после запуска"
-                logger.warning(error_msg)
-                debug_logger.warning(error_msg)
-                thread_react_detail(audio_paths['error_file'])
+        # Если процессов нет - запускаем мониторинг
+        thread_react_detail(audio_paths['wait_load_file'])
+        monitor_processes(filename, lambda procs, fname: on_monitoring_done(procs, fname, audio_paths))
 
         return True
 
     except FileNotFoundError as e:
-        error_msg = f"Файл не найден: {str(e)}"
-        logger.error(error_msg)
-        debug_logger.error(error_msg)
+        logger.error(f"Файл не найден: {e}")
         thread_react_detail(audio_paths['error_file'])
         return False
 
     except PermissionError as e:
-        error_msg = f"Ошибка доступа: {str(e)}"
-        logger.error(error_msg)
-        debug_logger.error(error_msg)
-        thread_react_detail(audio_paths['error_file'])
-        return False
-
-    except subprocess.SubprocessError as e:
-        error_msg = f"Ошибка запуска процесса: {str(e)}"
-        logger.error(error_msg)
-        debug_logger.error(error_msg)
+        logger.error(f"Ошибка доступа: {e}")
         thread_react_detail(audio_paths['error_file'])
         return False
 
     except Exception as e:
-        error_msg = f"Неожиданная ошибка: {str(e)}"
-        logger.error(error_msg)
-        debug_logger.error(error_msg, exc_info=True)
+        logger.error(f"Неожиданная ошибка: {e}", exc_info=True)
         thread_react_detail(audio_paths['error_file'])
         return False
+
+
+# def open_link(filename, target_path, arguments, workdir):
+#     """
+#     Улучшенная функция для открытия ярлыков (.lnk) с проверкой целевого файла
+#     :param workdir: Рабочая директория из ярлыка
+#     :param filename: Имя файла ярлыка
+#     :param target_path: Путь к исполняемому файлу (из ярлыка)
+#     :param arguments: Аргументы командной строки (из ярлыка)
+#     """
+#     settings_file = get_path('user_settings', "settings.json")
+#     speaker = get_current_speaker(settings_file)
+#     audio_paths = get_audio_paths(speaker)
+#
+#     try:
+#         # 1. Проверка существования целевого файла
+#         if not os.path.exists(target_path):
+#             error_msg = f"Целевой файл не существует: {target_path}"
+#             logger.error(error_msg)
+#             debug_logger.error(error_msg)
+#             thread_react_detail(audio_paths['error_file'])
+#             return False
+#
+#         # 2. Проверка доступности файла
+#         if not os.access(target_path, os.R_OK | os.X_OK):
+#             error_msg = f"Нет доступа к файлу: {target_path}"
+#             logger.error(error_msg)
+#             debug_logger.error(error_msg)
+#             thread_react_detail(audio_paths['error_file'])
+#             return False
+#
+#         if not workdir:
+#             workdir = os.path.dirname(target_path)
+#
+#             # Формируем команду
+#         command = [target_path] + arguments
+#
+#         # 3. Проверка существующих процессов
+#         existing_processes = get_process_names_from_file(filename)
+#         # 4. Запуск процесса
+#         process = subprocess.Popen(
+#             command,
+#             cwd=workdir,
+#             stdout=subprocess.PIPE,
+#             stderr=subprocess.PIPE,
+#             shell=True
+#         )
+#
+#         threading.Thread(
+#             target=log_stream,
+#             args=(process.stdout, debug_logger),
+#             daemon=True
+#         ).start()
+#
+#         threading.Thread(
+#             target=log_stream,
+#             args=(process.stderr, debug_logger),
+#             daemon=True
+#         ).start()
+#
+#         # 6. Обработка разных сценариев
+#         if existing_processes:
+#             debug_logger.info(f"Найдены процессы для '{filename}': {existing_processes}")
+#             start_folder = audio_paths['start_folder']
+#             thread_react(start_folder)
+#         else:
+#             thread_react_detail(audio_paths['wait_load_file'])
+#             before_processes = get_all_processes()
+#
+#             # Ждем запуска процессов (с таймаутом)
+#             time.sleep(40)
+#
+#             after_processes = get_all_processes()
+#             new_processes = find_new_processes(before_processes, after_processes)
+#
+#             if new_processes:
+#                 debug_logger.info(f"Обнаружены новые процессы: {new_processes}")
+#                 save_process_names(filename, new_processes)
+#                 thread_react_detail(audio_paths['done_load_file'])
+#             else:
+#                 error_msg = "Не удалось определить новые процессы после запуска"
+#                 logger.warning(error_msg)
+#                 debug_logger.warning(error_msg)
+#                 thread_react_detail(audio_paths['error_file'])
+#
+#         return True
+#
+#     except FileNotFoundError as e:
+#         error_msg = f"Файл не найден: {str(e)}"
+#         logger.error(error_msg)
+#         debug_logger.error(error_msg)
+#         thread_react_detail(audio_paths['error_file'])
+#         return False
+#
+#     except PermissionError as e:
+#         error_msg = f"Ошибка доступа: {str(e)}"
+#         logger.error(error_msg)
+#         debug_logger.error(error_msg)
+#         thread_react_detail(audio_paths['error_file'])
+#         return False
+#
+#     except subprocess.SubprocessError as e:
+#         error_msg = f"Ошибка запуска процесса: {str(e)}"
+#         logger.error(error_msg)
+#         debug_logger.error(error_msg)
+#         thread_react_detail(audio_paths['error_file'])
+#         return False
+#
+#     except Exception as e:
+#         error_msg = f"Неожиданная ошибка: {str(e)}"
+#         logger.error(error_msg)
+#         debug_logger.error(error_msg, exc_info=True)
+#         thread_react_detail(audio_paths['error_file'])
+#         return False
 
 def close_link(filename):
     """
@@ -726,3 +850,28 @@ def scan_and_copy_shortcuts():
 def log_stream(stream, logger):
     for line in stream:
         logger.info(line.decode('cp866', errors='replace').strip())
+
+def monitor_processes(filename, callback):
+    """Мониторинг процессов в отдельном потоке"""
+
+    def _monitor():
+        before = set(get_all_processes())
+        found = []
+        start_time = time.time()
+
+        while time.time() - start_time < 40:
+            time.sleep(1)
+            current = set(get_all_processes())
+            new = current - before
+
+            for proc in new:
+                if proc not in found:
+                    found.append(proc)
+                    logger.info(f"Найден новый процесс: {proc}")
+
+            if new:
+                before = current
+
+        callback(found, filename)
+
+    threading.Thread(target=_monitor, daemon=True).start()

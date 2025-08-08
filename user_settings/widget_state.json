@@ -1,12 +1,13 @@
 {
     "window_position": {
-        "x": 1839,
-        "y": 246
+        "x": 1838,
+        "y": 306
     },
     "window_size": {
         "width": 80,
-        "height": 250
+        "height": 280
     },
     "is_compact": true,
-    "is_pinned": true
+    "is_pinned": true,
+    "is_locked": false
 }

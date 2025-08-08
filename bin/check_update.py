@@ -2,9 +2,36 @@ import os
 import re
 from typing import Tuple, Optional, Dict
 import requests
+from PyQt5.QtCore import QThread, pyqtSignal
+
 from logging_config import debug_logger
 from path_builder import get_path
 
+
+class VersionCheckThread(QThread):
+    version_checked = pyqtSignal(str, str)  # Сигнал для stable и exp версий
+    check_failed = pyqtSignal()  # Сигнал при ошибке
+
+    def run(self):
+        try:
+            domain = "https://owl-app.ru"
+            dev_domain = "http://127.0.0.1:5000"
+            version_url = f"{domain}/version"
+            response = requests.get(version_url, timeout=5)
+
+            if response.status_code == 200:
+                data = response.json()
+                stable = data.get("stable", {}).get("version", "")
+                exp = data.get("experimental", {}).get("exp_version", "")
+                if stable:
+                    debug_logger.info(f"Последняя стабильная версия: {stable}")
+                if exp:
+                    debug_logger.info(f"Экспериментальная версия: {exp}")
+                self.version_checked.emit(stable, exp)
+            else:
+                self.check_failed.emit()
+        except requests.exceptions.RequestException:
+            self.check_failed.emit()
 
 def check_version():
     try:

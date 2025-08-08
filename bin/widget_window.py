@@ -10,6 +10,7 @@ from PyQt5.QtWidgets import QWidget, QVBoxLayout, QPushButton, QHBoxLayout, \
 from PyQt5.QtCore import Qt, QPoint, QSize, QPropertyAnimation, QRect, QTimer, QTime
 
 from bin.apply_color_methods import ApplyColor
+from bin.audio_control import controller
 from bin.function_list_main import shutdown_windows
 from bin.signals import color_signal
 from logging_config import debug_logger
@@ -23,7 +24,8 @@ class WindowStateManager:
             "window_position": {"x": 100, "y": 100},
             "window_size": {"width": 220, "height": 300},
             "is_compact": False,
-            "is_pinned": False
+            "is_pinned": False,
+            "is_locked": False
         }
 
         # Создаем файл при инициализации, если его нет
@@ -65,6 +67,7 @@ class WindowStateManager:
             },
             "is_compact": getattr(window, 'is_compact', False),
             "is_pinned": getattr(window, 'is_pinned', False),
+            "is_locked": getattr(window, 'is_locked', False)
         }
         self.save_state(state)
 
@@ -80,6 +83,7 @@ class WindowStateManager:
         # Устанавливаем дополнительные состояния
         window.is_compact = state["is_compact"]
         window.is_pinned = state["is_pinned"]
+        window.is_locked = state["is_locked"]
 
         return state
 
@@ -96,12 +100,16 @@ class SmartWidget(QWidget):
         self.open_main_path = get_path("bin", "icons", "open_main.svg")
         self.settings_path = get_path("bin", "icons", "settings.svg")
         self.shortcut_path = get_path("bin", "icons", "shortcut.svg")
+        self.next_track = get_path("bin", "icons", "next.svg")
+        self.prev_track = get_path("bin", "icons", "prev.svg")
+        self.pause_track = get_path("bin", "icons", "pause.svg")
         self.style_manager = ApplyColor(self)
         self.color_path = self.style_manager.color_path
         self.styles = self.style_manager.load_styles()
 
         self.pin_path = get_path("bin", "icons", "push_pin.svg")
         self.lock_path = get_path("bin", "icons", "lock.svg")
+        self.unlock_path = get_path("bin", "icons", "unlock.svg")
         self.close_path = get_path("bin", "icons", "cancel.svg")
         self.resize_path = get_path("bin", "icons", "resize.svg")
         self.ohm_path = self.assistant.ohm_path
@@ -519,7 +527,7 @@ class SmartWidget(QWidget):
                         border-radius: 10px;
                     }
                 """)
-        self.setFixedSize(80, 250)
+        self.setFixedSize(80, 280)
 
         # Главный layout
         main_layout = QVBoxLayout(self)
@@ -662,6 +670,67 @@ class SmartWidget(QWidget):
         self.update_time()
 
         content_layout.addWidget(self.time_clock_tab)
+        #
+        # audio_layout = QHBoxLayout()
+        # audio_layout.setContentsMargins(0, 5, 0, 0)
+        # audio_layout.setSpacing(5)
+        #
+        # self.prev_btn = QPushButton()
+        # self.prev_btn.clicked.connect(self.prev_track_action)
+        # self.prev_btn.setFixedSize(16, 16)
+        # self.prev_btn.setStyleSheet("""
+        #                 QPushButton {
+        #                     background-color: transparent;
+        #                     border: none;
+        #                 }
+        #                 QPushButton:hover {
+        #                     background: rgba(60, 60, 60, 100);
+        #                     border-radius: 5px;
+        #                 }
+        #             """)
+        #
+        # self.prev_svg = QSvgWidget(self.prev_track, self.prev_btn)
+        # self.prev_svg.setFixedSize(15, 15)
+        #
+        # self.pause_btn = QPushButton()
+        # self.pause_btn.clicked.connect(self.pause_track_action)
+        # self.pause_btn.setFixedSize(16, 16)
+        # self.pause_btn.setStyleSheet("""
+        #                 QPushButton {
+        #                     background-color: transparent;
+        #                     border: none;
+        #                 }
+        #                 QPushButton:hover {
+        #                     background: rgba(60, 60, 60, 100);
+        #                     border-radius: 5px;
+        #                 }
+        #             """)
+        #
+        # self.pause_svg = QSvgWidget(self.pause_track, self.pause_btn)
+        # self.pause_svg.setFixedSize(15, 15)
+        #
+        # self.next_btn = QPushButton()
+        # self.next_btn.clicked.connect(self.next_track_action)
+        # self.next_btn.setFixedSize(16, 16)
+        # self.next_btn.setStyleSheet("""
+        #                         QPushButton {
+        #                             background-color: transparent;
+        #                             border: none;
+        #                         }
+        #                         QPushButton:hover {
+        #                             background: rgba(60, 60, 60, 100);
+        #                             border-radius: 5px;
+        #                         }
+        #                     """)
+        #
+        # self.next_svg = QSvgWidget(self.next_track, self.next_btn)
+        # self.next_svg.setFixedSize(15, 15)
+        #
+        # audio_layout.addWidget(self.prev_btn)
+        # audio_layout.addWidget(self.pause_btn)
+        # audio_layout.addWidget(self.next_btn)
+        #
+        # content_layout.addLayout(audio_layout)
 
         # Кнопки с иконками
         buttons_widget = QWidget()
@@ -813,6 +882,8 @@ class SmartWidget(QWidget):
             # Сохраняем текущее состояние pinned перед очисткой UI
             current_pinned_state = getattr(self, 'is_pinned', False)
 
+            current_lock_state = getattr(self, "is_locked", False)
+
             # Определяем новые размеры
             if self.is_compact:
                 new_width, new_height = 80, 250  # Compact размер
@@ -838,6 +909,11 @@ class SmartWidget(QWidget):
                 flags = self.windowFlags() | Qt.WindowStaysOnTopHint
                 self.setWindowFlags(flags)
                 self.show()
+            self.is_locked = current_lock_state
+            if self.is_locked:
+                self.lock_svg.load(self.unlock_path)
+                self.lock_btn.setToolTip("Разрешить перемещение")
+                self.style_manager.apply_color_svg(self.lock_svg, strength=0.95)
 
             # Создаем анимацию
             self.animation = QPropertyAnimation(self, b"geometry")
@@ -952,14 +1028,17 @@ class SmartWidget(QWidget):
         """Переключатель для основного окна и настроек"""
         try:
             if self.assistant.isVisible():
-                # Если основное окно видимо - закрываем его и настройки
-                self.assistant.custom_hide()
+                if not (hasattr(self.assistant, 'mutable_panel') and self.assistant.mutable_panel.isVisible()):
+                    self.assistant.open_main_settings()
+                else:
+                    self.assistant.hide_widget()
+                    self.assistant.custom_hide()
             else:
                 # Если основное окно скрыто - показываем его
                 self.assistant.show()
 
                 # Открываем настройки, только если они еще не открыты
-                if not (hasattr(self.assistant, 'settings_window') and self.assistant.settings_window.isVisible()):
+                if not (hasattr(self.assistant, 'mutable_panel') and self.assistant.mutable_panel.isVisible()):
                     self.assistant.open_main_settings()
         except Exception as e:
             debug_logger.error(f"Ошибка при переключении окна настроек: {e}")
@@ -980,22 +1059,40 @@ class SmartWidget(QWidget):
         # Меняем иконку в зависимости от состояния
         if hasattr(self, 'lock_svg'):
             if self.is_locked:
-                # Меняем на иконку "разблокировки" (можно создать отдельный SVG)
-                self.lock_svg.load(get_path("bin", "icons", "unlock.svg"))
-                self.lock_btn.setToolTip("Разблокировать перемещение виджета")
+                # Меняем на иконку "разблокировки"
+                self.lock_svg.load(self.unlock_path)
+                self.lock_btn.setToolTip("Включить перемещение")
             else:
                 # Возвращаем стандартную иконку
                 self.lock_svg.load(self.lock_path)
-                self.lock_btn.setToolTip("Заблокировать перемещение виджета")
+                self.lock_btn.setToolTip("Отключить перемещение")
 
             # Применяем цвет к SVG
-            self.style_manager.apply_color_svg(self.lock_svg, strength=0.90)
+            self.style_manager.apply_color_svg(self.lock_svg, strength=0.95)
 
         # Сохраняем состояние блокировки
         self.save_state()
 
     def save_state(self):
         self.state_manager.save_window_state(self)
+
+    def prev_track_action(self):
+        try:
+            controller.previous_track()
+        except Exception as e:
+            debug_logger.error(f"Ошибка при переключении трека: {e}")
+
+    def pause_track_action(self):
+        try:
+            controller.play_pause()
+        except Exception as e:
+            debug_logger.error(f"Ошибка при попытке поставить паузу: {e}")
+
+    def next_track_action(self):
+        try:
+            controller.next_track()
+        except Exception as e:
+            debug_logger.error(f"Ошибка при переключении трека: {e}")
 
     def closeEvent(self, event):
         # Сохраняем состояние виджета
@@ -1019,6 +1116,11 @@ class SmartWidget(QWidget):
         try:
             self.styles = self.style_manager.load_styles()
 
+            # self.style_manager.apply_color_svg(self.lock_svg, strength=0.95)
+            # self.style_manager.apply_color_svg(self.prev_svg, strength=0.95)
+            # self.style_manager.apply_color_svg(self.pause_svg, strength=0.95)
+            # self.style_manager.apply_color_svg(self.next_svg, strength=0.95)
+
             # Применяем стили к текущему окну
             style_sheet = ""
             for widget, styles in self.styles.items():
@@ -1039,6 +1141,10 @@ class SmartWidget(QWidget):
 
     def update_colors(self):
         self.styles = self.style_manager.load_styles()
+        self.style_manager.apply_color_svg(self.lock_svg, strength=0.95)
+        # self.style_manager.apply_color_svg(self.prev_svg, strength=0.95)
+        # self.style_manager.apply_color_svg(self.pause_svg, strength=0.95)
+        # self.style_manager.apply_color_svg(self.next_svg, strength=0.95)
         for name, data in self.buttons_data.items():
             self.style_manager.apply_color_svg(data['svg'], strength=0.90)
 

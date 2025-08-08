@@ -71,7 +71,7 @@ class ColorSettingsWindow(QDialog):
     def init_ui(self):
         # Основной контейнер
         self.container = QWidget(self)
-        self.container.setObjectName("MessageContainer")
+        self.container.setObjectName("WindowContainer")
         self.container.setGeometry(0, 0, self.width(), self.height())
 
         # Кастомный заголовок
@@ -98,25 +98,6 @@ class ColorSettingsWindow(QDialog):
 
         # Создаем вкладки для разных элементов
         self.tab_widget = QTabWidget(self.content_widget)
-        self.tab_widget.setStyleSheet("""
-                QTabWidget::pane {
-                    border: 1px solid palette(shadow);
-                    background: palette(base);
-                }
-                QTabBar::tab {
-                    background: palette(button);
-                    color: palette(text);
-                    padding: 5px;
-                    border: 1px solid palette(shadow);
-                    border-bottom: none;
-                    border-top-left-radius: 4px;
-                    border-top-right-radius: 4px;
-                }
-                QTabBar::tab:selected {
-                    background: palette(base);
-                    border-bottom: 1px solid palette(base);
-                }
-            """)
 
         # Вкладка для фона
         self.bg_tab = QWidget()
@@ -509,6 +490,26 @@ class ColorSettingsWindow(QDialog):
                     "padding-left": "3px",
                     "padding-top": "3px",
                 },
+                "QTabBar::tab": {
+                    "background-color": self.get_gradient_css('buttons') if self.gradient_settings['buttons'][
+                        'enabled'] else self.btn_color,
+                    "color": self.text_color,
+                    "height": "30px",
+                    "border": f"1px solid {self.get_gradient_css('borders')}" if self.gradient_settings['borders'][
+                        'enabled'] else f"1px solid {self.border_color}",
+                    "border-radius": "3px",
+                    "font-size": "13px",
+                    "margin": "3px",
+                    "padding": "3px"
+                },
+                "QTabBar::tab:selected": {
+                    "background-color": self.get_hover_gradient_css('buttons'),
+                    "color": self.text_color,
+                    "font-size": "13px",
+                    "margin": "3px",
+                    "padding": "3px",
+                    "padding-top": "10px"
+                },
                 "QTextEdit": {
                     "background": "transparent",
                     "color": self.text_edit_color,
@@ -567,6 +568,11 @@ class ColorSettingsWindow(QDialog):
                     "border": f"1px solid {self.get_gradient_css('borders')}" if self.gradient_settings['borders'][
                         'enabled'] else f"1px solid {self.border_color}",
                     "border-radius": "25px"
+                },
+                "WindowContainer": {
+                    "border": f"1px solid {self.get_gradient_css('borders')}" if self.gradient_settings['borders'][
+                        'enabled'] else f"1px solid {self.border_color}",
+                    "border-radius": "3px"
                 }
             }
 
@@ -680,28 +686,16 @@ class ColorSettingsWindow(QDialog):
 
     def save_preset(self):
         """Сохраняет текущие стили как новый пресет."""
-        dialog = CustomInputDialog('Сохранить пресет', 'Введите имя пресета:', self)
+        dialog = SavePresetDialog(self)
+
         if dialog.exec_() != QDialog.Accepted:
-            return
+            return  # Пользователь отменил действие
 
         preset_name = dialog.get_text().strip()
-        if not preset_name:
-            self.assistant.show_notification_message("Имя пресета не может быть пустым!")
-            return
-
-        # Проверяем существующие пресеты
-        conflict_paths = [
-            os.path.join(self.base_presets, f"{preset_name}.json"),
-            os.path.join(self.custom_presets, f"{preset_name}.json")
-        ]
-
-        if any(os.path.exists(path) for path in conflict_paths):
-            self.assistant.show_notification_message(f"Пресет '{preset_name}' уже существует!\nПожалуйста, выберите другое имя.")
-            return
 
         try:
             os.makedirs(self.custom_presets, exist_ok=True)
-            preset_path = conflict_paths[1]  # custom_presets путь
+            preset_path = os.path.join(self.custom_presets, f"{preset_name}.json")
 
             with open(preset_path, 'w', encoding='utf-8') as f:
                 json.dump({
@@ -730,6 +724,26 @@ class ColorSettingsWindow(QDialog):
                         "background-color": self.get_pressed_gradient_css('buttons', 30),
                         "padding-left": "3px",
                         "padding-top": "3px",
+                    },
+                    "QTabBar::tab": {
+                        "background-color": self.get_gradient_css('buttons') if self.gradient_settings['buttons'][
+                            'enabled'] else self.btn_color,
+                        "color": self.text_color,
+                        "height": "30px",
+                        "border": f"1px solid {self.get_gradient_css('borders')}" if self.gradient_settings['borders'][
+                            'enabled'] else f"1px solid {self.border_color}",
+                        "border-radius": "3px",
+                        "font-size": "13px",
+                        "margin": "3px",
+                        "padding": "3px"
+                    },
+                    "QTabBar::tab:selected": {
+                        "background-color": self.get_hover_gradient_css('buttons'),
+                        "color": self.text_color,
+                        "font-size": "13px",
+                        "margin": "3px",
+                        "padding": "3px",
+                        "padding-top": "10px"
                     },
                     "QTextEdit": {
                         "background": "transparent",
@@ -790,6 +804,11 @@ class ColorSettingsWindow(QDialog):
                         "border": f"1px solid {self.get_gradient_css('borders')}" if self.gradient_settings['borders'][
                             'enabled'] else f"1px solid {self.border_color}",
                         "border-radius": "25px"
+                    },
+                    "WindowContainer": {
+                        "border": f"1px solid {self.get_gradient_css('borders')}" if self.gradient_settings['borders'][
+                            'enabled'] else f"1px solid {self.border_color}",
+                        "border-radius": "3px"
                     }
                 }, f, indent=4, ensure_ascii=False)
 
@@ -906,20 +925,21 @@ class GradientPreview(QLabel):
         painter.fillRect(self.rect(), gradient)
         painter.end()
 
-class CustomInputDialog(QDialog):
-    """Кастомное диалоговое окно ввода с собственной рамкой"""
 
-    def __init__(self, title, label, parent=None):
+class SavePresetDialog(QDialog):
+    """Кастомное диалоговое окно ввода с валидацией"""
+
+    def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.Dialog)
         self.setFixedSize(300, 150)
         self.setAttribute(Qt.WA_TranslucentBackground)
-        self.init_ui(title, label)
+        self.init_ui()
 
-    def init_ui(self, title, label):
+    def init_ui(self):
         # Основной контейнер
         self.container = QWidget(self)
-        self.container.setObjectName("MessageContainer")
+        self.container.setObjectName("WindowContainer")
         self.container.setGeometry(0, 0, self.width(), self.height())
 
         # Кастомный заголовок
@@ -930,7 +950,7 @@ class CustomInputDialog(QDialog):
         self.title_layout.setContentsMargins(10, 5, 10, 5)
         self.title_layout.setSpacing(5)
 
-        self.title_label = QLabel(title, self.title_bar)
+        self.title_label = QLabel('Сохранить пресет', self.title_bar)
         self.title_label.setGeometry(10, 5, 200, 20)
         self.title_layout.addWidget(self.title_label)
 
@@ -947,13 +967,17 @@ class CustomInputDialog(QDialog):
 
         # Поле ввода
         self.input_field = QLineEdit(self.content_widget)
-        self.input_field.setPlaceholderText(label)
+        self.input_field.setPlaceholderText('Введите имя пресета:')
+
+        # Label для ошибок
+        self.error_label = QLabel(self.content_widget)
+        self.error_label.setStyleSheet("color: red; font-size: 11px; background-color: transparent; height: 15px;")
 
         # Кнопки
         self.ok_button = QPushButton('Сохранить', self.content_widget)
         self.ok_button.setStyleSheet("padding: 1px 10px;")
         self.ok_button.setObjectName("AcceptButton")
-        self.ok_button.clicked.connect(self.accept)
+        self.ok_button.clicked.connect(self.try_accept)
 
         self.cancel_button = QPushButton('Закрыть', self.content_widget)
         self.cancel_button.setStyleSheet("padding: 1px 10px;")
@@ -963,9 +987,10 @@ class CustomInputDialog(QDialog):
         # Размещение элементов
         main_layout = QVBoxLayout(self.content_widget)
         main_layout.setContentsMargins(15, 15, 15, 15)
-        main_layout.setSpacing(15)
+        main_layout.setSpacing(10)  # Уменьшили отступ
 
         main_layout.addWidget(self.input_field)
+        main_layout.addWidget(self.error_label)
 
         button_layout = QHBoxLayout()
         button_layout.addStretch()
@@ -973,8 +998,34 @@ class CustomInputDialog(QDialog):
         button_layout.addWidget(self.cancel_button)
         main_layout.addLayout(button_layout)
 
-        # Установка стратегии позиционирования
         self.set_position_strategy()
+
+    def try_accept(self):
+        """Пытается закрыть окно, если ввод корректен."""
+        preset_name = self.get_text()
+        if not preset_name:
+            self.show_error("Имя не может быть пустым!")
+            return
+
+        conflict_paths = [
+            os.path.join(self.parent().base_presets, f"{preset_name}.json"),
+            os.path.join(self.parent().custom_presets, f"{preset_name}.json")
+        ]
+
+        if any(os.path.exists(path) for path in conflict_paths):
+            self.show_error(f"Пресет '{preset_name}' уже существует!")
+            return
+
+        self.accept()
+
+    def show_error(self, message):
+        """Показывает сообщение об ошибке."""
+        self.error_label.setText(message)
+        self.error_label.setVisible(True)
+
+    def get_text(self):
+        """Возвращает очищенный текст из поля ввода."""
+        return self.input_field.text().strip()
 
     def keyPressEvent(self, event):
         if event.key() == Qt.Key_Escape:
@@ -1009,10 +1060,6 @@ class CustomInputDialog(QDialog):
 
         # Проверяем, чтобы окно не выходило за пределы экрана
         self.ensure_on_screen()
-
-    def get_text(self):
-        """Возвращает введенный текст"""
-        return self.input_field.text()
 
     def mousePressEvent(self, event):
         """Перетаскивание окна за заголовок"""

@@ -5,7 +5,7 @@ import pyaudio
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, QTimer
 from PyQt5.QtSvg import QSvgWidget
 from PyQt5.QtWidgets import QVBoxLayout, QLabel, QWidget, QProgressBar, QApplication, QMessageBox, QPushButton, \
-    QGraphicsColorizeEffect, QDialog
+    QGraphicsColorizeEffect, QDialog, QSizePolicy
 from bin.apply_color_methods import ApplyColor
 from bin.toast_notification import SimpleNotice
 from logging_config import debug_logger
@@ -62,9 +62,10 @@ class InitScreen(QWidget):
         content_layout.addStretch()
 
         self.label = QLabel("Инициализация...", self)
-        self.label.setStyleSheet("background: transparent;")
+        self.label.setStyleSheet("background: transparent; min-height: 35px; max-height: 35px;")
         self.label.setAlignment(Qt.AlignCenter)
         self.label.setWordWrap(True)
+        self.label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         content_layout.addWidget(self.label)
 
         self.progress = QProgressBar(self)

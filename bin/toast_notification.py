@@ -187,7 +187,7 @@ class ToastNotification(QDialog):
             start_x = parent_geo.right() - self.width()
             start_y = parent_geo.top() - self.height()
             end_x = start_x
-            end_y = parent_geo.top() + 34
+            end_y = parent_geo.top() + 90
         else:
             # Иначе - позиционируем в правом верхнем углу экрана
             start_x = screen_geo.width() - self.width()  # 10px отступ от края
@@ -383,8 +383,6 @@ class SimpleNotice():
         content_layout.addLayout(self.button_layout)
 
         main_layout.addWidget(content_widget)
-
-
 
     def create_buttons(self):
         """Создание кнопок в зависимости от переданных параметров"""

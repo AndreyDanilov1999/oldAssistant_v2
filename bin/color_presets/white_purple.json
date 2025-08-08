@@ -22,6 +22,24 @@
         "padding-left": "3px",
         "padding-top": "3px"
     },
+    "QTabBar::tab": {
+        "background-color": "qlineargradient(x1:0.00, y1:0.50, x2:1.00, y2:0.50, stop:0 #e2e2e2, stop:1 #BEA4F1)",
+        "color": "#000000",
+        "height": "30px",
+        "border": "1px solid #ad77ff",
+        "border-radius": "3px",
+        "font-size": "13px",
+        "margin": "3px",
+        "padding": "3px"
+    },
+    "QTabBar::tab:selected": {
+        "background-color": "qlineargradient(x1:0.00, y1:0.50, x2:1.00, y2:0.50, stop:0 #BEA4F1, stop:1 #e2e2e2)",
+        "color": "#000000",
+        "font-size": "13px",
+        "margin": "3px",
+        "padding": "3px",
+        "padding-top": "10px"
+    },
     "QTextEdit": {
         "background": "transparent",
         "color": "#000000",
@@ -74,5 +92,9 @@
     "MessageContainer": {
         "border": "1px solid #ad77ff",
         "border-radius": "25px"
+    },
+    "WindowContainer": {
+        "border": "1px solid #ad77ff",
+        "border-radius": "3px"
     }
 }

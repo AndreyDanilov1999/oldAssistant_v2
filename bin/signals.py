@@ -11,3 +11,9 @@ class GuiSignals(QObject):
     close_widget_signal = pyqtSignal()
 
 gui_signals = GuiSignals()
+
+class ProgressBarSignals(QObject):
+    start_progress = pyqtSignal()
+    stop_progress = pyqtSignal()
+
+progress_signal = ProgressBarSignals()

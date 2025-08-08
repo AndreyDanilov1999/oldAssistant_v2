@@ -1,13 +1,15 @@
 {
-    "voice": "sanboy",
+    "voice": "sanych",
     "assistant_name": "сан",
     "assist_name2": "сан",
     "assist_name3": "сан",
     "steam_path": "D:\\Steam\\steam.exe",
-    "is_censored": true,
-    "volume_assist": 0.2,
+    "is_censored": false,
+    "volume_assist": 0.19,
     "show_upd_msg": true,
     "minimize_to_tray": false,
     "start_win": true,
-    "is_widget": true
+    "is_widget": true,
+    "input_device_id": 1,
+    "input_device_name": "Microphone (5- USB Audio Device"
 }

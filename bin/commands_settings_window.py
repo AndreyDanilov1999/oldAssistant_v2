@@ -1,6 +1,7 @@
 import json
 import os
-from PyQt5.QtCore import pyqtSignal, Qt, QStringListModel, QPropertyAnimation, QEasingCurve
+from PyQt5.QtCore import pyqtSignal, Qt, QStringListModel, QPropertyAnimation, QEasingCurve, QRect, \
+    QParallelAnimationGroup, QSize
 from PyQt5.QtWidgets import QFileDialog, QPushButton, QLineEdit, QLabel, QComboBox, \
     QVBoxLayout, QWidget, QDialog, QFrame, QStackedWidget, QHBoxLayout, QListWidget, QListWidgetItem, \
     QInputDialog, QSizePolicy, QCompleter, QDialogButtonBox, QMessageBox
@@ -20,12 +21,14 @@ class CommandSettingsWindow(QDialog):
         self.assistant = parent
         self.current_commands = parent.commands.copy() if hasattr(parent,
                                                                   'commands') else {}  # Центральное хранилище команд
+        # Подключаем сигнал родителя к слоту закрытия
+        if parent and hasattr(parent, "close_child_windows"):
+            parent.close_child_windows.connect(self.hide_with_animation)
         self.load_commands()
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.Dialog)
         self.setFixedSize(parent.width(), parent.height())
         self.setAttribute(Qt.WA_TranslucentBackground)  # Для эффектов прозрачности
 
-        # Анимация прозрачности
         self.opacity_animation = QPropertyAnimation(self, b"windowOpacity")
         self.opacity_animation.setDuration(300)
 
