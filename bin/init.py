@@ -152,9 +152,6 @@ class InitScreen(QWidget):
         else:
             self.label.setText(f"Произошла ошибка")
             self.progress.setValue(0)
-            if missing_file:
-                QMessageBox.critical(self, "Ошибка",
-                                     f"Не удалось найти {missing_file}")
             self.show_message(text=f"{error}", title="Ошибка", message_type="error")
             self.init_complete.emit(False)  # Отправляем сигнал об ошибке
             QTimer.singleShot(1000, lambda: self.close())
@@ -213,7 +210,9 @@ class CheckThread(QThread):
         files_to_check = (
             "settings_window.py", "speak_functions.py", "audio_control.py",
             "commands_settings_window.py", "func_list.py", "function_list_main.py",
-            "guide_window.py", "lists.py", "other_options_window.py")
+            "lists.py", "other_options_window.py", "apply_color_methods.py", "check_update.py",
+            "choose_color_window.py", "download_thread.py", "signals.py",
+            "toast_notification.py", "widget_window.py")
 
         total_files = len(files_to_check)
         step_per_file = files_weight / total_files if total_files else 0
@@ -222,7 +221,7 @@ class CheckThread(QThread):
             path = get_path("bin", file)
             if not os.path.exists(path):
                 self.progress_update.emit(f"Файл {file} не найден!", 0)
-                self.checks_complete.emit(False, file, "")  # Добавляем имя файла в сигнал
+                self.checks_complete.emit(False, "", f"Файл {file} не найден!")  # Добавляем имя файла в сигнал
                 return False
 
             progress = int((i + 1) * step_per_file) + 20

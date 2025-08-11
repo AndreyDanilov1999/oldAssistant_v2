@@ -4,24 +4,6 @@
         "color": "#ffffff",
         "font-size": "13px"
     },
-    "QTabBar::tab": {
-        "background-color": "qlineargradient(x1:0.85, y1:0.85, x2:0.15, y2:0.15, stop:0 #000000, stop:1 #18154B)",
-        "color": "#ffffff",
-        "height": "30px",
-        "border": "1px solid #4577ff",
-        "border-radius": "3px",
-        "font-size": "13px",
-        "margin": "3px",
-        "padding": "3px"
-    },
-    "QTabBar::tab:selected": {
-        "background-color": "qlineargradient(x1:0.85, y1:0.85, x2:0.15, y2:0.15, stop:0 #18154B, stop:1 #000000)",
-        "color": "#ffffff",
-        "font-size": "13px",
-        "margin": "3px",
-        "padding": "3px",
-        "padding-top": "10px"
-    },
     "QPushButton": {
         "background-color": "qlineargradient(x1:0.85, y1:0.85, x2:0.15, y2:0.15, stop:0 #000000, stop:1 #18154B)",
         "color": "#ffffff",
@@ -39,6 +21,24 @@
         "background-color": "qlineargradient(x1:0.85, y1:0.85, x2:0.15, y2:0.15, stop:0 #000000, stop:1 #00002d)",
         "padding-left": "3px",
         "padding-top": "3px"
+    },
+    "QTabBar::tab": {
+        "background-color": "qlineargradient(x1:0.85, y1:0.85, x2:0.15, y2:0.15, stop:0 #000000, stop:1 #18154B)",
+        "color": "#ffffff",
+        "height": "30px",
+        "border": "1px solid #4577ff",
+        "border-radius": "3px",
+        "font-size": "13px",
+        "margin": "3px",
+        "padding": "3px"
+    },
+    "QTabBar::tab:selected": {
+        "background-color": "qlineargradient(x1:0.85, y1:0.85, x2:0.15, y2:0.15, stop:0 #18154B, stop:1 #000000)",
+        "color": "#ffffff",
+        "font-size": "13px",
+        "margin": "3px",
+        "padding": "3px",
+        "padding-top": "10px"
     },
     "QTextEdit": {
         "background": "transparent",
@@ -96,5 +96,20 @@
     "WindowContainer": {
         "border": "1px solid #4577ff",
         "border-radius": "3px"
+    },
+    "QMenu": {
+        "background-color": "qlineargradient(x1:0.85, y1:0.85, x2:0.15, y2:0.15, stop:0 #000000, stop:1 #18154B)",
+        "color": "#ffffff",
+        "font-size": "13px",
+        "padding": "5px"
+    },
+    "QMenu::item": {
+        "padding": "8px 20px",
+        "border-radius": "5px"
+    },
+    "QMenu::item:selected": {
+        "border-radius": "5px",
+        "background-color": "#4577ff",
+        "color": "#ffffff"
     }
 }

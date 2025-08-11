@@ -96,5 +96,20 @@
     "WindowContainer": {
         "border": "1px solid qlineargradient(x1:0.10, y1:0.79, x2:0.90, y2:0.21, stop:0 #df4548, stop:1 #8612eb)",
         "border-radius": "3px"
+    },
+    "QMenu": {
+        "background-color": "qlineargradient(x1:0.50, y1:0.00, x2:0.50, y2:1.00, stop:0 #38041c, stop:1 #2e3d46)",
+        "color": "#ffffff",
+        "font-size": "13px",
+        "padding": "5px"
+    },
+    "QMenu::item": {
+        "padding": "8px 20px",
+        "border-radius": "5px"
+    },
+    "QMenu::item:selected": {
+        "border-radius": "5px",
+        "background-color": "qlineargradient(x1:0.10, y1:0.79, x2:0.90, y2:0.21, stop:0 #df4548, stop:1 #8612eb)",
+        "color": "#ffffff"
     }
 }

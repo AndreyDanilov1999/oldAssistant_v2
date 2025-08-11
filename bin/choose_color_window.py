@@ -3,12 +3,12 @@ import math
 import os
 import re
 
-
 from PyQt5.QtCore import pyqtSignal, Qt
 from PyQt5.QtGui import QColor, QPainter, QLinearGradient
 from PyQt5.QtWidgets import QLabel, QVBoxLayout, QPushButton, QSpinBox, QSlider, QDialog, QWidget, QTabWidget, \
     QColorDialog, QCheckBox, QHBoxLayout, QComboBox, QApplication, QLineEdit
 
+from bin.signals import color_signal
 from logging_config import debug_logger
 from path_builder import get_path
 
@@ -456,7 +456,7 @@ class ColorSettingsWindow(QDialog):
 
             self.update_gradient_preview(element_type)
 
-        QApplication.processEvents() # Обработать все события в очереди
+        QApplication.processEvents()  # Обработать все события в очереди
         self.container.repaint()
         self.update_text_preview()  # для обновления цвета текста на превью во вкладке "Текст"
         self.apply_changes(preview=True)
@@ -573,12 +573,30 @@ class ColorSettingsWindow(QDialog):
                     "border": f"1px solid {self.get_gradient_css('borders')}" if self.gradient_settings['borders'][
                         'enabled'] else f"1px solid {self.border_color}",
                     "border-radius": "3px"
+                },
+                "QMenu": {
+                    "background-color": self.get_gradient_css('buttons') if self.gradient_settings['buttons'][
+                        'enabled'] else self.btn_color,
+                    "color": "#ffffff",
+                    "font-size": "13px",
+                    "padding": "5px"
+                },
+                "QMenu::item": {
+                    "padding": "8px 20px",
+                    "border-radius": "5px"
+                },
+                "QMenu::item:selected": {
+                    "border-radius": "5px",
+                    "background-color": f"{self.get_gradient_css('borders')}" if self.gradient_settings['borders'][
+                        'enabled'] else f"{self.border_color}",
+                    "color": "#ffffff"
                 }
             }
 
             if not preview:
                 self.save_color_settings(new_styles)
                 self.colorChanged.emit()
+                color_signal.color_changed.emit()
                 self.assistant.check_start_win()
             else:
                 # Применяем стили только для предпросмотра
@@ -809,6 +827,23 @@ class ColorSettingsWindow(QDialog):
                         "border": f"1px solid {self.get_gradient_css('borders')}" if self.gradient_settings['borders'][
                             'enabled'] else f"1px solid {self.border_color}",
                         "border-radius": "3px"
+                    },
+                    "QMenu": {
+                        "background-color": self.get_gradient_css('buttons') if self.gradient_settings['buttons'][
+                            'enabled'] else self.btn_color,
+                        "color": "#ffffff",
+                        "font-size": "13px",
+                        "padding": "5px"
+                    },
+                    "QMenu::item": {
+                        "padding": "8px 20px",
+                        "border-radius": "5px"
+                    },
+                    "QMenu::item:selected": {
+                        "border-radius": "5px",
+                        "background-color": f"{self.get_gradient_css('borders')}" if self.gradient_settings['borders'][
+                            'enabled'] else f"{self.border_color}",
+                        "color": "#ffffff"
                     }
                 }, f, indent=4, ensure_ascii=False)
 

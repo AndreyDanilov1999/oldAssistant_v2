@@ -96,5 +96,20 @@
     "WindowContainer": {
         "border": "1px solid #2ad0ca",
         "border-radius": "3px"
+    },
+    "QMenu": {
+        "background-color": "qlineargradient(x1:0.85, y1:0.85, x2:0.15, y2:0.15, stop:0 #000000, stop:1 #0D313A)",
+        "color": "#ffffff",
+        "font-size": "13px",
+        "padding": "5px"
+    },
+    "QMenu::item": {
+        "padding": "8px 20px",
+        "border-radius": "5px"
+    },
+    "QMenu::item:selected": {
+        "border-radius": "5px",
+        "background-color": "#2ad0ca",
+        "color": "#ffffff"
     }
 }

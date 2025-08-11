@@ -285,9 +285,9 @@ class InterfaceWidget(QWidget):
         btn_purple.clicked.connect(lambda: self.apply_style_file("white_purple.json"))
         right_col.addWidget(btn_purple)
 
-        btn_white_blue = QPushButton("Светло-голубой")
-        btn_white_blue.clicked.connect(lambda: self.apply_style_file("white_blue.json"))
-        right_col.addWidget(btn_white_blue)
+        btn_pink_blue = QPushButton("Pink-Blue")
+        btn_pink_blue.clicked.connect(lambda: self.apply_style_file("pink_blue.json"))
+        right_col.addWidget(btn_pink_blue)
 
         btn_orange_purple = QPushButton("Закат")
         btn_orange_purple.clicked.connect(lambda: self.apply_style_file("sunset.json"))

@@ -1,6 +1,6 @@
 {
     "QWidget": {
-        "background-color": "qlineargradient(x1:0.08, y1:0.24, x2:0.92, y2:0.76, stop:0 #e6f7e7, stop:1 #a5cfa4)",
+        "background-color": "qlineargradient(x1:0.07, y1:0.24, x2:0.93, y2:0.76, stop:0 #e6f7e7, stop:1 #a5cfa4)",
         "color": "#000000",
         "font-size": "13px"
     },
@@ -96,5 +96,20 @@
     "WindowContainer": {
         "border": "1px solid #01b801",
         "border-radius": "3px"
+    },
+    "QMenu": {
+        "background-color": "qlineargradient(x1:0.89, y1:0.81, x2:0.11, y2:0.19, stop:0 #9f9f9f, stop:1 #6fcf6a)",
+        "color": "#ffffff",
+        "font-size": "13px",
+        "padding": "5px"
+    },
+    "QMenu::item": {
+        "padding": "8px 20px",
+        "border-radius": "5px"
+    },
+    "QMenu::item:selected": {
+        "border-radius": "5px",
+        "background-color": "#01b801",
+        "color": "#ffffff"
     }
 }
