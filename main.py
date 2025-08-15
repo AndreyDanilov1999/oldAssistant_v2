@@ -113,7 +113,7 @@ class Assistant(QMainWindow):
 
     def __init__(self):
         super().__init__()
-        self.version = "1.4.0"
+        self.version = "1.4.2"
         self.ps = "Powered by theoldman"
         self.label_version = QLabel(f"Версия: {self.version} {self.ps}", self)
         self.label_message = QLabel('', self)
@@ -169,19 +169,19 @@ class Assistant(QMainWindow):
         # self.game_mode = None
         # self.game_mode_bool = False
         self.update_settings(self.settings_file_path)
-        self.settings = self.load_settings()
-        self.assistant_name = self.settings.get('assistant_name', "джо")
-        self.assist_name2 = self.settings.get('assist_name2', "джо")
-        self.assist_name3 = self.settings.get('assist_name3', "джо")
-        self.speaker = self.settings.get("voice", "johnny")
-        self.volume_assist = self.settings.get('volume_assist', 0.2)
-        self.steam_path = self.settings.get('steam_path', '')
-        self.is_censored = self.settings.get('is_censored', False)
-        self.show_upd_msg = self.settings.get("show_upd_msg", False)
-        self.is_min_tray = self.settings.get("minimize_to_tray", True)
-        self.is_widget = self.settings.get("is_widget", True)
-        self.input_device_id = self.settings.get("input_device_id", None)
-        self.input_device_name = self.settings.get("input_device_name", None)
+        self.assistant_name = None
+        self.assist_name2 = None
+        self.assist_name3 = None
+        self.speaker = None
+        self.volume_assist = None
+        self.steam_path = None
+        self.is_censored = None
+        self.show_upd_msg = None
+        self.is_min_tray = None
+        self.is_widget = None
+        self.input_device_id = None
+        self.input_device_name = None
+        self.install_settings()
         self.audio_stream = None
         self.last_audio_time = None  # Время последнего НЕтихого пакета
         self.silence_timer = QTimer()  # Таймер для проверки тишины
@@ -233,33 +233,27 @@ class Assistant(QMainWindow):
             new_pos = event.globalPos() - self.drag_pos
             self.move(new_pos)
 
-            # # Если окно настроек открыто - перемещаем его вместе с основным
-            # if hasattr(self, 'settings_window') and self.settings_window.isVisible():
-            #     # Позиционируем окно настроек относительно основного
-            #     settings_x = new_pos.x() - self.settings_window.width()
-            #     settings_y = new_pos.y()
-            #     self.settings_window.move(settings_x, settings_y)
-            #
-            # # Если окно настроек открыто - перемещаем его вместе с основным
-            # if hasattr(self, 'other_window') and self.other_window.isVisible():
-            #     # Позиционируем окно настроек относительно основного
-            #     settings_x = new_pos.x() - self.other_window.width()
-            #     settings_y = new_pos.y()
-            #     self.other_window.move(settings_x, settings_y)
-            #
-            # # Если окно настроек открыто - перемещаем его вместе с основным
-            # if hasattr(self, 'guide_window') and self.guide_window.isVisible():
-            #     # Позиционируем окно настроек относительно основного
-            #     settings_x = new_pos.x() - self.guide_window.width()
-            #     settings_y = new_pos.y()
-            #     self.guide_window.move(settings_x, settings_y)
-
             event.accept()
 
     def title_bar_mouse_release(self, event):
         """Обработка отпускания кнопки мыши"""
         self.drag_pos = None
         event.accept()
+
+    def install_settings(self):
+        self.settings = self.load_settings()
+        self.assistant_name = self.settings.get('assistant_name', "джо")
+        self.assist_name2 = self.settings.get('assist_name2', "джо")
+        self.assist_name3 = self.settings.get('assist_name3', "джо")
+        self.speaker = self.settings.get("voice", "johnny")
+        self.volume_assist = self.settings.get('volume_assist', 0.2)
+        self.steam_path = self.settings.get('steam_path', 'D:/Steam/steam.exe')
+        self.is_censored = self.settings.get('is_censored', False)
+        self.show_upd_msg = self.settings.get("show_upd_msg", False)
+        self.is_min_tray = self.settings.get("minimize_to_tray", False)
+        self.is_widget = self.settings.get("is_widget", True)
+        self.input_device_id = self.settings.get("input_device_id", None)
+        self.input_device_name = self.settings.get("input_device_name", None)
 
     def initui(self):
         """Инициализация пользовательского интерфейса."""
@@ -513,13 +507,13 @@ class Assistant(QMainWindow):
             quit_action = QAction("Закрыть", self)
             quit_action.triggered.connect(self.close_app)
 
-            tray_menu = QMenu()
-            tray_menu.addAction(check_micro)
-            tray_menu.addAction(settings)
-            tray_menu.addAction(show_action)
-            tray_menu.addAction(hide_action)
-            tray_menu.addAction(quit_action)
-            self.tray_icon.setContextMenu(tray_menu)
+            self.menu_tray = QMenu()
+            self.menu_tray.addAction(check_micro)
+            self.menu_tray.addAction(settings)
+            self.menu_tray.addAction(show_action)
+            self.menu_tray.addAction(hide_action)
+            self.menu_tray.addAction(quit_action)
+            self.tray_icon.setContextMenu(self.menu_tray)
             self.tray_icon.activated.connect(self.on_tray_icon_activated)
             self.tray_icon.show()
 
@@ -661,8 +655,25 @@ class Assistant(QMainWindow):
 
             # Устанавливаем стиль для текущего окна
             self.setStyleSheet(style_sheet)
+            self.apply_menu_styles(self.menu_tray)
         except Exception as e:
             debug_logger.error(f"Ошибка в методе apply_styles: {e}")
+
+    def apply_menu_styles(self, menu: QMenu):
+        """Применяет стили из self.styles к QMenu"""
+        if not hasattr(self, 'styles') or not self.styles:
+            return
+
+        menu_style = ""
+        for widget_name, styles in self.styles.items():
+            if widget_name.startswith("QMenu"):
+                menu_style += f"{widget_name} {{\n"
+                for prop, value in styles.items():
+                    menu_style += f"    {prop}: {value};\n"
+                menu_style += "}\n"
+
+        if menu_style.strip():
+            menu.setStyleSheet(menu_style)
 
     def update_colors(self):
         self.styles = self.style_manager.load_styles()
@@ -730,22 +741,6 @@ class Assistant(QMainWindow):
             self.update_app(type_version=self.type_version)
         except Exception as e:
             debug_logger.error(f"Ошибка при запуске программы обновления: {e}")
-
-    # def update_answer(self, event):
-    #     """Реакция бота на отсутствие обновления"""
-    #     try:
-    #         self.check_update_app()
-    #         if self.update_label.text() == "Установлена последняя версия":
-    #             update_button = self.audio_paths.get('update_button')
-    #             thread_react_detail(update_button)
-    #         elif self.update_label.text() == "Доступно обновление":
-    #             pass
-    #         elif self.update_label.text() == "Ошибка обновления":
-    #             error = self.audio_paths.get('error_file')
-    #             thread_react_detail(error)
-    #
-    #     except Exception as e:
-    #         debug_logger.error(f"Ошибка при запуске программы обновления: {e}")
 
     @pyqtSlot()
     def update_answer(self, event):
@@ -936,23 +931,20 @@ class Assistant(QMainWindow):
         return ""
 
     def handle_message_click(self):
-        self.showNormal()
+        """Обработка действия, если апдейт уже был скачан (активация окна)"""
+        if not self.isVisible():
+            self.show()
+        if self.isMinimized():
+            self.showNormal()
         self.raise_()
         self.activateWindow()
-        QTimer.singleShot(2000, lambda: self.update_app(type_version=self.type_version))
+        QApplication.processEvents()
+        QTimer.singleShot(500, lambda: self.update_app(type_version=self.type_version))
 
     def show_update_notice(self, version):
         """Показ уведомления о новой версии"""
         if not self.isVisible():  # Если окно скрыто в трее
-            # Показываем message в трее
-            self.tray_icon.showMessage(
-                "Обновление загружено",
-                QSystemTrayIcon.Information,
-                3000  # 3 секунды
-            )
-            self.tray_icon.messageClicked.connect(
-                lambda: self.handle_message_click()
-            )
+            pass
         else:
             # Если окно видимо - показываем обычный диалог
             self.show_popup(version)
@@ -1071,6 +1063,25 @@ class Assistant(QMainWindow):
         self.file_watcher = QFileSystemWatcher([self.log_file_path])
         self.file_watcher.fileChanged.connect(self.update_logs)
 
+    def _check_log_file_size(self, max_lines=100):
+        """Проверяет, превышает ли файл логов max_lines строк. Если да — очищает его."""
+        try:
+            if not os.path.exists(self.log_file_path):
+                return
+
+            with open(self.log_file_path, "r", encoding="utf-8-sig", errors="replace") as file:
+                lines = file.readlines()
+
+            if len(lines) > max_lines:
+                # Очищаем файл и оставляем только последние 10 строк
+                with open(self.log_file_path, "w", encoding="utf-8") as file:
+                    file.writelines(lines[-10:])
+                self.log_area.clear()  # Очищаем QTextEdit
+                self.last_position = 0  # Сбрасываем позицию чтения
+                self.logger.info("Файл логов превысил лимит, очищен.")
+        except Exception as e:
+            self.logger.error(f"Ошибка при проверке размера логов: {e}")
+
     def load_existing_logs(self):
         """Загрузка всех записей из файла логов при запуске."""
         try:
@@ -1078,18 +1089,16 @@ class Assistant(QMainWindow):
                 self.logger.info("Файл логов не найден. Создаем новый.")
                 with open(self.log_file_path, "w", encoding="utf-8"):
                     pass  # Создаем пустой файл
+            else:
+                self._check_log_file_size()  # Проверяем и чистим, если нужно
 
             with open(self.log_file_path, "r", encoding="utf-8-sig", errors="replace") as file:
                 existing_logs = file.read()
-                self.log_area.append(existing_logs)
-                self.last_position = file.tell()  # Сохраняем позицию последнего прочитанного байта
+                self.log_area.setPlainText(existing_logs)
+                self.last_position = file.tell()
         except Exception as e:
             self.logger.error(f"Ошибка при чтении файла логов: {e}")
             self.log_area.append(f"Ошибка при чтении файла логов: {e}")
-
-    def update_logs(self):
-        """Обновление логов при изменении файла."""
-        self.check_log()
 
     def check_log(self):
         """Проверка файла на наличие новых данных."""
@@ -1100,8 +1109,10 @@ class Assistant(QMainWindow):
                 self.file_watcher.addPath(self.log_file_path)
                 return
 
+            self._check_log_file_size()  # Проверяем, не превышен ли лимит
+
             with open(self.log_file_path, "r", encoding="utf-8-sig", errors="replace") as file:
-                file.seek(self.last_position)  # Переходим к последней прочитанной позиции
+                file.seek(self.last_position)
                 new_lines = file.readlines()
                 if new_lines:
                     self.text_append("".join(new_lines))
@@ -1113,6 +1124,10 @@ class Assistant(QMainWindow):
         except Exception as e:
             self.logger.error(f"Ошибка при чтении файла логов: {e}")
             self.log_area.append(f"Ошибка при чтении файла логов: {e}")
+
+    def update_logs(self):
+        """Обновление логов при изменении файла."""
+        self.check_log()
 
     def text_append(self, text):
         """Добавление текста в QTextEdit с автоматической прокруткой."""
@@ -1146,26 +1161,26 @@ class Assistant(QMainWindow):
 
     def load_commands(self):
         """Загружает команды из JSON-файла."""
-        file_path = get_path('user_settings', 'commands.json')  # Полный путь к файлу
+        file_path = get_path('user_settings', 'commands.json')
         try:
             if not os.path.exists(file_path):
                 logger.info(f"Файл {file_path} не найден.")
                 debug_logger.debug(f"Файл {file_path} не найден.")
-                return {}  # Возвращаем пустой словарь, если файл не найден
+                return {}
 
             with open(file_path, 'r', encoding='utf-8') as file:
-                content = file.read().strip()  # Читаем содержимое и убираем пробелы
-                if not content:  # Если файл пустой
-                    return {}  # Возвращаем пустой словарь
-                return json.loads(content)  # Загружаем JSON
+                content = file.read().strip()
+                if not content:
+                    return {}
+                return json.loads(content)
         except json.JSONDecodeError:
             logger.error(f"Ошибка: файл {file_path} содержит некорректный JSON.")
             debug_logger.error(f"Ошибка: файл {file_path} содержит некорректный JSON.")
-            return {}  # Возвращаем пустой словарь при ошибке декодирования
+            return {}
         except Exception as e:
             logger.error(f"Ошибка при загрузке команд из файла {file_path}: {e}")
             debug_logger.error(f"Ошибка при загрузке команд из файла {file_path}: {e}")
-            return {}  # Возвращаем пустой словарь при других ошибках
+            return {}
 
     def load_settings(self):
         """Загружает настройки из settings.json."""
@@ -1257,10 +1272,8 @@ class Assistant(QMainWindow):
         """Обработка активации иконки в трее."""
         if reason == QSystemTrayIcon.Trigger:  # Одинарный щелчок
             if self.isVisible():
-                # Если окно видимо - сворачиваем
                 self.hide()
             else:
-                # Если окно скрыто - разворачиваем
                 screen_geometry = self.screen().availableGeometry()
                 self.move(
                     (screen_geometry.width() - self.width()) // 2,
@@ -2338,8 +2351,8 @@ class Assistant(QMainWindow):
         # Восстанавливаем ширину
         self.animation.setPropertyName(b"maximumWidth")
         self.animation.setStartValue(1)
-        self.animation.setEndValue(250)
-        self.animation.setDuration(500)
+        self.animation.setEndValue(230)
+        self.animation.setDuration(400)
         self.animation.setEasingCurve(QEasingCurve.OutBack)
         self.animation.start()
 
@@ -2845,8 +2858,8 @@ class Assistant(QMainWindow):
         except subprocess.CalledProcessError as e:
             if "не существует" not in e.stderr:
                 error_msg = f"Ошибка при удалении задачи '{task_name}': {e.stderr}"
+                self.show_notification_message(message=f"{error_msg}")
                 debug_logger.error(error_msg)
-                self.log_area.append(error_msg)
             else:
                 debug_logger.info(f"Задача '{task_name}' не найдена в планировщике")
 
@@ -2914,17 +2927,11 @@ class UpdateApp(QDialog):
             return
 
         if not self.extract_archive(self.update_file_path):
+            self.assistant.show_notification_message("Не удалось распаковать архив с новой версией")
             return
         debug_logger.info(f"Архив с новой версией распакован по пути {self.extract_dir}")
-        self.swap_update_file()
-        QTimer.singleShot(3000, lambda: self.start_update())
-
-    def swap_update_file(self):
-        try:
-            subprocess.Popen([get_path("swap-updater.exe")], shell=True)
-            debug_logger.info("swap-updater.exe успешно запущен")
-        except Exception as e:
-            debug_logger.error(f"Ошибка при запуске swap-updater.exe: {e}")
+        self.assistant.show_notification_message("Начинаю установку...")
+        QTimer.singleShot(500, lambda: self.start_update())
 
     def start_update(self):
         try:

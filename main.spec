@@ -66,7 +66,6 @@ a = Analysis(
         ('G:/PycharmProjects/oldAssistant_v2/bin/commands_settings_window.py', 'bin'),
         ('G:/PycharmProjects/oldAssistant_v2/bin/settings_window.py', 'bin'),
         ('G:/PycharmProjects/oldAssistant_v2/bin/other_options_window.py', 'bin'),
-        ('G:/PycharmProjects/oldAssistant_v2/bin/guide_window.py', 'bin'),
         ('G:/PycharmProjects/oldAssistant_v2/bin/widget_window.py', 'bin'),
         ('G:/PycharmProjects/oldAssistant_v2/bin/signals.py', 'bin'),
         ('G:/PycharmProjects/oldAssistant_v2/bin/toast_notification.py', 'bin'),

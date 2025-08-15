@@ -68,6 +68,26 @@ class ColorSettingsWindow(QDialog):
         self.init_ui()
         self.load_color_settings()
 
+    def title_bar_mouse_press(self, event):
+        """Обработка нажатия мыши на заголовок"""
+        if event.button() == Qt.LeftButton:
+            self.drag_pos = event.globalPos() - self.frameGeometry().topLeft()
+            event.accept()
+
+    def title_bar_mouse_move(self, event):
+        """Обработка перемещения мыши при удерживании на заголовке"""
+        if self.drag_pos and event.buttons() == Qt.LeftButton:
+            # Получаем новую позицию основного окна
+            new_pos = event.globalPos() - self.drag_pos
+            self.move(new_pos)
+
+            event.accept()
+
+    def title_bar_mouse_release(self, event):
+        """Обработка отпускания кнопки мыши"""
+        self.drag_pos = None
+        event.accept()
+
     def init_ui(self):
         # Основной контейнер
         self.container = QWidget(self)
@@ -77,10 +97,14 @@ class ColorSettingsWindow(QDialog):
         # Кастомный заголовок
         self.title_bar = QWidget(self.container)
         self.title_bar.setObjectName("TitleBar")
-        self.title_bar.setGeometry(1, 1, self.width() - 2, 35)
+        self.title_bar.setGeometry(1, 1, self.width() - 2, 35)  # Убрал отступ в 1 пиксель
         self.title_layout = QHBoxLayout(self.title_bar)
         self.title_layout.setContentsMargins(10, 5, 10, 5)
         self.title_layout.setSpacing(5)
+
+        self.title_bar.mousePressEvent = self.title_bar_mouse_press
+        self.title_bar.mouseMoveEvent = self.title_bar_mouse_move
+        self.title_bar.mouseReleaseEvent = self.title_bar_mouse_release
 
         self.title_label = QLabel("Редактор стилей", self.title_bar)
         self.title_layout.addWidget(self.title_label)
@@ -93,25 +117,34 @@ class ColorSettingsWindow(QDialog):
 
         # Основной контент
         self.content_widget = QWidget(self.container)
-        self.content_widget.setGeometry(1, 36, self.width() - 2, self.height() - 37)
+        self.content_widget.setGeometry(1, 36, self.width() - 2, self.height() - 37)  # Исправленная геометрия
         self.content_widget.setObjectName("ContentWidget")
 
-        # Создаем вкладки для разных элементов
-        self.tab_widget = QTabWidget(self.content_widget)
+        # Главный layout для content_widget
+        self.main_content_layout = QVBoxLayout(self.content_widget)
+        self.main_content_layout.setContentsMargins(5, 5, 5, 5)
+        self.main_content_layout.setSpacing(5)
 
-        # Вкладка для фона
+        # Контейнер для вкладок и связанных элементов
+        self.tabs_container = QWidget()
+        self.tabs_layout = QVBoxLayout(self.tabs_container)
+        self.tabs_layout.setContentsMargins(0, 0, 0, 0)
+        self.tabs_layout.setSpacing(0)
+
+        # Создаем вкладки
+        self.tab_widget = QTabWidget()
+        self.tab_widget.setObjectName("TabWidget")  # Для стилизации
+
+        # Вкладки
         self.bg_tab = QWidget()
         self.init_gradient_tab(self.bg_tab, 'background', 'Фон')
 
         self.text_tab = QWidget()
-        # Добавляем раздел для текста
         self.add_text_color_section(self.text_tab)
 
-        # Вкладка для кнопок
         self.btn_tab = QWidget()
         self.init_gradient_tab(self.btn_tab, 'buttons', 'Кнопки')
 
-        # Вкладка для обводок
         self.border_tab = QWidget()
         self.init_gradient_tab(self.border_tab, 'borders', 'Обводки')
 
@@ -120,11 +153,18 @@ class ColorSettingsWindow(QDialog):
         self.tab_widget.addTab(self.btn_tab, "Кнопки")
         self.tab_widget.addTab(self.border_tab, "Обводки")
 
-        # Кнопка для сохранения пресета
+        self.tabs_layout.addWidget(self.tab_widget)
+
+        # Контейнер для нижних элементов
+        self.bottom_container = QWidget()
+        self.bottom_layout = QVBoxLayout(self.bottom_container)
+        self.bottom_layout.setContentsMargins(10, 10, 10, 10)
+        self.bottom_layout.setSpacing(8)
+
+        # Нижние элементы
         self.save_preset_button = QPushButton('Сохранить стиль')
         self.save_preset_button.clicked.connect(self.save_preset)
 
-        # Выпадающий список для пресетов
         self.preset_combo_box = QComboBox()
         self.load_presets()
         self.preset_combo_box.setCurrentIndex(0)
@@ -133,31 +173,32 @@ class ColorSettingsWindow(QDialog):
         self.warning_label = QLabel("Внимание!\nПри выборе градиента для 'Обводки', "
                                     "первый цвет будет браться за основу окрашивания значков и svg-элементов")
         self.warning_label.setWordWrap(True)
+        self.warning_label.setStyleSheet("background-color: transparent")
 
-        # Кнопка для применения изменений
         self.apply_button = QPushButton('Применить')
         self.apply_button.clicked.connect(lambda: self.apply_changes(preview=False))
 
-        # Размещение элементов
-        layout = QVBoxLayout(self.content_widget)
-        layout.setContentsMargins(10, 10, 10, 10)
-        layout.setSpacing(8)
-        layout.addWidget(self.tab_widget)
-        layout.addWidget(self.save_preset_button)
-        layout.addWidget(QLabel('Стили:'))
-        layout.addWidget(self.preset_combo_box)
-        layout.addWidget(self.warning_label)
-        layout.addStretch()
-        layout.addWidget(self.apply_button)
+        # Добавляем элементы в нижний контейнер
+        self.bottom_layout.addWidget(self.save_preset_button)
+        self.bottom_layout.addWidget(QLabel('Стили:'))
+        self.bottom_layout.addWidget(self.preset_combo_box)
+        self.bottom_layout.addWidget(self.warning_label)
+        self.bottom_layout.addStretch()
+        self.bottom_layout.addWidget(self.apply_button)
+
+        # Добавляем основные части в главный layout
+        self.main_content_layout.addWidget(self.tabs_container)
+        self.main_content_layout.addWidget(self.bottom_container)
 
     def init_gradient_tab(self, tab, element_type, title):
         """Инициализирует вкладку для настройки градиента конкретного элемента"""
         layout = QVBoxLayout(tab)
-        layout.setContentsMargins(5, 5, 5, 5)
-        layout.setSpacing(8)
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(10)
 
         # Чекбокс для включения градиента
         checkbox = QCheckBox(f'Использовать градиент для {title.lower()}')
+        checkbox.setStyleSheet("background-color: transparent")
         checkbox.stateChanged.connect(lambda state: self.toggle_gradient(element_type, state))
         layout.addWidget(checkbox)
 
@@ -227,11 +268,6 @@ class ColorSettingsWindow(QDialog):
         layout = QVBoxLayout(tab)
         layout.setContentsMargins(5, 5, 5, 5)
         layout.setSpacing(8)
-
-        # Заголовок
-        text_label = QLabel("Цвет текста")
-        text_label.setStyleSheet("font-weight: bold;")
-        layout.addWidget(text_label)
 
         # Основной текст
         self.text_color_btn = QPushButton('Цвет текста (общий, на кнопках)')
@@ -438,17 +474,12 @@ class ColorSettingsWindow(QDialog):
         # Обновляем UI если виджеты уже созданы
         if widgets:
             widgets['checkbox'].setChecked(settings['enabled'])
-            # --- ЯВНО ВЫЗЫВАЕМ toggle_gradient ПОСЛЕ setChecked ---
+            # ЯВНО ВЫЗЫВАЕМ toggle_gradient ПОСЛЕ setChecked
             # Это необходимо, чтобы обновить видимость gradient_group и доступность других элементов
             # в соответствии с загруженным значением settings['enabled']
             self.toggle_gradient(element_type, Qt.Checked if settings['enabled'] else Qt.Unchecked)
-            # ----------------------------------------------------
-            # Следующие строки могут быть избыточны, так как toggle_gradient уже делает это,
-            # но оставим их для ясности, если вы хотите разделить логику.
-            # if 'gradient_group' in widgets:
-            #     widgets['gradient_group'].setVisible(settings['enabled']) # Уже сделано в toggle_gradient
             if 'solid_color_btn' in widgets:
-                widgets['solid_color_btn'].setText('Выбрать градиент' if settings['enabled'] else 'Выбрать цвет')
+                widgets['solid_color_btn'].setText('Выбрать цвет')
 
             if settings['enabled']:
                 widgets['slider'].setValue(settings['angle'])
@@ -502,6 +533,10 @@ class ColorSettingsWindow(QDialog):
                     "margin": "3px",
                     "padding": "3px"
                 },
+                "TabWidget::pane": {
+                    "margin": "0px",
+                    "padding": "0px"
+                },
                 "QTabBar::tab:selected": {
                     "background-color": self.get_hover_gradient_css('buttons'),
                     "color": self.text_color,
@@ -509,6 +544,40 @@ class ColorSettingsWindow(QDialog):
                     "margin": "3px",
                     "padding": "3px",
                     "padding-top": "10px"
+                },
+                "QLineEdit": {
+                    "background-color": "transparent",
+                    "border": f"1px solid {self.get_gradient_css('borders')}" if self.gradient_settings['borders'][
+                        'enabled'] else f"1px solid {self.border_color}",
+                    "border-radius": "3px",
+                    "padding": "5px"
+                },
+                "QComboBox": {
+                    "background-color": "transparent",
+                    "border": f"1px solid {self.get_gradient_css('borders')}" if self.gradient_settings['borders'][
+                        'enabled'] else f"1px solid {self.border_color}",
+                    "border-radius": "3px",
+                    "padding": "5px"
+                },
+                "QCheckBox": {
+                    "background-color": "transparent",
+                    "padding": "2px"
+                },
+                "QCheckBox::indicator": {
+                    "width": "12px",
+                    "height": "12px",
+                    "border": f"1px solid {self.get_gradient_css('borders')}" if self.gradient_settings['borders'][
+                        'enabled'] else f"1px solid {self.border_color}",
+                    "border-radius": "5px",
+                    "padding": "5px"
+                },
+                "QCheckBox::indicator:hover": {
+                    "width": "11px",
+                    "height": "11px"
+                },
+                "QCheckBox::indicator:checked": {
+                    "background-color": f"{self.get_gradient_css('borders')}" if self.gradient_settings['borders'][
+                        'enabled'] else f"{self.border_color}",
                 },
                 "QTextEdit": {
                     "background": "transparent",
@@ -590,6 +659,10 @@ class ColorSettingsWindow(QDialog):
                     "background-color": f"{self.get_gradient_css('borders')}" if self.gradient_settings['borders'][
                         'enabled'] else f"{self.border_color}",
                     "color": "#ffffff"
+                },
+                "QColorDialog QPushButton": {
+                    "padding-left": "5px",
+                    "padding-right": "5px"
                 }
             }
 
@@ -743,6 +816,10 @@ class ColorSettingsWindow(QDialog):
                         "padding-left": "3px",
                         "padding-top": "3px",
                     },
+                    "TabWidget::pane": {
+                        "margin": "0px",
+                        "padding": "0px"
+                    },
                     "QTabBar::tab": {
                         "background-color": self.get_gradient_css('buttons') if self.gradient_settings['buttons'][
                             'enabled'] else self.btn_color,
@@ -762,6 +839,40 @@ class ColorSettingsWindow(QDialog):
                         "margin": "3px",
                         "padding": "3px",
                         "padding-top": "10px"
+                    },
+                    "QLineEdit": {
+                        "background-color": "transparent",
+                        "border": f"1px solid {self.get_gradient_css('borders')}" if self.gradient_settings['borders'][
+                            'enabled'] else f"1px solid {self.border_color}",
+                        "border-radius": "3px",
+                        "padding": "5px"
+                    },
+                    "QComboBox": {
+                        "background-color": "transparent",
+                        "border": f"1px solid {self.get_gradient_css('borders')}" if self.gradient_settings['borders'][
+                            'enabled'] else f"1px solid {self.border_color}",
+                        "border-radius": "3px",
+                        "padding": "5px"
+                    },
+                    "QCheckBox": {
+                        "background-color": "transparent",
+                        "padding": "2px"
+                    },
+                    "QCheckBox::indicator": {
+                        "width": "12px",
+                        "height": "12px",
+                        "border": f"1px solid {self.get_gradient_css('borders')}" if self.gradient_settings['borders'][
+                            'enabled'] else f"1px solid {self.border_color}",
+                        "border-radius": "5px",
+                        "padding": "5px"
+                    },
+                    "QCheckBox::indicator:hover": {
+                        "width": "11px",
+                        "height": "11px"
+                    },
+                    "QCheckBox::indicator:checked": {
+                        "background-color": f"{self.get_gradient_css('borders')}" if self.gradient_settings['borders'][
+                            'enabled'] else f"{self.border_color}",
                     },
                     "QTextEdit": {
                         "background": "transparent",
@@ -844,6 +955,10 @@ class ColorSettingsWindow(QDialog):
                         "background-color": f"{self.get_gradient_css('borders')}" if self.gradient_settings['borders'][
                             'enabled'] else f"{self.border_color}",
                         "color": "#ffffff"
+                    },
+                    "QColorDialog QPushButton": {
+                        "padding-left": "5px",
+                        "padding-right": "5px"
                     }
                 }, f, indent=4, ensure_ascii=False)
 
@@ -967,7 +1082,7 @@ class SavePresetDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.Dialog)
-        self.setFixedSize(300, 150)
+        self.setFixedSize(320, 150)
         self.setAttribute(Qt.WA_TranslucentBackground)
         self.init_ui()
 
@@ -1021,7 +1136,7 @@ class SavePresetDialog(QDialog):
 
         # Размещение элементов
         main_layout = QVBoxLayout(self.content_widget)
-        main_layout.setContentsMargins(15, 15, 15, 15)
+        main_layout.setContentsMargins(10, 10, 10, 10)
         main_layout.setSpacing(10)  # Уменьшили отступ
 
         main_layout.addWidget(self.input_field)

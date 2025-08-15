@@ -32,6 +32,10 @@
         "margin": "3px",
         "padding": "3px"
     },
+    "TabWidget::pane": {
+        "margin": "0px",
+        "padding": "0px"
+    },
     "QTabBar::tab:selected": {
         "background-color": "qlineargradient(x1:0.85, y1:0.85, x2:0.15, y2:0.15, stop:0 #0D313A, stop:1 #000000)",
         "color": "#e5e5e5",
@@ -39,6 +43,36 @@
         "margin": "3px",
         "padding": "3px",
         "padding-top": "10px"
+    },
+    "QLineEdit": {
+        "background-color": "transparent",
+        "border": "1px solid #2ad0ca",
+        "border-radius": "3px",
+        "padding": "5px"
+    },
+    "QComboBox": {
+        "background-color": "transparent",
+        "border": "1px solid #2ad0ca",
+        "border-radius": "3px",
+        "padding": "5px"
+    },
+    "QCheckBox": {
+        "background-color": "transparent",
+        "padding": "2px"
+    },
+    "QCheckBox::indicator": {
+        "width": "12px",
+        "height": "12px",
+        "border": "1px solid #2ad0ca",
+        "border-radius": "5px",
+        "padding": "5px"
+    },
+    "QCheckBox::indicator:hover": {
+        "width": "11px",
+        "height": "11px"
+    },
+    "QCheckBox::indicator:checked": {
+        "background-color": "#2ad0ca"
     },
     "QTextEdit": {
         "background": "transparent",
@@ -111,5 +145,9 @@
         "border-radius": "5px",
         "background-color": "#2ad0ca",
         "color": "#ffffff"
+    },
+    "QColorDialog QPushButton": {
+        "padding-left": "5px",
+        "padding-right": "5px"
     }
 }
