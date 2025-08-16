@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import shutil
 import time
 import psutil
@@ -8,7 +9,7 @@ from PyQt5.QtGui import QIcon, QColor
 from PyQt5.QtSvg import QSvgWidget
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QLabel, QPushButton,
-    QVBoxLayout, QGraphicsColorizeEffect, QSizePolicy
+    QVBoxLayout, QGraphicsColorizeEffect, QSizePolicy, QProgressBar
 )
 import sys
 from pathlib import Path
@@ -157,6 +158,8 @@ class UpdateThread(QThread):
                         continue
                     if item == "Update.exe":
                         continue
+                    if item == "log":
+                        continue
 
                     src = os.path.join(update_internal_dir, item)
                     dst = os.path.join(self.root_dir, item)
@@ -197,7 +200,7 @@ class UpdateWindow(QWidget):
         self.thread = None
         self.setWindowIcon(QIcon(get_path('icon.ico')))
         self.style_path = get_path('color.json')
-        self.svg_path = get_path("owl_start.svg")
+        self.svg_path = get_path("logo.svg")
         self.style_manager = ApplyColor(self.style_path)
         self.styles = self.style_manager.load_styles()
         self.init_ui()
@@ -220,12 +223,12 @@ class UpdateWindow(QWidget):
         self.main_widget = QWidget()
         self.main_widget.setStyleSheet("""border-radius:20px""")
         content_layout = QVBoxLayout(self.main_widget)
-        content_layout.setContentsMargins(15, 0, 15, 20)
+        content_layout.setContentsMargins(15, 0, 15, 10)
         content_layout.addStretch()
 
         self.svg_image = QSvgWidget()
         self.svg_image.load(self.svg_path)
-        self.svg_image.setFixedSize(130, 120)
+        self.svg_image.setFixedSize(120, 110)
         self.svg_image.setStyleSheet("""
                             background: transparent;
                             border: none;
@@ -241,10 +244,9 @@ class UpdateWindow(QWidget):
         self.label.setWordWrap(True)
         content_layout.addWidget(self.label)
 
-        self.progress = QLabel("█" * 10)
+        self.progress = QProgressBar()
         self.progress.setFixedWidth(200)
         self.progress.setAlignment(Qt.AlignCenter)
-        self.progress.setStyleSheet("font-family: monospace;")
         self.progress.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
 
         content_layout.addWidget(self.progress)
@@ -420,16 +422,28 @@ class ApplyColor():
             widget.setStyleSheet(self.format_style(self.styles[widget_name]))
 
     def apply_color_svg(self, svg_widget: QSvgWidget, strength: float) -> None:
-        """Применяет цвет к SVG виджету"""
         if "TitleBar" in self.styles and "border-bottom" in self.styles["TitleBar"]:
-            border_parts = self.styles["TitleBar"]["border-bottom"].split()
-            for part in border_parts:
-                if part.startswith('#'):
-                    color_effect = QGraphicsColorizeEffect()
-                    color_effect.setColor(QColor(part))
-                    svg_widget.setGraphicsEffect(color_effect)
-                    color_effect.setStrength(strength)
-                    break
+            border_value = self.styles["TitleBar"]["border-bottom"]
+            color = QColor("#000000")  # Fallback
+
+            # Ищем градиент в любой части строки
+            gradient_match = re.search(r"qlineargradient\([^)]+\)", border_value)
+            if gradient_match:
+                gradient_str = gradient_match.group(0)
+                # Ищем первый цвет градиента
+                color_match = re.search(r"stop:0\s+(#[0-9a-fA-F]+)", gradient_str)
+                if color_match:
+                    color = QColor(color_match.group(1))
+            else:
+                # Стандартная обработка HEX-цвета
+                hex_match = re.search(r"#[0-9a-fA-F]{3,6}", border_value)
+                if hex_match:
+                    color = QColor(hex_match.group(0))
+
+            color_effect = QGraphicsColorizeEffect()
+            color_effect.setColor(color)
+            svg_widget.setGraphicsEffect(color_effect)
+            color_effect.setStrength(strength)
 
     def format_style(self, style_dict):
         """Форматирует стиль в строку"""
@@ -472,6 +486,7 @@ class ApplyColor():
                 progress_style = f"""
                     QProgressBar {{
                         border: 1px solid {self.adjust_color(color, brightness=-30)};
+                        border-radius: 5px;
                         height: 20px;
                         text-align: center;
                     }}

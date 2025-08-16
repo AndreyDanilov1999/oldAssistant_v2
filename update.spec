@@ -2,11 +2,11 @@
 
 block_cipher = None
 
-# Главные файлы проекта
+# Главные файлы проекта (сборка в один файл)
 main_script = 'update_app/update.py'
 additional_files = [
-    ('G:/PycharmProjects/oldAssistant_v2/update_app/color.json', '.'),    # Все будет внутри exe
-    ('G:/PycharmProjects/oldAssistant_v2/update_app/owl_start.svg', '.'),
+    ('G:/PycharmProjects/oldAssistant_v2/update_app/color.json', '.'),
+    ('G:/PycharmProjects/oldAssistant_v2/update_app/logo.svg', '.'),
     ('G:/PycharmProjects/oldAssistant_v2/update_app/icon.ico', '.'),
 ]
 

@@ -1,20 +1,20 @@
 {
     "QWidget": {
-        "background-color": "#0e111e",
-        "color": "#C6DDF8",
+        "background-color": "qlineargradient(x1:0.50, y1:1.00, x2:0.50, y2:0.00, stop:0 #08121F, stop:1 #000000)",
+        "color": "#fffbf8",
         "font-size": "13px"
     },
     "QPushButton": {
-        "background-color": "qlineargradient(x1:1.0, y1:1.0, x2:0.1, y2:0.1, stop:0 #000000, stop:1 #18154B)",
-        "color": "#C6DDF8",
+        "background-color": "qlineargradient(x1:0.50, y1:0.00, x2:0.50, y2:1.00, stop:0 #161638, stop:1 #090b0d)",
+        "color": "#fffbf8",
         "height": "30px",
-        "border": "1px solid #7BB3F6",
+        "border": "1px solid qlineargradient(x1:0.99, y1:0.40, x2:0.01, y2:0.60, stop:0 #1C5BE8, stop:1 #84C7F5)",
         "border-radius": "3px",
         "font-size": "13px"
     },
     "QPushButton:hover": {
-        "background-color": "#02001c",
-        "color": "#C6DDF8",
+        "background-color": "qlineargradient(x1:0.50, y1:0.00, x2:0.50, y2:1.00, stop:0 #090b0d, stop:1 #161638)",
+        "color": "#fffbf8",
         "font-size": "13px"
     },
     "QPushButton:pressed": {
@@ -30,7 +30,7 @@
         "font-size": "15px"
     },
     "TitleBar": {
-        "border-bottom": "1px solid #7BB3F6"
+        "border-bottom": "1px solid qlineargradient(x1:0.99, y1:0.40, x2:0.01, y2:0.60, stop:0 #1C5BE8, stop:1 #532deb)"
     },
     "TrayButton": {
         "background-color": "qlineargradient(x1:1.0, y1:1.0, x2:0.1, y2:0.1, stop:0 #000000, stop:1 #18154B)",

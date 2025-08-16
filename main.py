@@ -113,7 +113,7 @@ class Assistant(QMainWindow):
 
     def __init__(self):
         super().__init__()
-        self.version = "1.4.2"
+        self.version = "1.4.3"
         self.ps = "Powered by theoldman"
         self.label_version = QLabel(f"Версия: {self.version} {self.ps}", self)
         self.label_message = QLabel('', self)
@@ -324,16 +324,16 @@ class Assistant(QMainWindow):
             self.start_svg.setStyleSheet("background: transparent;")
             self.title_bar_layout.addWidget(self.start_win_btn)
 
-            self.minimize_button = QPushButton("─")
-            self.minimize_button.setCursor(QCursor(Qt.PointingHandCursor))
-            self.minimize_button.setObjectName("TrayButton")
-            self.minimize_button.clicked.connect(self.custom_hide)
-            self.minimize_button.setFixedSize(25, 25)
-            self.title_bar_layout.addWidget(self.minimize_button)
+            # self.minimize_button = QPushButton("─")
+            # self.minimize_button.setCursor(QCursor(Qt.PointingHandCursor))
+            # self.minimize_button.setObjectName("TrayButton")
+            # self.minimize_button.clicked.connect(self.custom_hide)
+            # self.minimize_button.setFixedSize(25, 25)
+            # self.title_bar_layout.addWidget(self.minimize_button)
 
             self.close_button = QPushButton("✕")
             self.close_button.setCursor(QCursor(Qt.PointingHandCursor))
-            self.close_button.clicked.connect(self.close)
+            self.close_button.clicked.connect(self.custom_hide)
             self.close_button.setFixedSize(25, 25)
             self.close_button.setObjectName("CloseButton")
             self.title_bar_layout.addWidget(self.close_button)
@@ -2931,7 +2931,7 @@ class UpdateApp(QDialog):
             return
         debug_logger.info(f"Архив с новой версией распакован по пути {self.extract_dir}")
         self.assistant.show_notification_message("Начинаю установку...")
-        QTimer.singleShot(500, lambda: self.start_update())
+        QTimer.singleShot(800, lambda: self.start_update())
 
     def start_update(self):
         try:
