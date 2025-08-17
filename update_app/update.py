@@ -120,7 +120,7 @@ class UpdateThread(QThread):
             self.update_complete.emit(False)
 
     def delete_old_files(self):
-        preserved = ["user_settings", "update", "update_pack"]
+        preserved = ["user_settings", "update", "update_pack", "log"]
 
         # Удаление внутри self.root_dir (как раньше)
         for item in os.listdir(self.root_dir):
@@ -343,7 +343,7 @@ class UpdateWindow(QWidget):
     def set_status(self, text, progress=None):
         self.label.setText(text)
         if progress is not None:
-            self.progress.setText("█" * int(progress / 5))
+            self.progress.setValue(progress)
 
     def show_error(self, message):
         self.label.setText(message)
@@ -352,47 +352,6 @@ class UpdateWindow(QWidget):
     def quit_application(self):
         sys.exit(1)
 
-#     def start_update_process(self):
-#         if self.thread is not None:
-#             return  # Защита от повторного запуска
-#
-#         self.label.setText("Запуск имитации обновления...")
-#
-#         # === ВРЕМЕННАЯ ЗАМЕНА: используем имитацию ===
-#         self.thread = MockUpdateThread()
-#         # ==========================================
-#
-#         self.thread.status_update.connect(self.set_status)
-#         self.thread.update_complete.connect(self.on_update_complete)
-#         self.thread.start()
-#
-# class MockUpdateThread(QThread):
-#     status_update = pyqtSignal(str, int)  # сообщение, процент
-#     update_complete = pyqtSignal(bool, str)
-#
-#     def __init__(self):
-#         super().__init__()
-#
-#     def run(self):
-#         steps = [
-#             "Подготовка...",
-#             "Анализ обновления...",
-#             "Копирование файлов...",
-#             "Обновление конфигураций...",
-#             "Очистка временных файлов..."
-#         ]
-#
-#         for i, step in enumerate(steps):
-#             # Имитация работы
-#             for progress in range(0, 101, 5):  # 0, 5, 10, ..., 100
-#                 self.status_update.emit(f"{step} {progress}%", progress + i * 20 // len(steps))
-#                 time.sleep(0.03)  # Задержка для плавности
-#
-#             # Небольшая пауза между шагами
-#             time.sleep(0.2)
-#
-#         # Завершаем
-#         self.update_complete.emit(True, "Обновление успешно завершено")
 
 class ApplyColor():
     def __init__(self, new_color=None, parent=None):
