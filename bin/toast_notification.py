@@ -29,7 +29,7 @@ class ToastNotification(QDialog):
             self.parent.installEventFilter(self)
         self.timeout = timeout
         self.message = message
-        self.svg_path = get_path("bin", "owl_start.svg")
+        self.svg_path = get_path("bin", "logo.svg")
         self.style_path = get_path('user_settings', 'color_settings.json')
         self.style_manager = ApplyColor(self)
         self.styles = self.style_manager.load_styles()
