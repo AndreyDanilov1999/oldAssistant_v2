@@ -358,14 +358,31 @@ class SmartWidget(QWidget):
         buttons_layout.setSpacing(0)
 
         buttons_config = {
-            'power_btn': {'icon': self.power_path, 'tooltip': 'Выключить Компьютер', 'action': self.shutdown_system},
-            'settings_btn': {'icon': self.settings_path, 'tooltip': 'Открыть настройки', 'action': self.open_settings},
-            'scrn_folder_btn': {'icon': self.camera_path, 'tooltip': 'Открыть папку скриншотов',
-                                'action': self.assistant.open_folder_screenshots},
-            'link_btn': {'icon': self.shortcut_path, 'tooltip': 'Открыть папку с ярлыками',
-                         'action': self.assistant.open_folder_shortcuts},
-            'open_main_btn': {'icon': self.open_main_path, 'tooltip': 'Развернуть основное окно',
-                              'action': self.open_main_window}
+            'power_btn': {
+                'icon': self.power_path,
+                'tooltip': 'Выключить Компьютер',
+                'action': self.shutdown_system
+            },
+            'settings_btn': {
+                'icon': self.settings_path,
+                'tooltip': 'Открыть настройки',
+                'action': self.open_settings
+            },
+            'screen_btn': {
+                'icon': self.camera_path,
+                'tooltip': 'Скриншот области',
+                'action': self.assistant.capture_area
+            },
+            'link_btn': {
+                'icon': self.shortcut_path,
+                'tooltip': 'Открыть папку с ярлыками',
+                'action': self.assistant.open_folder_shortcuts
+            },
+            'open_main_btn': {
+                'icon': self.open_main_path,
+                'tooltip': 'Развернуть основное окно',
+                'action': self.open_main_window
+            }
         }
 
         for btn_name, config in buttons_config.items():
@@ -412,7 +429,7 @@ class SmartWidget(QWidget):
         layout.addStretch()
         for btn_name, config in player_config.items():
             btn = QPushButton()
-            btn.setFixedSize(20, 20)
+            btn.setFixedSize(25, 20)
             btn.setToolTip(config['tooltip'])
             btn.setStyleSheet("""
                 QPushButton {
@@ -424,8 +441,8 @@ class SmartWidget(QWidget):
                 }
             """)
             svg = QSvgWidget(config['icon'], btn)
-            svg.setFixedSize(18, 18)
-            svg.move(1, 1)
+            svg.setFixedSize(20, 20)
+            svg.move(3, 0)
             self.player_buttons[btn_name] = {'button': btn, 'svg': svg}
             self.style_manager.apply_color_svg(svg, strength=0.90)
             btn.clicked.connect(config['action'])
