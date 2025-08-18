@@ -731,7 +731,12 @@ class SmartWidget(QWidget):
             # Создаем кастомное окно вместо QMessageBox
             confirm_dialog = QDialog(self)
             confirm_dialog.setWindowFlags(Qt.Dialog | Qt.FramelessWindowHint)
-            confirm_dialog.setFixedSize(110, 80)
+            confirm_dialog.setFixedSize(120, 70)
+            confirm_dialog.setStyleSheet(
+                "background-color: rgba(60, 60, 60, 100);"
+                "border: none;"
+                "border-radius: 5px;"
+            )
 
             # Основной контейнер
             main_layout = QVBoxLayout(confirm_dialog)
@@ -746,12 +751,14 @@ class SmartWidget(QWidget):
                     color: white;
                     font-size: 12px;
                     padding: 0;
+                    background-color: transparent;
                 }
             """)
             main_layout.addWidget(label)
 
             # Контейнер для кнопок
             btn_container = QWidget()
+            btn_container.setStyleSheet("background: transparent")
             btn_layout = QHBoxLayout(btn_container)
             btn_layout.setContentsMargins(0, 0, 0, 0)
             btn_layout.setSpacing(5)
@@ -771,6 +778,9 @@ class SmartWidget(QWidget):
                     width: 20px;
                     height: 20px;
                     font-size: 12px;
+                }
+                QPushButton:hover {
+                    background: rgba(70, 70, 70, 240);
                 }
             """
             yes_btn.setStyleSheet(btn_style)

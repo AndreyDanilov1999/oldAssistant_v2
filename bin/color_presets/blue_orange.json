@@ -77,7 +77,7 @@
     "QTextEdit": {
         "background": "transparent",
         "color": "#fff4ee",
-        "border": "1px solid",
+        "border": "none",
         "border-radius": "4px",
         "font-size": "15px"
     },

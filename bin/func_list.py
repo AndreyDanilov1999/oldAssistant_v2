@@ -515,7 +515,8 @@ def open_link(filename, target_path, arguments, workdir):
             cwd=workdir,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            shell=True
+            env=os.environ,
+            shell=False
         )
 
         # Логирование в фоне

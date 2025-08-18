@@ -16,7 +16,7 @@ from bin.apply_color_methods import ApplyColor
 from bin.check_update import load_changelog, VersionCheckThread
 from bin.download_thread import DownloadThread, SliderProgressBar
 from bin.init import InitScreen
-from bin.signals import gui_signals, color_signal, progress_signal
+from bin.signals import gui_signals, color_signal, progress_signal, commands_signal
 from bin.toast_notification import ToastNotification, SimpleNotice
 from bin.widget_window import SmartWidget
 ctypes.windll.user32.SetProcessDPIAware()
@@ -38,8 +38,8 @@ from PyQt5.QtSvg import QSvgWidget
 from packaging import version
 import psutil
 import winsound
-from bin.commands_settings_window import CommandSettingsWindow
-from bin.other_options_window import CensorCounterWidget, CheckUpdateWidget, DebugLoggerWidget, \
+from bin.commands_widgets import CreateCommandsWidget, CommandsWidget, ProcessLinksWidget
+from bin.other_options_widgets import CensorCounterWidget, CheckUpdateWidget, DebugLoggerWidget, \
     RelaxWidget
 from bin.func_list import handler_links, handler_folder
 from bin.function_list_main import *
@@ -48,7 +48,7 @@ import threading
 import sounddevice as sd
 import subprocess
 from bin.audio_control import controller
-from bin.settings_window import SettingsWidget, InterfaceWidget, OtherSettingsWidget
+from bin.settings_widgets import SettingsWidget, InterfaceWidget, OtherSettingsWidget
 from bin.speak_functions import thread_react_detail, thread_react, react
 from logging_config import logger, debug_logger
 from bin.lists import get_audio_paths
@@ -113,7 +113,7 @@ class Assistant(QMainWindow):
 
     def __init__(self):
         super().__init__()
-        self.version = "1.4.4"
+        self.version = "1.4.5"
         self.ps = "Powered by theoldman"
         self.label_version = QLabel(f"Версия: {self.version} {self.ps}", self)
         self.label_message = QLabel('', self)
@@ -136,6 +136,7 @@ class Assistant(QMainWindow):
         gui_signals.open_widget_signal.connect(self.open_widget)
         gui_signals.close_widget_signal.connect(self.close_widget)
         color_signal.color_changed.connect(self.update_colors)
+        commands_signal.commands_updated.connect(self.save_commands)
         self.last_position = 0
         self.MEMORY_LIMIT_MB = 1024
         self.log_file_path = get_path('assistant.log')
@@ -161,6 +162,9 @@ class Assistant(QMainWindow):
         self.icon_logs_path = get_path("bin", "icons", "logs.svg")
         self.icon_censor_path = get_path("bin", "icons", "censor.svg")
         self.icon_relax_path = get_path("bin", "icons", "relax.svg")
+        self.icon_create_command_path = get_path("bin", "icons", "commands.svg")
+        self.icon_added_commands_path = get_path("bin", "icons", "commands_list.svg")
+        self.icon_process_link_path = get_path("bin", "icons", "process_link.svg")
         self.style_manager = ApplyColor(self)
         self.color_path = self.style_manager.color_path
         self.styles = self.style_manager.load_styles()
@@ -247,7 +251,7 @@ class Assistant(QMainWindow):
         self.assist_name3 = self.settings.get('assist_name3', "джо")
         self.speaker = self.settings.get("voice", "johnny")
         self.volume_assist = self.settings.get('volume_assist', 0.2)
-        self.steam_path = self.settings.get('steam_path', 'D:/Steam/steam.exe')
+        self.steam_path = self.settings.get('steam_path', '')
         self.is_censored = self.settings.get('is_censored', False)
         self.show_upd_msg = self.settings.get("show_upd_msg", False)
         self.is_min_tray = self.settings.get("minimize_to_tray", False)
@@ -324,13 +328,6 @@ class Assistant(QMainWindow):
             self.start_svg.setStyleSheet("background: transparent;")
             self.title_bar_layout.addWidget(self.start_win_btn)
 
-            # self.minimize_button = QPushButton("─")
-            # self.minimize_button.setCursor(QCursor(Qt.PointingHandCursor))
-            # self.minimize_button.setObjectName("TrayButton")
-            # self.minimize_button.clicked.connect(self.custom_hide)
-            # self.minimize_button.setFixedSize(25, 25)
-            # self.title_bar_layout.addWidget(self.minimize_button)
-
             self.close_button = QPushButton("✕")
             self.close_button.setCursor(QCursor(Qt.PointingHandCursor))
             self.close_button.clicked.connect(self.custom_hide)
@@ -348,7 +345,6 @@ class Assistant(QMainWindow):
 
             # === ЛЕВАЯ ЧАСТЬ: Контейнер с динамической шириной ===
             self.left_container = QWidget()
-            # self.left_container.setFixedWidth(250)
             self.left_container.setMaximumWidth(250)
             self.left_container_layout = QVBoxLayout(self.left_container)
             self.left_container_layout.setContentsMargins(5, 5, 5, 5)
@@ -1182,6 +1178,16 @@ class Assistant(QMainWindow):
             debug_logger.error(f"Ошибка при загрузке команд из файла {file_path}: {e}")
             return {}
 
+    def save_commands(self):
+        """Централизованное сохранение команд"""
+        try:
+            path = get_path('user_settings', 'commands.json')
+            with open(path, 'w', encoding='utf-8') as file:
+                json.dump(self.commands, file, ensure_ascii=False, indent=4)
+
+        except Exception as e:
+            logger.error(f"Ошибка сохранения команд: {e}")
+
     def load_settings(self):
         """Загружает настройки из settings.json."""
         try:
@@ -1233,7 +1239,7 @@ class Assistant(QMainWindow):
                 "assistant_name": "джо",
                 "assist_name2": "джо",
                 "assist_name3": "джо",
-                "steam_path": "D:/Steam/steam.exe",
+                "steam_path": "",
                 "is_censored": True,
                 "volume_assist": 0.2,
                 "show_upd_msg": True,
@@ -2259,7 +2265,7 @@ class Assistant(QMainWindow):
             self.show_message("Ошибка", "error")
 
     def show_widget(self):
-        """Открывает панель настроек: сначала сжимаем, потом расширяем с панелью настроек"""
+        """Открывает панель настроек: сначала сжимаем, потом расширяем с изменяемой панелью"""
         # Анимация сжатия левой панели
         self._load_current_panel()
         self.show_layout(self.compact_layout)
@@ -2269,7 +2275,7 @@ class Assistant(QMainWindow):
         self.animation.setPropertyName(b"maximumWidth")
         self.animation.setStartValue(220)
         self.animation.setEndValue(1)
-        self.animation.setDuration(500)
+        self.animation.setDuration(400)
         self.animation.setEasingCurve(QEasingCurve.InBack)
         # После сжатия — начинаем расширение с панелью настроек
         self.animation.finished.connect(self._expand_mutable_panel)
@@ -2282,8 +2288,8 @@ class Assistant(QMainWindow):
         self.mutable_panel.show()
 
         self.animation.setStartValue(1)
-        self.animation.setEndValue(400)
-        self.animation.setDuration(500)
+        self.animation.setEndValue(self._get_panel_width())
+        self.animation.setDuration(400)
         self.animation.setEasingCurve(QEasingCurve.OutBack)
         self.animation.start()
 
@@ -2314,6 +2320,12 @@ class Assistant(QMainWindow):
                 self._animate_content_switch(self._load_guide_panel)
             else:
                 self._load_guide_panel()
+        elif self._current_panel == 'commands':
+            if self.mutable_panel.isVisible():
+                # Если панель уже видна - анимируем переключение
+                self._animate_content_switch(self._load_commands_panel)
+            else:
+                self._load_commands_panel()
 
     def hide_widget(self):
         """Закрывает панель настроек"""
@@ -2326,9 +2338,9 @@ class Assistant(QMainWindow):
         # Сжимаем
         self.animation.stop()
         self.animation.setPropertyName(b"maximumWidth")
-        self.animation.setStartValue(400)
+        self.animation.setStartValue(self._get_panel_width())
         self.animation.setEndValue(1)
-        self.animation.setDuration(500)
+        self.animation.setDuration(400)
         self.animation.setEasingCurve(QEasingCurve.InBack)
         self.animation.finished.connect(self._restore_buttons_panel)
         self.animation.start()
@@ -2379,10 +2391,14 @@ class Assistant(QMainWindow):
 
         # Анимация расширения
         self.animation.setStartValue(1)
-        self.animation.setEndValue(400)
+        self.animation.setEndValue(self._get_panel_width())
         self.animation.setDuration(350)
         self.animation.setEasingCurve(QEasingCurve.OutBack)
         self.animation.start()
+
+    def _get_panel_width(self):
+        """Возвращает ширину панели в зависимости от текущего контента"""
+        return 500 if self._current_panel == 'commands' else 400
 
     def _load_settings_panel(self):
         """Инициализация виджетов настроек с SVG на вкладках"""
@@ -2414,7 +2430,7 @@ class Assistant(QMainWindow):
             self.svg_settings_list.append({"svg": svg})
             container = QWidget()
             layout = QHBoxLayout(container)
-            layout.setContentsMargins(8, 0, 0, 5)
+            layout.setContentsMargins(10, 0, 0, 5)
             layout.addStretch()
             layout.addWidget(svg)
             layout.addStretch()
@@ -2429,29 +2445,79 @@ class Assistant(QMainWindow):
         self.tabs.setTabToolTip(2, "Настройки интерфейса")
 
         self.mutable_layout.addWidget(self.tabs)
-        self.mutable_layout.addSpacerItem(QSpacerItem(400, 1, QSizePolicy.Fixed, QSizePolicy.Fixed))
+        self.mutable_layout.addSpacerItem(QSpacerItem(self._get_panel_width(), 1, QSizePolicy.Fixed, QSizePolicy.Fixed))
 
         if isinstance(self.tabs.widget(0), SettingsWidget):
             self.tabs.widget(0).voice_changed.connect(self.update_voice)
 
     def open_commands_settings(self):
-        """Обработка нажатия кнопки 'Ваши команды'"""
+        """Открывает встроенную панель 'Ваши Команды'"""
         try:
-            # Создаем окно настроек с анимацией
-            settings_window = CommandSettingsWindow(self)
-            settings_window.commands_updated.connect(self.reload_commands)
+            if self.mutable_panel.isVisible() and self._current_panel == 'commands':
+                self.hide_widget()
+                return
 
-            settings_window.show()
+            self._current_panel = 'commands'
 
+            if self.mutable_panel.isVisible():
+                # Уже открыто — запускаем анимацию переключения
+                self._load_current_panel()
+            else:
+                self.show_widget()  # Запускаем анимацию открытия
         except Exception as e:
             debug_logger.error(f"Ошибка при открытии настроек команд: {e}", exc_info=True)
             self.show_message(f"Ошибка при открытии настроек команд: {str(e)}", "Ошибка", "error")
 
+    def _load_commands_panel(self):
+        """Инициализация виджетов настроек с SVG на вкладках"""
+        if not hasattr(self, 'mutable_layout') or self.mutable_layout is None:
+            return
+        self.svg_settings_list = []
+        self._clear_mutable_panel()
+
+        self.tabs = QTabWidget()
+        self.tabs.setObjectName("CommandsTabs")
+        self.tabs.setDocumentMode(True)
+
+        # Создаем виджеты для содержимого вкладок
+        new_com_widget = CreateCommandsWidget(self)
+        added_com_widget = CommandsWidget(self)
+        process_links_widget = ProcessLinksWidget(self)
+
+        self.tabs.addTab(new_com_widget, "")
+        self.tabs.addTab(added_com_widget, "")
+        self.tabs.addTab(process_links_widget, "")
+
+        tab_bar = self.tabs.tabBar()
+
+        def create_centered_svg_tab(svg_path):
+            svg = QSvgWidget(svg_path)
+            svg.setFixedSize(32, 32)
+            svg.setStyleSheet("background: transparent;")
+            self.style_manager.apply_color_svg(svg, strength=0.90)
+            self.svg_settings_list.append({"svg": svg})
+            container = QWidget()
+            layout = QHBoxLayout(container)
+            layout.setContentsMargins(10, 0, 0, 5)
+            layout.addStretch()
+            layout.addWidget(svg)
+            layout.addStretch()
+            return container
+
+        tab_bar.setTabButton(0, QTabBar.LeftSide, create_centered_svg_tab(self.icon_create_command_path))
+        tab_bar.setTabButton(1, QTabBar.LeftSide, create_centered_svg_tab(self.icon_added_commands_path))
+        tab_bar.setTabButton(2, QTabBar.LeftSide, create_centered_svg_tab(self.icon_process_link_path))
+
+        self.tabs.setTabToolTip(0, "Создание новых команд")
+        self.tabs.setTabToolTip(1, "Список ваших команд")
+        self.tabs.setTabToolTip(2, "Процессы ярлыков")
+
+        self.mutable_layout.addWidget(self.tabs)
+        self.mutable_layout.addSpacerItem(QSpacerItem(self._get_panel_width() + 30, 1, QSizePolicy.Fixed, QSizePolicy.Fixed))
+
     def other_options(self):
         """Открывает встроенную панель 'Прочее'"""
         try:
-            # self.close_child_windows.connect(self.hide_widget)
-            # Если панель уже открыта и это 'прочее' — закрываем
             if self.mutable_panel.isVisible() and hasattr(self, '_current_panel') and self._current_panel == 'other':
                 self.hide_widget()
                 return
@@ -2499,7 +2565,7 @@ class Assistant(QMainWindow):
             self.svg_others_list.append({"svg": svg})
             container = QWidget()
             layout = QHBoxLayout(container)
-            layout.setContentsMargins(8, 0, 0, 5)
+            layout.setContentsMargins(10, 0, 0, 5)
             layout.addStretch()
             layout.addWidget(svg)
             layout.addStretch()
@@ -2527,7 +2593,7 @@ class Assistant(QMainWindow):
 
         # Добавляем в layout
         self.mutable_layout.addWidget(self.tabs)
-        self.spacer = QSpacerItem(400, 1, QSizePolicy.Fixed, QSizePolicy.Fixed)
+        self.spacer = QSpacerItem(self._get_panel_width(), 1, QSizePolicy.Fixed, QSizePolicy.Fixed)
         self.mutable_layout.addSpacerItem(self.spacer)
 
     def guide_options(self):
@@ -2557,7 +2623,7 @@ class Assistant(QMainWindow):
         self.main_layout = QVBoxLayout(self.main)
         self.main_layout.setContentsMargins(5, 5, 5, 5)
 
-        self.spacer = QSpacerItem(400, 1, QSizePolicy.Fixed, QSizePolicy.Fixed)
+        self.spacer = QSpacerItem(self._get_panel_width(), 1, QSizePolicy.Fixed, QSizePolicy.Fixed)
         self.main_layout.addSpacerItem(self.spacer)
         # Заголовок
         label = QLabel("🎥 Обучение")

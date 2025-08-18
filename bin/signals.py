@@ -17,3 +17,8 @@ class ProgressBarSignals(QObject):
     stop_progress = pyqtSignal()
 
 progress_signal = ProgressBarSignals()
+
+class CommandsChangeSignal(QObject):
+    commands_updated = pyqtSignal()
+
+commands_signal = CommandsChangeSignal()

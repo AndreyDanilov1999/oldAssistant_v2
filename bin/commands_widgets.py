@@ -1,204 +1,31 @@
 import json
 import os
-from PyQt5.QtCore import pyqtSignal, Qt, QStringListModel, QPropertyAnimation, QEasingCurve, QRect, \
-    QParallelAnimationGroup, QSize
+from PyQt5.QtCore import Qt, QStringListModel
+from PyQt5.QtGui import QFont
 from PyQt5.QtWidgets import QFileDialog, QPushButton, QLineEdit, QLabel, QComboBox, \
     QVBoxLayout, QWidget, QDialog, QFrame, QStackedWidget, QHBoxLayout, QListWidget, QListWidgetItem, \
-    QInputDialog, QSizePolicy, QCompleter, QDialogButtonBox, QMessageBox
+    QCompleter, QDialogButtonBox, QMessageBox
 from bin.func_list import search_links, scan_and_copy_shortcuts
-from logging_config import logger, debug_logger
+from bin.signals import commands_signal
+from logging_config import debug_logger
 from path_builder import get_path
 
-
-class CommandSettingsWindow(QDialog):
-    """
-    Окно настроек команд с анимацией появления/исчезания
-    """
-    commands_updated = pyqtSignal(dict)
-
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.assistant = parent
-        self.current_commands = parent.commands.copy() if hasattr(parent,
-                                                                  'commands') else {}  # Центральное хранилище команд
-        # Подключаем сигнал родителя к слоту закрытия
-        if parent and hasattr(parent, "close_child_windows"):
-            parent.close_child_windows.connect(self.hide_with_animation)
-        self.load_commands()
-        self.setWindowFlags(Qt.FramelessWindowHint | Qt.Dialog)
-        self.setFixedSize(parent.width(), parent.height())
-        self.setAttribute(Qt.WA_TranslucentBackground)  # Для эффектов прозрачности
-
-        self.opacity_animation = QPropertyAnimation(self, b"windowOpacity")
-        self.opacity_animation.setDuration(300)
-
-        self.init_ui()
-        self.setup_animation()
-
-    def setup_animation(self):
-        # Позиционируем по центру родительского окна
-        parent_center = self.assistant.geometry().center()
-        self.move(parent_center.x() - self.width() // 2,
-                  parent_center.y() - self.height() // 2)
-
-    def init_ui(self):
-        # Главный контейнер
-        self.container = QWidget(self)
-        self.container.setObjectName("SettingsContainer")
-        self.container.setGeometry(0, 0, self.width(), self.height() - 120)
-
-        # Кастомный заголовок
-        self.title_bar = QWidget(self.container)
-        self.title_bar.setObjectName("TitleBar")
-        self.title_bar.setGeometry(0, 0, self.container.width(), 35)
-        self.title_bar_layout = QHBoxLayout(self.title_bar)
-        self.title_bar_layout.setContentsMargins(10, 5, 10, 5)
-
-        self.title_label = QLabel("Настройки команд")
-        self.title_label.setStyleSheet("background: transparent;")
-        self.title_bar_layout.addWidget(self.title_label)
-        self.title_bar_layout.addStretch()
-
-        self.close_btn = QPushButton("✕", self.title_bar)
-        self.close_btn.setFixedSize(25, 25)
-        self.close_btn.setObjectName("CloseButton")
-        self.close_btn.clicked.connect(self.hide_with_animation)
-        self.title_bar_layout.addWidget(self.close_btn)
-
-        # Основной layout под заголовком
-        main_layout = QHBoxLayout()
-        main_layout.setContentsMargins(0, 40, 0, 0)  # Отступ под заголовком
-        self.container.setLayout(main_layout)
-
-        # Левая панель с кнопками
-        self.tabs_container = QWidget()
-        self.tabs_container.setFixedWidth(200)
-        self.tabs_container.setObjectName("TabsContainer")
-
-        self.tabs_layout = QVBoxLayout(self.tabs_container)
-        self.tabs_layout.setContentsMargins(5, 15, 5, 10)
-        self.tabs_layout.setSpacing(5)
-        self.tabs_layout.setAlignment(Qt.AlignTop)
-
-        # Правая панель с контентом
-        self.right_column = QStackedWidget()
-        self.right_column.setObjectName("ContentStack")
-
-        # Разделитель
-        separator = QFrame()
-        separator.setFrameShape(QFrame.VLine)
-        separator.setFrameShadow(QFrame.Sunken)
-
-        # Компоновка
-        main_layout.addWidget(self.tabs_container)
-        main_layout.addWidget(separator)
-        main_layout.addWidget(self.right_column)
-
-        # Добавляем вкладки
-        self.add_tab("Создание команд", CreateCommandsWidget(self.assistant, self))
-        self.add_tab("Ваши Команды", CommandsWidget(self.assistant, self))
-        self.add_tab("Процессы ярлыков", ProcessLinksWidget(self.assistant))
-
-    def keyPressEvent(self, event):
-        """Переопределяем обработку нажатия клавиш"""
-        if event.key() == Qt.Key_Escape:
-            # Только Escape закрывает окно
-            if self.opacity_animation.state() != QPropertyAnimation.Running:
-                self.hide_with_animation()
-            event.accept()
-        elif event.key() == Qt.Key_Return or event.key() == Qt.Key_Enter:
-            # Игнорируем Enter, чтобы он не закрывал диалог
-            event.ignore()
-        else:
-            super().keyPressEvent(event)
-
-    def add_tab(self, button_name, content_widget):
-        button = QPushButton(button_name)
-        button.setFixedHeight(30)
-        button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-
-        if button_name == "Ваши Команды":
-            self.commands_widget = content_widget
-            self.commands_updated.connect(self.commands_widget.on_commands_updated)
-
-        self.tabs_layout.addWidget(button)
-        self.right_column.addWidget(content_widget)
-        button.clicked.connect(lambda: self.right_column.setCurrentWidget(content_widget))
-
-    def showEvent(self, event):
-        """Анимация появления"""
-        self.setWindowOpacity(0.0)
-        self.raise_()
-
-        self.opacity_animation.stop()
-        self.opacity_animation.setStartValue(0.0)
-        self.opacity_animation.setEndValue(1.0)
-        self.opacity_animation.start()
-
-        super().showEvent(event)
-
-    def hide_with_animation(self):
-        """Анимация исчезания"""
-        self.opacity_animation.stop()
-        self.opacity_animation.setStartValue(1.0)
-        self.opacity_animation.setEndValue(0.0)
-        self.opacity_animation.finished.connect(self.hide)
-        self.opacity_animation.start()
-
-    def hideEvent(self, event):
-        """Сброс состояния"""
-        self.opacity_animation.finished.disconnect(self.hide)
-        self.setWindowOpacity(1.0)
-        super().hideEvent(event)
-
-    def load_commands(self):
-        """Централизованная загрузка команд"""
-        try:
-            path = get_path('user_settings', 'commands.json')
-            if os.path.exists(path):
-                with open(path, 'r', encoding='utf-8') as file:
-                    self.current_commands = json.load(file)
-            else:
-                self.current_commands = {}
-        except Exception as e:
-            logger.error(f"Ошибка загрузки команд: {e}")
-            self.current_commands = {}
-
-    def save_commands(self):
-        """Централизованное сохранение команд с уведомлением"""
-        try:
-            path = get_path('user_settings', 'commands.json')
-            with open(path, 'w', encoding='utf-8') as file:
-                json.dump(self.current_commands, file, ensure_ascii=False, indent=4)
-
-            if hasattr(self.assistant, 'commands'):
-                self.assistant.commands = self.current_commands.copy()
-
-            self.load_commands()
-        except Exception as e:
-            logger.error(f"Ошибка сохранения команд: {e}")
-
-    def handle_commands_change(self, new_commands):
-        """Обработчик изменений из дочерних виджетов"""
-        self.current_commands = new_commands
-        self.save_commands()  # Будет испущен сигнал commands_updated
 
 class CreateCommandsWidget(QWidget):
     """
     Виджет создания команд с динамическим отображением форм
     """
 
-    def __init__(self, assistant, settings_window, parent=None):
+    def __init__(self, assistant, parent=None):
         super().__init__(parent)
         self.assistant = assistant
-        self.settings_window = settings_window
         self.current_form = None  # Текущая активная форма
         self.init_ui()
 
     def init_ui(self):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(15, 15, 15, 15)
-        layout.setSpacing(20)
+        layout.setSpacing(15)
 
         # Заголовок
         title = QLabel("Для чего создаем команду?")
@@ -233,6 +60,12 @@ class CreateCommandsWidget(QWidget):
 
         layout.addStretch()
 
+        self.ps = QLabel("Внимание! Перед присвоением команды попробуйте сказать нужную фразу и "
+                         "сверьте распознанный вариант в окне логов. (Инструкция во вкладке 'Гайды')")
+        self.ps.setWordWrap(True)
+        self.ps.setStyleSheet("background-color: transparent")
+        layout.addWidget(self.ps)
+
         self.search_btn = QPushButton("Автопоиск ярлыков")
         self.search_btn.clicked.connect(self.autosearch_shortcuts)
         layout.addWidget(self.search_btn)
@@ -247,18 +80,14 @@ class CreateCommandsWidget(QWidget):
         if hasattr(self.shortcut_form, 'refresh_shortcuts'):
             self.shortcut_form.refresh_shortcuts()
 
-        # Отправляем сигнал об обновлении команд
-        if hasattr(self.parent(), 'commands_updated'):
-            self.parent().commands_updated.emit()
-
     def create_forms(self):
         """Создаем все формы заранее"""
         # Форма для ярлыка
-        self.shortcut_form = AppCommandForm(self.assistant, self.settings_window)
+        self.shortcut_form = AppCommandForm(self.assistant)
         self.form_container.addWidget(self.shortcut_form)
 
         # Форма для папки
-        self.folder_form = FolderCommandForm(self.assistant, self.settings_window)
+        self.folder_form = FolderCommandForm(self.assistant)
         self.form_container.addWidget(self.folder_form)
 
         # Изначально скрываем все формы
@@ -280,37 +109,43 @@ class CreateCommandsWidget(QWidget):
 
 
 class AppCommandForm(QWidget):
-    def __init__(self, assistant, settings_window, parent=None):
+    def __init__(self, assistant, parent=None):
         super().__init__(parent)
         self.assistant = assistant
-        self.settings_window = settings_window
         search_links()
         self.init_ui()
 
     def init_ui(self):
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(5, 5, 5, 5)
+        layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(5)
         layout.addStretch()
 
         self.key_input = QLineEdit(self)
         self.key_input.setPlaceholderText("Введите команду (например: 'браузер')")
         self.key_input.returnPressed.connect(self.apply_command)  # Обработка нажатия Enter
+
+        # Label для ошибок
+        self.error_label = QLabel(self)
+        self.error_label.setStyleSheet("color: red; font-size: 11px; background-color: transparent; height: 15px;")
+
         self.label_command = QLabel("Команда (уникальное слово):")
         self.label_command.setStyleSheet("background: transparent;")
-        layout.addWidget(self.label_command)
-        layout.addWidget(self.key_input)
 
         self.shortcut_combo = SearchComboBox(self)
         self.load_shortcuts()
         self.shortcut_combo.lineEdit().returnPressed.connect(self.apply_command)  # Обработка нажатия Enter
         self.label_link = QLabel("Выберите ярлык:")
         self.label_link.setStyleSheet("background: transparent;")
-        layout.addWidget(self.label_link)
-        layout.addWidget(self.shortcut_combo)
 
         self.apply_button = QPushButton("Добавить команду", self)
         self.apply_button.clicked.connect(self.apply_command)
+
+        layout.addWidget(self.label_command)
+        layout.addWidget(self.key_input)
+        layout.addWidget(self.error_label)
+        layout.addWidget(self.label_link)
+        layout.addWidget(self.shortcut_combo)
         layout.addWidget(self.apply_button)
 
     def load_shortcuts(self):
@@ -320,7 +155,7 @@ class AppCommandForm(QWidget):
                 links = json.load(file)
                 self.shortcut_combo.updateModel(links)
         except Exception as e:
-            logger.error(f"Ошибка загрузки ярлыков: {e}")
+            debug_logger.error(f"Ошибка загрузки ярлыков: {e}")
 
     def refresh_shortcuts(self):
         current_selection = self.shortcut_combo.currentText()
@@ -332,65 +167,86 @@ class AppCommandForm(QWidget):
                 if current_selection in links:
                     self.shortcut_combo.setCurrentText(current_selection)
         except Exception as e:
-            logger.error(f"Ошибка загрузки ярлыков: {e}")
+            debug_logger.error(f"Ошибка загрузки ярлыков: {e}")
 
     def apply_command(self):
         key = self.key_input.text().strip().lower()
         selected_name = self.shortcut_combo.currentFileName()
 
         if not key:
-            self.assistant.show_message("Команда не может быть пустой!", "Предупреждение", "warning")
+            self.show_error("Команда не может быть пустой!")
             return
 
-        if key in self.settings_window.current_commands:
-            self.assistant.show_message(f"Команда '{key}' уже существует!", "Предупреждение", "warning")
+        if key in self.assistant.commands:
+            self.show_error(f"Команда '{key}' уже существует!")
             return
 
         if not selected_name:
-            self.assistant.show_message("Пожалуйста, выберите ярлык из списка!", "Предупреждение", "warning")
+            self.show_error("Пожалуйста, выберите ярлык из списка!")
             return
 
-        self.settings_window.current_commands[key] = selected_name
-        self.settings_window.save_commands()
-        self.settings_window.commands_updated.emit(self.settings_window.current_commands)
+        self.assistant.commands[key] = selected_name
+        commands_signal.commands_updated.emit()
         self.assistant.show_notification_message(message=f"Команда '{key}' добавлена!")
         self.key_input.clear()
+        self.error_label_clear()
+
+    def show_error(self, message):
+        """Показывает сообщение об ошибке."""
+        self.error_label.setText(message)
+        self.error_label.setVisible(True)
+
+    def error_label_clear(self):
+        """Очистка лейбла ошибок"""
+        self.error_label.setText("")
+        self.error_label.setVisible(False)
 
 
 class FolderCommandForm(QWidget):
-    def __init__(self, assistant, settings_window, parent=None):
+    def __init__(self, assistant, parent=None):
         super().__init__(parent)
         self.assistant = assistant
-        self.settings_window = settings_window
         self.init_ui()
 
     def init_ui(self):
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(5, 5, 5, 5)
+        layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(5)
         layout.addStretch()
 
         self.key_input = QLineEdit(self)
         self.key_input.setPlaceholderText("Введите команду (например: 'загрузки')")
         self.key_input.returnPressed.connect(self.apply_command)  # Обработка нажатия Enter
+
+        # Label для ошибок
+        self.error_label = QLabel(self)
+        self.error_label.setStyleSheet("color: red; font-size: 11px; background-color: transparent; height: 15px;")
+
         self.label_command_folder = QLabel("Команда (уникальное слово):")
         self.label_command_folder.setStyleSheet("background: transparent;")
-        layout.addWidget(self.label_command_folder)
-        layout.addWidget(self.key_input)
+
+        choice_layout = QHBoxLayout()
+        choice_layout.setSpacing(5)
 
         self.folder_path = QLineEdit(self)
         self.folder_path.returnPressed.connect(self.apply_command)  # Обработка нажатия Enter
         self.label_folder = QLabel("Путь к папке:")
         self.label_folder.setStyleSheet("background: transparent;")
-        layout.addWidget(self.label_folder)
-        layout.addWidget(self.folder_path)
 
-        select_button = QPushButton("Выбрать папку...", self)
+        select_button = QPushButton("Обзор", self)
+        select_button.setStyleSheet("padding-left: 6px; padding-right: 6px;")
         select_button.clicked.connect(self.select_folder)
-        layout.addWidget(select_button)
 
         self.apply_button = QPushButton("Добавить команду", self)
         self.apply_button.clicked.connect(self.apply_command)
+
+        layout.addWidget(self.label_command_folder)
+        layout.addWidget(self.key_input)
+        layout.addWidget(self.error_label)
+        layout.addWidget(self.label_folder)
+        choice_layout.addWidget(self.folder_path)
+        choice_layout.addWidget(select_button)
+        layout.addLayout(choice_layout)
         layout.addWidget(self.apply_button)
 
     def select_folder(self):
@@ -403,19 +259,28 @@ class FolderCommandForm(QWidget):
         folder = self.folder_path.text().strip()
 
         if not key or not folder:
-            self.assistant.show_message("Заполните все поля!", "Предупреждение", "warning")
+            self.show_error("Заполните все поля!")
             return
 
-        if key in self.settings_window.current_commands:
-            self.assistant.show_message(f"Команда '{key}' уже существует!", "Предупреждение", "warning")
+        if key in self.assistant.commands:
+            self.show_error(f"Команда '{key}' уже существует!")
             return
 
-        self.settings_window.current_commands[key] = folder
-        self.settings_window.save_commands()
-        self.settings_window.commands_updated.emit(self.settings_window.current_commands)
+        self.assistant.commands[key] = folder
+        commands_signal.commands_updated.emit()
         self.assistant.show_notification_message(message=f"Команда '{key}' добавлена!")
         self.key_input.clear()
         self.folder_path.clear()
+        self.error_label_clear()
+
+    def show_error(self, message):
+        """Показывает сообщение об ошибке."""
+        self.error_label.setText(message)
+        self.error_label.setVisible(True)
+
+    def error_label_clear(self):
+        self.error_label.setText("")
+        self.error_label.setVisible(False)
 
 
 class CommandsWidget(QWidget):
@@ -424,33 +289,25 @@ class CommandsWidget(QWidget):
     def __init__(self, assistant, parent=None):
         super().__init__(parent)
         self.assistant = assistant
-        self.parent_window = parent
-        self.commands = {}
         self.init_ui()
-        self.load_initial_commands()
-
-        # Подключаем сигнал обновления команд
-        if hasattr(parent, 'commands_updated'):
-            parent.commands_updated.connect(self.on_commands_updated)
-
-    def load_initial_commands(self):
-        """Первоначальная загрузка команд"""
-        self.commands = self.load_commands_from_file(get_path('user_settings', 'commands.json'))
         self.update_commands_list()
-
-    def on_commands_updated(self, new_commands):
-        """Обработчик обновления команд (принимает словарь новых команд)"""
-        self.commands = new_commands.copy()
-        self.update_commands_list()
+        commands_signal.commands_updated.connect(self.update_commands_list)
 
     def init_ui(self):
         """Инициализация интерфейса"""
-        self.setWindowTitle("Добавленные команды")
         layout = QVBoxLayout(self)
         layout.setContentsMargins(15, 15, 15, 15)
-        layout.setSpacing(20)
+        layout.setSpacing(10)
+
+        self.title = QLabel("Добавленные команды")
+
+        self.title.setAlignment(Qt.AlignCenter)
+        self.title.setStyleSheet("background: transparent; font-size: 16px; font-weight: bold;")
+        layout.addWidget(self.title)
 
         self.commands_list = QListWidget(self)
+        self.commands_list.setFont(QFont("Tahoma"))
+        self.commands_list.setStyleSheet("border: none; font-size: 15px;")
         self.commands_list.setSelectionMode(QListWidget.SingleSelection)
         layout.addWidget(self.commands_list)
 
@@ -474,30 +331,17 @@ class CommandsWidget(QWidget):
         """Обновляет список команд"""
         self.commands_list.clear()
 
-        if not isinstance(self.commands, dict):
-            logger.error("Команды должны быть словарем")
+        if not isinstance(self.assistant.commands, dict):
+            debug_logger.error("Команды должны быть словарем")
             self.assistant.show_message("Некорректный формат команд", "Ошибка", "error")
             return
 
-        for key, value in self.commands.items():
+        for key, value in self.assistant.commands.items():
             item_text = f"{key} : {value}"
             item = QListWidgetItem(item_text)
             self.commands_list.addItem(item)
 
         self.select_last_item()
-
-    def load_commands_from_file(self, filename):
-        """Загрузка команд из файла"""
-        try:
-            with open(filename, 'r', encoding='utf-8') as file:
-                return json.load(file)
-        except FileNotFoundError:
-            logger.warning(f"Файл {filename} не найден, создаем новый")
-            return {}
-        except json.JSONDecodeError:
-            logger.error(f"Ошибка в формате файла {filename}")
-            self.assistant.show_message("Ошибка в формате JSON", "Ошибка", "error")
-            return {}
 
     def delete_command(self):
         """Удаление выбранной команды"""
@@ -509,9 +353,9 @@ class CommandsWidget(QWidget):
         # Удаляем выбранные команды
         for item in selected_items:
             key = item.text().split(" : ")[0]
-            if key in self.commands:
-                self.remove_command_from_process_names(self.commands[key])
-                del self.commands[key]
+            if key in self.assistant.commands:
+                self.remove_command_from_process_names(self.assistant.commands[key])
+                del self.assistant.commands[key]
                 self.commands_list.takeItem(self.commands_list.row(item))
 
         self.save_commands()
@@ -529,20 +373,16 @@ class CommandsWidget(QWidget):
             with open(process_names_file, 'w', encoding='utf-8') as file:
                 json.dump(updated_names, file, ensure_ascii=False, indent=4)
         except Exception as e:
-            logger.error(f"Ошибка при обновлении process_names.json: {e}")
+            debug_logger.error(f"Ошибка при обновлении process_names.json: {e}")
 
     def save_commands(self):
-        """Только сохраняет команды, НЕ испускает сигнал"""
+        """Cохраняет команды"""
         try:
             with open(get_path('user_settings', 'commands.json'), 'w', encoding='utf-8') as file:
-                json.dump(self.commands, file, ensure_ascii=False, indent=4)
-
-            # Просим родительское окно обработать обновление
-            if hasattr(self.parent_window, 'handle_commands_change'):
-                self.parent_window.handle_commands_change(self.commands)
+                json.dump(self.assistant.commands, file, ensure_ascii=False, indent=4)
 
         except Exception as e:
-            logger.error(f"Ошибка сохранения: {e}")
+            debug_logger.error(f"Ошибка сохранения команд в CommandsWidget: {e}")
 
 
 class ProcessLinksWidget(QWidget):
@@ -562,10 +402,10 @@ class ProcessLinksWidget(QWidget):
         # Основной вертикальный макет
         main_layout = QVBoxLayout()
         main_layout.setContentsMargins(15, 15, 15, 15)
-        main_layout.setSpacing(20)
+        main_layout.setSpacing(10)
 
         # Заголовок
-        self.title = QLabel("Список процессов, привязанных к ярлыку\n(нужны для закрытия)")
+        self.title = QLabel("Процессы ярлыков\n(нужны для закрытия)")
 
         self.title.setAlignment(Qt.AlignCenter)
         self.title.setStyleSheet("background: transparent; font-size: 16px; font-weight: bold;")
@@ -604,7 +444,7 @@ class ProcessLinksWidget(QWidget):
         right_layout.addWidget(self.remove_process_button)
 
         # Добавляем левую и правую части в горизонтальный макет
-        content_layout.addLayout(left_layout, 1)
+        content_layout.addLayout(left_layout, 2)
         content_layout.addLayout(right_layout, 2)
 
         # Добавляем горизонтальный макет в основной вертикальный макет
@@ -658,17 +498,6 @@ class ProcessLinksWidget(QWidget):
 
         link_name = current_link.text()
         self.add_custom_process(link_name)
-        # process_name, ok = QInputDialog.getText(self, "Добавить процесс", "Введите название процесса:")
-        # if ok and process_name:
-        #     for item in self.process_names:
-        #         if link_name in item:
-        #             if process_name not in item[link_name]:
-        #                 item[link_name].append(process_name)
-        #                 self.update_processes_list(link_name)
-        #                 self.save_process_names()
-        #             else:
-        #                 self.assistant.show_message("Процесс с таким именем уже существует.", "Ошибка", "error")
-        #             break
 
     def remove_process(self):
         """ Удаляет процесс из выбранного ярлыка """
