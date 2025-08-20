@@ -61,7 +61,7 @@ from PyQt5.QtCore import Qt, QFileSystemWatcher, QTimer, QEvent, pyqtSignal, QPr
 
 MUTEX_NAME = "Assistant_123456789AB"
 build_ini = get_config_value("app", "build")
-version_file = "1.5.0"
+version_file = "1.5.1"
 update_version(version_file)
 
 def activate_existing_window():
@@ -755,6 +755,7 @@ class Assistant(QMainWindow):
         except Exception as e:
             debug_logger.error(f"Ошибка при запуске программы обновления: {e}")
 
+#  тут исправлена логика обработки ручной проверки
     @pyqtSlot()
     def update_answer(self, event):
         """Реакция бота на отсутствие обновления"""
