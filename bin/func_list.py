@@ -1,6 +1,7 @@
 """
 Функции для запуска и закрытия программ и игр
 """
+import configparser
 import json
 import os
 import shlex
@@ -8,14 +9,12 @@ import shutil
 import subprocess
 import threading
 import time
+from datetime import datetime
+from pathlib import Path
+
 import psutil
 import pygetwindow as gw
-from PyQt5.QtCore import QTimer, QPropertyAnimation, Qt, QThread, pyqtSignal
-from PyQt5.QtSvg import QSvgWidget
-from PyQt5.QtWidgets import QGraphicsColorizeEffect, QWidget, QVBoxLayout, QLabel, QListWidget, QHBoxLayout, QDialog
 from win32com.client import Dispatch
-
-from bin.apply_color_methods import ApplyColor
 from bin.lists import get_audio_paths
 from logging_config import logger, debug_logger
 from bin.speak_functions import thread_react, thread_react_detail
@@ -36,6 +35,99 @@ def load_settings(settings_file):
         debug_logger.error(f"Файл настроек {settings_file} не найден.")
 
     return {}  # Возвращаем пустой словарь, если файл не найден или ошибка
+
+
+def get_config_value(section, key, default=None):
+    """Получение конкретного значения из конфига"""
+    config_path = Path(get_path("config.ini"))
+
+    if not config_path.exists():
+        config = load_default_config(config_path)
+    else:
+        config = configparser.ConfigParser()
+        config.read(config_path, encoding='utf-8')
+
+    return config.get(section, key, fallback=default)
+
+
+def set_config_value(section, key, value):
+    """Обновление значения в конфиге"""
+    config_path = Path(get_path("config.ini"))
+
+    if config_path.exists():
+        config = configparser.ConfigParser()
+        config.read(config_path, encoding='utf-8')
+    else:
+        config = load_default_config(config_path)
+
+    if not config.has_section(section):
+        config.add_section(section)
+
+    config.set(section, key, value)
+
+    with open(config_path, 'w', encoding='utf-8') as f:
+        config.write(f)
+
+
+def load_default_config(config_path):
+    """
+    Создает конфигурационный файл с настройками по умолчанию
+    Возвращает объект configparser с загруженными настройками
+    """
+    config = configparser.ConfigParser()
+
+    # Настройки по умолчанию
+    config['app'] = {
+        'version': '0.0.0',
+        'name': 'Assistant',
+        'build': 'prod'
+    }
+
+    # Создаем директорию если её нет
+    config_path = Path(config_path)
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Сохраняем конфиг в файл
+    with open(config_path, 'w', encoding='utf-8') as configfile:
+        config.write(configfile)
+
+    return config
+
+
+def update_version(version_str: str):
+    numbers = version_str.split('-')[0].split('.')
+    major = numbers[0]
+    minor = numbers[1] if len(numbers) > 1 else '0'
+    patch = numbers[2] if len(numbers) > 2 else '0'
+
+    content = f"""# UTF-8
+VSVersionInfo(
+  ffi=FixedFileInfo(
+    filevers=({major}, {minor}, {patch}, 0),
+    prodvers=({major}, {minor}, {patch}, 0),
+    mask=0x3f,
+    flags=0x0,
+    OS=0x40004,
+    fileType=0x1,
+    subtype=0x0,
+    date=(0, 0)
+  ),
+  kids=[
+    StringFileInfo(
+      [
+        StringTable(
+          '040904B0',
+          [StringStruct('FileVersion', '{major}.{minor}.{patch}.0'),
+          StringStruct('ProductVersion', '{version_str}')]
+        )
+      ]
+    ),
+    VarFileInfo([VarStruct('Translation', [0x409, 1200])])
+  ]
+)"""
+
+    with open(get_path('version.txt'), 'w', encoding='utf-8') as f:
+        f.write(content)
 
 
 def get_current_speaker(settings_file):

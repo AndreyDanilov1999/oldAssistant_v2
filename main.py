@@ -31,17 +31,15 @@ import time
 import traceback
 import zipfile
 import markdown2
-import requests
 import win32con
 import win32gui
 from PyQt5.QtSvg import QSvgWidget
 from packaging import version
 import psutil
-import winsound
 from bin.commands_widgets import CreateCommandsWidget, CommandsWidget, ProcessLinksWidget
 from bin.other_options_widgets import CensorCounterWidget, CheckUpdateWidget, DebugLoggerWidget, \
     RelaxWidget
-from bin.func_list import handler_links, handler_folder
+from bin.func_list import handler_links, handler_folder, get_config_value, set_config_value, update_version
 from bin.function_list_main import *
 from path_builder import get_path
 import threading
@@ -62,7 +60,9 @@ from PyQt5.QtCore import Qt, QFileSystemWatcher, QTimer, QEvent, pyqtSignal, QPr
     QEasingCurve, pyqtSlot, QUrl
 
 MUTEX_NAME = "Assistant_123456789AB"
-
+build_ini = get_config_value("app", "build")
+version_file = "1.5.0"
+update_version(version_file)
 
 def activate_existing_window():
     hwnd = win32gui.FindWindow(None, "Ассистент")
@@ -113,7 +113,7 @@ class Assistant(QMainWindow):
 
     def __init__(self):
         super().__init__()
-        self.version = "1.4.5"
+        self.version = self.get_version()
         self.ps = "Powered by theoldman"
         self.label_version = QLabel(f"Версия: {self.version} {self.ps}", self)
         self.label_message = QLabel('', self)
@@ -133,38 +133,21 @@ class Assistant(QMainWindow):
         self.censored_thread = None
         self._current_panel = None
         self.widget_window = None
+        self.is_manual_check = False
         gui_signals.open_widget_signal.connect(self.open_widget)
         gui_signals.close_widget_signal.connect(self.close_widget)
         color_signal.color_changed.connect(self.update_colors)
         commands_signal.commands_updated.connect(self.save_commands)
+        self.update_checked.connect(self.handle_update_status)
+        self.close_child_windows.connect(self.hide_widget)
         self.last_position = 0
         self.MEMORY_LIMIT_MB = 1024
         self.log_file_path = get_path('assistant.log')
         self.init_logger()
         self.svg_file_path = get_path("owl.svg")
-        self.icon_start_win = get_path("bin", "icons", "start-win.svg")
-        self.icon_update = get_path("bin", "icons", "install-btn.svg")
+        self.install_icons()
         self.process_names = get_path('user_settings', 'process_names.json')
         self.ohm_path = get_path("bin", "OHM", "OpenHardwareMonitor.exe")
-        self.icon_settings_path = get_path("bin", "icons", "settings.svg")
-        self.icon_shortcut_path = get_path("bin", "icons", "shortcut.svg")
-        self.icon_power_path = get_path("bin", "icons", "power.svg")
-        self.icon_guide_path = get_path("bin", "icons", "guide.svg")
-        self.icon_other_path = get_path("bin", "icons", "other.svg")
-        self.icon_commands_path = get_path("bin", "icons", "commands.svg")
-        self.icon_widget_path = get_path("bin", "icons", "open_widget.svg")
-        self.icon_close_path = get_path("bin", "icons", "close.svg")
-        self.icon_screenshot_path = get_path("bin", "icons", "camera.svg")
-        self.icon_tray_path = get_path("bin", "icons", "tray_icon.png")
-        self.icon_updates_path = get_path("bin", "icons", "updates.svg")
-        self.icon_advance_settings_path = get_path("bin", "icons", "settings+.svg")
-        self.icon_styles_path = get_path("bin", "icons", "styles.svg")
-        self.icon_logs_path = get_path("bin", "icons", "logs.svg")
-        self.icon_censor_path = get_path("bin", "icons", "censor.svg")
-        self.icon_relax_path = get_path("bin", "icons", "relax.svg")
-        self.icon_create_command_path = get_path("bin", "icons", "commands.svg")
-        self.icon_added_commands_path = get_path("bin", "icons", "commands_list.svg")
-        self.icon_process_link_path = get_path("bin", "icons", "process_link.svg")
         self.style_manager = ApplyColor(self)
         self.color_path = self.style_manager.color_path
         self.styles = self.style_manager.load_styles()
@@ -180,7 +163,7 @@ class Assistant(QMainWindow):
         self.volume_assist = None
         self.steam_path = None
         self.is_censored = None
-        self.show_upd_msg = None
+        self.run_updater = None
         self.is_min_tray = None
         self.is_widget = None
         self.input_device_id = None
@@ -217,12 +200,23 @@ class Assistant(QMainWindow):
             self.showNormal()
         self.run_assist()
         self.toggle_update_button()
-        QTimer.singleShot(1500, self.check_update_app)
+        QTimer.singleShot(2000, lambda: self.check_update_app())
+        self.update_checker = QTimer()
+        self.update_checker.timeout.connect(self.check_update_app)
+        self.update_checker.start(1800000)  # Чек обновлений раз в 30 минут (1800000)
 
     def handle_init_result(self, success):
         """Обработчик результата инициализации"""
         if success:
             self.check_up()
+
+    def get_version(self):
+        vers_on_ini = get_config_value("app", "version")
+
+        if not vers_on_ini or vers_on_ini != version_file:
+            set_config_value("app", "version", f"{version_file}")
+            return version_file
+        return version_file
 
     def title_bar_mouse_press(self, event):
         """Обработка нажатия мыши на заголовок"""
@@ -253,11 +247,34 @@ class Assistant(QMainWindow):
         self.volume_assist = self.settings.get('volume_assist', 0.2)
         self.steam_path = self.settings.get('steam_path', '')
         self.is_censored = self.settings.get('is_censored', False)
-        self.show_upd_msg = self.settings.get("show_upd_msg", False)
+        self.run_updater = self.settings.get("run_updater", True)
         self.is_min_tray = self.settings.get("minimize_to_tray", False)
         self.is_widget = self.settings.get("is_widget", True)
         self.input_device_id = self.settings.get("input_device_id", None)
         self.input_device_name = self.settings.get("input_device_name", None)
+
+    def install_icons(self):
+        self.icon_start_win = get_path("bin", "icons", "start-win.svg")
+        self.icon_update = get_path("bin", "icons", "install-btn.svg")
+        self.icon_settings_path = get_path("bin", "icons", "settings.svg")
+        self.icon_shortcut_path = get_path("bin", "icons", "shortcut.svg")
+        self.icon_power_path = get_path("bin", "icons", "power.svg")
+        self.icon_guide_path = get_path("bin", "icons", "guide.svg")
+        self.icon_other_path = get_path("bin", "icons", "other.svg")
+        self.icon_commands_path = get_path("bin", "icons", "commands.svg")
+        self.icon_widget_path = get_path("bin", "icons", "open_widget.svg")
+        self.icon_close_path = get_path("bin", "icons", "close.svg")
+        self.icon_screenshot_path = get_path("bin", "icons", "camera.svg")
+        self.icon_tray_path = get_path("bin", "icons", "tray_icon.png")
+        self.icon_updates_path = get_path("bin", "icons", "updates.svg")
+        self.icon_advance_settings_path = get_path("bin", "icons", "settings+.svg")
+        self.icon_styles_path = get_path("bin", "icons", "styles.svg")
+        self.icon_logs_path = get_path("bin", "icons", "logs.svg")
+        self.icon_censor_path = get_path("bin", "icons", "censor.svg")
+        self.icon_relax_path = get_path("bin", "icons", "relax.svg")
+        self.icon_create_command_path = get_path("bin", "icons", "commands.svg")
+        self.icon_added_commands_path = get_path("bin", "icons", "commands_list.svg")
+        self.icon_process_link_path = get_path("bin", "icons", "process_link.svg")
 
     def initui(self):
         """Инициализация пользовательского интерфейса."""
@@ -742,20 +759,17 @@ class Assistant(QMainWindow):
     def update_answer(self, event):
         """Реакция бота на отсутствие обновления"""
         try:
-            # Отключаем только наш обработчик (если он был)
-            try:
-                self.update_checked.disconnect(self.handle_update_status)
-            except TypeError:
-                pass  # Если не было подключено, игнорируем
-
-            # Подключаем заново
-            self.update_checked.connect(self.handle_update_status)
+            self.is_manual_check = True  # Устанавливаем флаг ручной проверки
             self.check_update_app()
         except Exception as e:
             debug_logger.error(f"Ошибка при запуске программы обновления: {e}")
 
     def handle_update_status(self, is_success, status_text):
         """Обрабатывает результат проверки обновлений"""
+        if not self.is_manual_check:  # Пропускаем реакцию для автоматических проверок
+            return
+
+        # Реагируем только если это ручная проверка
         if status_text == "Установлена последняя версия":
             update_button = self.audio_paths.get('update_button')
             thread_react_detail(update_button)
@@ -764,6 +778,8 @@ class Assistant(QMainWindow):
         elif not is_success:
             error = self.audio_paths.get('error_file')
             thread_react_detail(error)
+
+        self.is_manual_check = False
 
     def toggle_update_button(self):
         """
@@ -838,26 +854,6 @@ class Assistant(QMainWindow):
             self.thread.check_failed.connect(self.handle_check_failed)
             self.thread.start()
 
-        except requests.Timeout:
-            self.animation_stop_load()
-            logger.warning("Таймаут при проверке обновлений")
-            debug_logger.warning("Таймаут при проверке обновлений")
-            self.update_label.show()
-            self.update_label.setText("Ошибка соединения, попытка восстановления")
-            QTimer.singleShot(2000, lambda: self.check_update_app())
-        except requests.RequestException as e:
-            self.animation_stop_load()
-            logger.error(f"Ошибка сети: {str(e)}")
-            debug_logger.warning(f"Ошибка сети: {str(e)}")
-            self.update_label.show()
-            self.update_label.setText("Нет соединения")
-            QTimer.singleShot(2000, lambda: self.check_update_app())
-        except ValueError as e:
-            self.animation_stop_load()
-            logger.error(f"Ошибка формата данных: {str(e)}")
-            debug_logger.warning(f"Ошибка формата данных: {str(e)}")
-            self.update_label.show()
-            self.update_label.setText("Ошибка данных")
         except Exception as e:
             self.animation_stop_load()
             logger.error(f"Неожиданная ошибка")
@@ -867,7 +863,7 @@ class Assistant(QMainWindow):
             QTimer.singleShot(2000, lambda: self.check_update_app())
 
     def handle_version_check(self, stable_version, exp_version):
-        # Обработка полученных версий (аналогично вашему коду)
+        # Обработка полученных версий
         new_version = exp_version if self.beta_version else stable_version
         latest_version = version.parse(new_version)
         current_ver = version.parse(self.version)
@@ -907,12 +903,11 @@ class Assistant(QMainWindow):
             if success:
                 self.type_version = "exp" if "exp_" in os.path.basename(file_path).lower() else "stable"
                 version = self.extract_version_simple(file_path)
-                if self.settings.get("show_upd_msg", True):
-                    self.show_update_notice(version)
+                self.show_notification_message(f"Доступно обновление (v.{version})")
                 if skipped:
-                    debug_logger.info(f"[SKIP] Файл уже существует")
-                    self.handle_message_click()
                     self.show_notification_message("Сейчас будет установлена новая версия")
+                    debug_logger.info(f"[SKIP] Файл уже существует")
+                    self.open_window_and_update()
                 else:
                     debug_logger.info(f"[OK] Новый файл загружен")
             else:
@@ -924,9 +919,9 @@ class Assistant(QMainWindow):
         parts = filename.split('_')
         if len(parts) >= 3:
             return parts[-1].replace('.zip', '')
-        return ""
+        return "-.-.-"
 
-    def handle_message_click(self):
+    def open_window_and_update(self):
         """Обработка действия, если апдейт уже был скачан (активация окна)"""
         if not self.isVisible():
             self.show()
@@ -937,117 +932,117 @@ class Assistant(QMainWindow):
         QApplication.processEvents()
         QTimer.singleShot(500, lambda: self.update_app(type_version=self.type_version))
 
-    def show_update_notice(self, version):
-        """Показ уведомления о новой версии"""
-        if not self.isVisible():  # Если окно скрыто в трее
-            pass
-        else:
-            # Если окно видимо - показываем обычный диалог
-            self.show_popup(version)
-
-    def show_popup(self, version):
-        """Кастомное окно обновления"""
-        dialog = QDialog(self)
-        dialog.setWindowFlags(Qt.FramelessWindowHint | Qt.Dialog)
-        dialog.setFixedSize(450, 200)
-        screen_geometry = QApplication.primaryScreen().availableGeometry()
-        dialog.move(
-            screen_geometry.center() - dialog.rect().center()
-        )
-
-        # Основной контейнер с рамкой
-        container = QWidget(dialog)
-        container.setObjectName("WindowContainer")
-        container.setGeometry(0, 0, dialog.width(), dialog.height())
-
-        # Заголовок с крестиком
-        title_bar = QWidget(container)
-        title_bar.setObjectName("TitleBar")
-        title_bar.setGeometry(1, 1, dialog.width() - 2, 35)
-        title_layout = QHBoxLayout(title_bar)
-        title_layout.setContentsMargins(10, 5, 10, 5)
-
-        title_label = QLabel("Доступно обновление")
-        title_label.setStyleSheet("background: transparent;")
-        title_layout.addWidget(title_label)
-        title_layout.addStretch()
-
-        close_btn = QPushButton("✕")
-        close_btn.setFixedSize(25, 25)
-        close_btn.setObjectName("CloseButton")
-        close_btn.clicked.connect(dialog.reject)
-        title_layout.addWidget(close_btn)
-
-        # Основное содержимое
-        content_widget = QWidget(container)
-        content_widget.setGeometry(1, 36, dialog.width() - 2, dialog.height() - 37)
-
-        # Вертикальный layout
-        layout = QVBoxLayout(content_widget)
-        layout.setContentsMargins(10, 10, 10, 10)
-
-        # Текст сообщения
-        text_label = QLabel(
-            f"<b>Доступна новая версия\n{version}</b>"
-        )
-        text_label.setStyleSheet("background: transparent;")
-        text_label.setAlignment(Qt.AlignCenter)
-        text_label.setWordWrap(True)
-        layout.addWidget(text_label)
-
-        # Чекбокс
-        checkbox = QCheckBox("Больше не показывать")
-        checkbox.setStyleSheet("background: transparent;")
-        layout.addWidget(checkbox, 0, Qt.AlignLeft)
-
-        button_layout = QHBoxLayout()
-        button_layout.setSpacing(10)
-
-        changes_btn = QPushButton("Список изменений")
-        install_btn = QPushButton("Установить")
-        later_btn = QPushButton("Позже")
-
-        # Настройка кнопок (одинаковая ширина и высота)
-        for btn in [changes_btn, install_btn, later_btn]:
-            btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-            btn.setMinimumHeight(30)
-
-        # Добавляем кнопки в горизонтальный layout
-        button_layout.addWidget(changes_btn)
-        button_layout.addWidget(install_btn)
-        button_layout.addWidget(later_btn)
-
-        # Вставляем горизонтальный layout в основной вертикальный
-        layout.addLayout(button_layout)
-
-        # Обработчики
-        def on_changes():
-            self.changelog_window(None)
-
-        def on_install():
-            self.update_app(type_version=self.type_version)
-            if checkbox.isChecked():
-                self.show_upd_msg = False
-                self.save_settings()
-            dialog.accept()
-
-        def on_later():
-            if checkbox.isChecked():
-                self.show_upd_msg = False
-                self.save_settings()
-            dialog.reject()
-
-        changes_btn.clicked.connect(on_changes)
-        install_btn.clicked.connect(on_install)
-        later_btn.clicked.connect(on_later)
-
-        # Позиционирование
-        if self.parent():
-            dialog.move(
-                self.parent().geometry().center() - dialog.rect().center()
-            )
-        winsound.MessageBeep(winsound.MB_ICONASTERISK)
-        dialog.exec_()
+    # def show_update_notice(self, version):
+    #     """Показ уведомления о новой версии"""
+    #     if not self.isVisible():  # Если окно скрыто в трее
+    #         pass
+    #     else:
+    #         # Если окно видимо - показываем обычный диалог
+    #         self.show_popup(version)
+    #
+    # def show_popup(self, version):
+    #     """Кастомное окно обновления"""
+    #     dialog = QDialog(self)
+    #     dialog.setWindowFlags(Qt.FramelessWindowHint | Qt.Dialog)
+    #     dialog.setFixedSize(450, 200)
+    #     screen_geometry = QApplication.primaryScreen().availableGeometry()
+    #     dialog.move(
+    #         screen_geometry.center() - dialog.rect().center()
+    #     )
+    #
+    #     # Основной контейнер с рамкой
+    #     container = QWidget(dialog)
+    #     container.setObjectName("WindowContainer")
+    #     container.setGeometry(0, 0, dialog.width(), dialog.height())
+    #
+    #     # Заголовок с крестиком
+    #     title_bar = QWidget(container)
+    #     title_bar.setObjectName("TitleBar")
+    #     title_bar.setGeometry(1, 1, dialog.width() - 2, 35)
+    #     title_layout = QHBoxLayout(title_bar)
+    #     title_layout.setContentsMargins(10, 5, 10, 5)
+    #
+    #     title_label = QLabel("Доступно обновление")
+    #     title_label.setStyleSheet("background: transparent;")
+    #     title_layout.addWidget(title_label)
+    #     title_layout.addStretch()
+    #
+    #     close_btn = QPushButton("✕")
+    #     close_btn.setFixedSize(25, 25)
+    #     close_btn.setObjectName("CloseButton")
+    #     close_btn.clicked.connect(dialog.reject)
+    #     title_layout.addWidget(close_btn)
+    #
+    #     # Основное содержимое
+    #     content_widget = QWidget(container)
+    #     content_widget.setGeometry(1, 36, dialog.width() - 2, dialog.height() - 37)
+    #
+    #     # Вертикальный layout
+    #     layout = QVBoxLayout(content_widget)
+    #     layout.setContentsMargins(10, 10, 10, 10)
+    #
+    #     # Текст сообщения
+    #     text_label = QLabel(
+    #         f"<b>Доступна новая версия\n{version}</b>"
+    #     )
+    #     text_label.setStyleSheet("background: transparent;")
+    #     text_label.setAlignment(Qt.AlignCenter)
+    #     text_label.setWordWrap(True)
+    #     layout.addWidget(text_label)
+    #
+    #     # Чекбокс
+    #     checkbox = QCheckBox("Больше не показывать")
+    #     checkbox.setStyleSheet("background: transparent;")
+    #     layout.addWidget(checkbox, 0, Qt.AlignLeft)
+    #
+    #     button_layout = QHBoxLayout()
+    #     button_layout.setSpacing(10)
+    #
+    #     changes_btn = QPushButton("Список изменений")
+    #     install_btn = QPushButton("Установить")
+    #     later_btn = QPushButton("Позже")
+    #
+    #     # Настройка кнопок (одинаковая ширина и высота)
+    #     for btn in [changes_btn, install_btn, later_btn]:
+    #         btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+    #         btn.setMinimumHeight(30)
+    #
+    #     # Добавляем кнопки в горизонтальный layout
+    #     button_layout.addWidget(changes_btn)
+    #     button_layout.addWidget(install_btn)
+    #     button_layout.addWidget(later_btn)
+    #
+    #     # Вставляем горизонтальный layout в основной вертикальный
+    #     layout.addLayout(button_layout)
+    #
+    #     # Обработчики
+    #     def on_changes():
+    #         self.changelog_window(None)
+    #
+    #     def on_install():
+    #         self.update_app(type_version=self.type_version)
+    #         if checkbox.isChecked():
+    #             self.show_upd_msg = False
+    #             self.save_settings()
+    #         dialog.accept()
+    #
+    #     def on_later():
+    #         if checkbox.isChecked():
+    #             self.show_upd_msg = False
+    #             self.save_settings()
+    #         dialog.reject()
+    #
+    #     changes_btn.clicked.connect(on_changes)
+    #     install_btn.clicked.connect(on_install)
+    #     later_btn.clicked.connect(on_later)
+    #
+    #     # Позиционирование
+    #     if self.parent():
+    #         dialog.move(
+    #             self.parent().geometry().center() - dialog.rect().center()
+    #         )
+    #     winsound.MessageBeep(winsound.MB_ICONASTERISK)
+    #     dialog.exec_()
 
     def init_logger(self):
         """Инициализация логгера."""
@@ -1206,7 +1201,7 @@ class Assistant(QMainWindow):
             "steam_path": self.steam_path,
             "is_censored": self.is_censored,
             "volume_assist": self.volume_assist,
-            "show_upd_msg": self.show_upd_msg,
+            "run_updater": self.run_updater,
             "minimize_to_tray": self.is_min_tray,
             "start_win": self.toggle_start,
             "is_widget": self.is_widget,
@@ -1220,6 +1215,12 @@ class Assistant(QMainWindow):
             # Сохраняем настройки в файл
             with open(self.settings_file_path, 'w', encoding='utf-8') as file:
                 json.dump(settings_data, file, ensure_ascii=False, indent=4)
+
+            if self.run_updater:
+                value = "prod"
+            else:
+                value = "dev"
+            set_config_value("app", "build", f"{value}")
 
             self.show_notification_message("Настройки сохранены!")
             debug_logger.debug("Настройки сохранены.")
@@ -1242,7 +1243,7 @@ class Assistant(QMainWindow):
                 "steam_path": "",
                 "is_censored": True,
                 "volume_assist": 0.2,
-                "show_upd_msg": True,
+                "run_updater": True,
                 "minimize_to_tray": True,
                 "start_win": True,
                 "is_widget": True,
@@ -3001,7 +3002,8 @@ class UpdateApp(QDialog):
 
     def start_update(self):
         try:
-            subprocess.Popen([get_path("Update.exe")], shell=True)
+            # флаг no-checked для пропуска проверки новой версии в апдейте
+            subprocess.Popen([get_path("Update.exe"), "--no-checked"], shell=True)
             debug_logger.info("Update.exe успешно запущен")
         except Exception as e:
             debug_logger.error(f"Ошибка при запуске Update.exe: {e}")
@@ -3414,16 +3416,61 @@ class SystemScreenshot:
         return None
 
 
+def should_launch_updater():
+    """Определяет нужно ли запускать updater"""
+    # Не запускаем updater если:
+    # 1. Это запуск после обновления (--updated)
+    # 2. Updater уже запущен
+    # 3. Это специальный режим (например, --no-update)
+    if build_ini == "dev":
+        return False
+
+    if len(sys.argv) > 1 and sys.argv[1] == "--updated":
+        return False
+
+    # Проверяем, не запущен ли уже updater
+    for proc in psutil.process_iter(['name']):
+        if proc.info['name'] == 'Update.exe':
+            return False
+
+    return True
+
+
 if __name__ == '__main__':
     try:
-        if activate_existing_window():
-            sys.exit(0)
+        # Запускаем updater если нужно
+        if should_launch_updater():
+            updater_path = get_path("Update.exe")
+            if os.path.exists(updater_path):
+                subprocess.Popen([updater_path])
+                sys.exit(0)  # Закрываем основную программу
+
+        # Продолжаем обычный запуск
+        if len(sys.argv) > 1 and sys.argv[1] == "--updated":
+            logger.info("Запуск после обновления")
+        else:
+            if activate_existing_window():
+                sys.exit(0)
+
         app = QApplication([])
         app.setWindowIcon(QIcon(get_path('icon_assist.ico')))
         window = Assistant()
-
         app.exec_()
 
     except Exception as e:
         logger.error(f"Произошла ошибка при запуске программы: {e}")
         debug_logger.error(f"Произошла ошибка при запуске программы: {e}")
+
+# if __name__ == '__main__':
+#     try:
+#         if activate_existing_window():
+#             sys.exit(0)
+#         app = QApplication([])
+#         app.setWindowIcon(QIcon(get_path('icon_assist.ico')))
+#         window = Assistant()
+#
+#         app.exec_()
+#
+#     except Exception as e:
+#         logger.error(f"Произошла ошибка при запуске программы: {e}")
+#         debug_logger.error(f"Произошла ошибка при запуске программы: {e}")

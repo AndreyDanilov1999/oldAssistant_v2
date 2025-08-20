@@ -8,6 +8,8 @@ additional_files = [
     ('G:/PycharmProjects/oldAssistant_v2/update_app/color.json', '.'),
     ('G:/PycharmProjects/oldAssistant_v2/update_app/logo.svg', '.'),
     ('G:/PycharmProjects/oldAssistant_v2/update_app/icon.ico', '.'),
+    ('G:/PycharmProjects/oldAssistant_v2/update_app/check_and_download.py', '.'),
+    ('G:/PycharmProjects/oldAssistant_v2/update_app/utils.py', '.'),
 ]
 
 a = Analysis(
@@ -45,5 +47,6 @@ exe = EXE(
     strip=False,
     upx=True,              # Сжатие исполняемого файла
     console=False,          # True - показывать консоль, False - скрыть
+    uac_admin=True,
     icon='G:/PycharmProjects/oldAssistant_v2/update_app/icon.ico'
 )

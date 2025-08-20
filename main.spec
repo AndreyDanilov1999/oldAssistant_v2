@@ -1,4 +1,5 @@
 # -*- mode: python ; coding: utf-8 -*-
+version_file = 'G:/PycharmProjects/oldAssistant_v2/version.txt'
 
 a = Analysis(
     ['main.py'],
@@ -9,6 +10,7 @@ a = Analysis(
     ],
     datas=[
         ('G:/PycharmProjects/oldAssistant_v2/app.manifest', '.'),
+        ('G:/PycharmProjects/oldAssistant_v2/version.txt', '.'),
         ('G:/PycharmProjects/oldAssistant_v2/icon_assist.ico', '.'),
         ('G:/PycharmProjects/oldAssistant_v2/logging_config.py', '.'),
         ('G:/PycharmProjects/oldAssistant_v2/owl.svg', '.'),
@@ -78,6 +80,7 @@ a = Analysis(
         ('G:/PycharmProjects/oldAssistant_v2/bin/color_presets', 'bin/color_presets'),
         ('G:/PycharmProjects/oldAssistant_v2/bin/fonts', 'bin/fonts'),
         ('G:/PycharmProjects/oldAssistant_v2/bin/guides', 'bin/guides'),
+        ('G:/PycharmProjects/oldAssistant_v2/config.ini', '.'),
         ('G:/PycharmProjects/oldAssistant_v2/path_builder.py', '.'),
         ('G:/PycharmProjects/oldAssistant_v2/Update.exe', '.'),
         ('G:/PycharmProjects/oldAssistant_v2/swap-updater.exe', '.'),
@@ -114,6 +117,7 @@ exe = EXE(
     icon=['icon_assist.ico'],
     manifest="G:/PycharmProjects/oldAssistant_v2/app.manifest",
     uac_admin=True,
+    version=version_file,
 )
 coll = COLLECT(
     exe,

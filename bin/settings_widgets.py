@@ -383,7 +383,7 @@ class SettingsWidget(QWidget):
             "steam_path": "D:/Steam/steam.exe",
             "is_censored": True,
             "volume_assist": 0.2,
-            "show_upd_msg": True,
+            "run_updater": True,
             "minimize_to_tray": False,
             "start_win": True,
             "is_widget": True,
@@ -465,9 +465,9 @@ class OtherSettingsWidget(QWidget):
         self.censor_check.stateChanged.connect(self.toggle_censor)
         layout.addWidget(self.censor_check)
 
-        self.update_check = QCheckBox("Уведомлять о новой версии", self)
+        self.update_check = QCheckBox("Запуск утилиты обновления перед стартом", self)
         self.update_check.setStyleSheet("background: transparent;")
-        self.update_check.setChecked(self.assistant.show_upd_msg)
+        self.update_check.setChecked(self.assistant.run_updater)
         self.update_check.stateChanged.connect(self.toggle_update)
         layout.addWidget(self.update_check)
 
@@ -510,7 +510,7 @@ class OtherSettingsWidget(QWidget):
         self.assistant.save_settings()
 
     def toggle_update(self):
-        self.assistant.show_upd_msg = self.update_check.isChecked()
+        self.assistant.run_updater = self.update_check.isChecked()
         self.assistant.save_settings()
 
     def toggle_minimize(self):
