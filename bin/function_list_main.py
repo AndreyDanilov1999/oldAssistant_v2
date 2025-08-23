@@ -4,7 +4,7 @@
 import os
 from datetime import datetime
 from bin.lists import get_audio_paths
-from bin.func_list import get_current_speaker
+from bin.utils import get_current_speaker
 from logging_config import logger, debug_logger
 import subprocess
 import webbrowser

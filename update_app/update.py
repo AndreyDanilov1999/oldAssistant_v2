@@ -5,8 +5,6 @@ import shutil
 import subprocess
 import time
 import zipfile
-from pathlib import Path
-
 import psutil
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, QTimer
 from PyQt5.QtGui import QIcon, QColor

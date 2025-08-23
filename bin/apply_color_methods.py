@@ -99,6 +99,7 @@ class ApplyColor():
                 progress_style = f"""
                     QProgressBar {{
                         border: 1px solid {self.adjust_color(color, brightness=-30)};
+                        border-radius: 5px;
                         height: 20px;
                         text-align: center;
                     }}

@@ -209,7 +209,7 @@ class CheckThread(QThread):
     def check_main_files(self, files_weight):
         files_to_check = (
             "settings_widgets.py", "speak_functions.py", "audio_control.py",
-            "commands_widgets.py", "func_list.py", "function_list_main.py",
+            "commands_widgets.py", "utils.py", "function_list_main.py",
             "lists.py", "other_options_widgets.py", "apply_color_methods.py", "check_update.py",
             "choose_color_window.py", "download_thread.py", "signals.py",
             "toast_notification.py", "widget_window.py")

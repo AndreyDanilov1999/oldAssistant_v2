@@ -1,16 +1,15 @@
 import json
 import os
 import sounddevice as sd
-from sounddevice import default
-
+import winshell
 from bin.signals import color_signal
 from bin.speak_functions import thread_react
 from bin.choose_color_window import ColorSettingsWindow
 from path_builder import get_path
 from logging_config import logger, debug_logger
-from PyQt5.QtCore import pyqtSignal, Qt, QPoint, QPropertyAnimation, QEasingCurve
+from PyQt5.QtCore import pyqtSignal, Qt
 from PyQt5.QtWidgets import QFileDialog, QPushButton, QCheckBox, QLineEdit, QLabel, QSlider, QComboBox, \
-    QVBoxLayout, QWidget, QDialog, QFrame, QStackedWidget, QHBoxLayout, QApplication
+    QVBoxLayout, QWidget, QHBoxLayout
 
 speakers = dict(Персик="persik", Джарвис="jarvis", Пласид='placide', Бестия='rogue',
                 Джонни='johnny', СанСаныч='sanych', Санбой='sanboy', Woman='tigress', Стейтем='stathem')
@@ -495,6 +494,10 @@ class OtherSettingsWidget(QWidget):
         self.get_widget_btn.clicked.connect(self.get_widget)
         layout.addWidget(self.get_widget_btn)
 
+        self.add_link_btn = QPushButton("Добавить ярлык на Рабочий стол", self)
+        self.add_link_btn.clicked.connect(self.add_link_desktop)
+        layout.addWidget(self.add_link_btn)
+
         self.label_input = QLabel("Устройство ввода")
         self.label_input.setStyleSheet("background: transparent;")
         self.device_list = QComboBox()
@@ -525,6 +528,70 @@ class OtherSettingsWidget(QWidget):
 
     def get_widget(self):
         self.assistant.open_widget()
+
+    def add_link_desktop(self):
+        """
+        Создает ярлыки на рабочем столе и в меню "Пуск" с проверкой на существование
+        """
+        dir_path = os.path.dirname(get_path())
+        executable_path = os.path.join(dir_path, "Assistant.exe")
+        app_name = "Ассистент"
+
+        # Проверяем существование исполняемого файла
+        if not os.path.exists(executable_path):
+            self.assistant.show_notification_message(f"Ошибка: Файл {executable_path} не существует")
+            return
+
+        shortcuts_created = False
+
+        try:
+            # Создаем ярлык на рабочем столе (если его нет)
+            desktop_path = winshell.desktop()
+            desktop_shortcut = os.path.join(desktop_path, f"{app_name}.lnk")
+
+            if not os.path.exists(desktop_shortcut):
+                with winshell.shortcut(desktop_shortcut) as shortcut:
+                    shortcut.path = executable_path
+                    shortcut.working_directory = os.path.dirname(executable_path)
+                    shortcut.description = f"Ярлык для {app_name}"
+                    shortcut.icon_location = (executable_path, 0)
+                shortcuts_created = True
+                debug_logger.info(f"Ярлык создан на рабочем столе: {desktop_shortcut}")
+            else:
+                debug_logger.error(f"Ярлык на рабочем столе уже существует: {desktop_shortcut}")
+
+        except Exception as e:
+            self.assistant.show_notification_message(f"Ошибка создания ярлыка на рабочем столе: {e}")
+
+        try:
+            # Создаем ярлык в меню "Пуск" (если его нет)
+            programs_folder = winshell.programs()
+
+            # Создаем папку для нашего приложения в меню "Пуск"
+            app_startup_folder = os.path.join(programs_folder, app_name)
+            os.makedirs(app_startup_folder, exist_ok=True)
+
+            startup_shortcut = os.path.join(app_startup_folder, f"{app_name}.lnk")
+
+            if not os.path.exists(startup_shortcut):
+                with winshell.shortcut(startup_shortcut) as shortcut:
+                    shortcut.path = executable_path
+                    shortcut.working_directory = os.path.dirname(executable_path)
+                    shortcut.description = f"Ярлык для {app_name}"
+                    shortcut.icon_location = (executable_path, 0)
+                shortcuts_created = True
+                debug_logger.info(f"Ярлык создан в меню 'Пуск': {startup_shortcut}")
+            else:
+                debug_logger.error(f"Ярлык в меню 'Пуск' уже существует: {startup_shortcut}")
+
+        except Exception as e:
+            self.assistant.show_notification_message(f"Ошибка создания ярлыка в меню 'Пуск': {e}")
+
+        # Показываем сообщение только если были созданы новые ярлыки
+        if shortcuts_created:
+            self.assistant.show_notification_message("Ярлык успешно создан!")
+        else:
+            self.assistant.show_notification_message("Ярлык уже существует!")
 
     def get_devices(self):
         self.device_list.clear()

@@ -4,13 +4,16 @@
 import configparser
 import json
 import os
+import re
 import shlex
 import shutil
 import subprocess
 import threading
 import time
+import webbrowser
 from datetime import datetime
 from pathlib import Path
+from urllib.parse import urlparse
 
 import psutil
 import pygetwindow as gw
@@ -324,6 +327,15 @@ def handler_links(filename, action):
     # Получаем путь к ярлыку
     shortcut_path = os.path.join(root_folder, filename)
 
+    if is_url_string(filename):
+        try:
+            if action == 'open':
+                open_browser_link(filename)
+
+        except Exception as e:
+            logger.info(f"Ошибка при обработке ссылки: {filename}: {e}")
+            debug_logger.info(f"Ошибка при обработке ссылки: {filename}: {e}")
+
     # Обработка .lnk файлов
     if filename.endswith(".lnk"):
         try:
@@ -358,6 +370,8 @@ def handler_links(filename, action):
             open_url_link(game_id_or_url, filename)  # Передаём game_id или URL
         if action == 'close':
             close_link(filename)
+
+
 
 
 def handler_folder(folder_path, action):
@@ -968,3 +982,62 @@ def monitor_processes(filename, callback):
         callback(found, filename)
 
     threading.Thread(target=_monitor, daemon=True).start()
+
+
+def open_browser_link(url):
+    """
+    Открывает ссылку в браузере с обработкой различных форматов
+    """
+    try:
+        # Очищаем URL от лишних пробелов
+        url = url.strip()
+
+        # Если URL пустой
+        if not url:
+            return False
+
+        # Проверяем, есть ли протокол в URL
+        parsed_url = urlparse(url)
+        if not parsed_url.scheme:
+            # Добавляем http:// если протокола нет
+            url = 'http://' + url
+
+        # Открываем в браузере
+        webbrowser.open(url)
+        return True
+
+    except Exception as e:
+        logger.error(f"Ошибка при открытии ссылки '{url}': {e}")
+        debug_logger.error(f"Ошибка при открытии ссылки '{url}': {e}")
+        return False
+
+
+def is_url_string(text):
+    """
+    Проверяет, является ли строка URL, а не путем к файлу
+    """
+    if not text or not isinstance(text, str):
+        return False
+
+    text = text.strip()
+    debug_logger.info(f"Проверка сайта: {text}")
+    # Проверка на признаки URL
+    url_indicators = [
+        # Протоколы
+        r'^https?://',
+        r'^ftp://',
+        r'^file://',
+        r'^mailto:',
+        # Доменные имена
+        r'^[a-zA-Z0-9-]+\.[a-zA-Z]{2,}',  # domain.tld
+        r'^www\.[a-zA-Z0-9-]+\.[a-zA-Z]{2,}',  # www.domain.tld
+        # localhost и IP-адреса
+        r'^localhost',
+        r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}',  # IP address
+    ]
+
+    for pattern in url_indicators:
+        if re.match(pattern, text, re.IGNORECASE):
+            return True
+
+    return False

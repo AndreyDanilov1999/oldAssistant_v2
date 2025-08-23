@@ -1,11 +1,13 @@
 import json
 import os
+import re
+
 from PyQt5.QtCore import Qt, QStringListModel
 from PyQt5.QtGui import QFont
 from PyQt5.QtWidgets import QFileDialog, QPushButton, QLineEdit, QLabel, QComboBox, \
     QVBoxLayout, QWidget, QDialog, QFrame, QStackedWidget, QHBoxLayout, QListWidget, QListWidgetItem, \
     QCompleter, QDialogButtonBox, QMessageBox
-from bin.func_list import search_links, scan_and_copy_shortcuts
+from bin.utils import search_links, scan_and_copy_shortcuts
 from bin.signals import commands_signal
 from logging_config import debug_logger
 from path_builder import get_path
@@ -47,6 +49,12 @@ class CreateCommandsWidget(QWidget):
         self.btn_folder.setCheckable(True)
         self.btn_folder.clicked.connect(self.show_folder_form)
         btn_layout.addWidget(self.btn_folder)
+
+        # Кнопка для создания команды папки
+        self.btn_url = QPushButton("Для url-ссылки")
+        self.btn_url.setCheckable(True)
+        self.btn_url.clicked.connect(self.show_url_form)
+        btn_layout.addWidget(self.btn_url)
 
         layout.addLayout(btn_layout)
 
@@ -90,6 +98,9 @@ class CreateCommandsWidget(QWidget):
         self.folder_form = FolderCommandForm(self.assistant)
         self.form_container.addWidget(self.folder_form)
 
+        self.url_form = UrlCommandForm(self.assistant)
+        self.form_container.addWidget(self.url_form)
+
         # Изначально скрываем все формы
         self.form_container.setCurrentIndex(-1)
 
@@ -97,6 +108,7 @@ class CreateCommandsWidget(QWidget):
         """Показывает форму для создания команды ярлыка"""
         self.btn_shortcut.setChecked(True)
         self.btn_folder.setChecked(False)
+        self.btn_url.setChecked(False)
         self.form_container.show()
         self.form_container.setCurrentWidget(self.shortcut_form)
 
@@ -104,8 +116,17 @@ class CreateCommandsWidget(QWidget):
         """Показывает форму для создания команды папки"""
         self.btn_folder.setChecked(True)
         self.btn_shortcut.setChecked(False)
+        self.btn_url.setChecked(False)
         self.form_container.show()
         self.form_container.setCurrentWidget(self.folder_form)
+
+    def show_url_form(self):
+        """Показывает форму для создания команды папки"""
+        self.btn_folder.setChecked(False)
+        self.btn_shortcut.setChecked(False)
+        self.btn_url.setChecked(True)
+        self.form_container.show()
+        self.form_container.setCurrentWidget(self.url_form)
 
 
 class AppCommandForm(QWidget):
@@ -272,6 +293,124 @@ class FolderCommandForm(QWidget):
         self.key_input.clear()
         self.folder_path.clear()
         self.error_label_clear()
+
+    def show_error(self, message):
+        """Показывает сообщение об ошибке."""
+        self.error_label.setText(message)
+        self.error_label.setVisible(True)
+
+    def error_label_clear(self):
+        self.error_label.setText("")
+        self.error_label.setVisible(False)
+
+
+class UrlCommandForm(QWidget):
+    def __init__(self, assistant, parent=None):
+        super().__init__(parent)
+        self.assistant = assistant
+        self.init_ui()
+
+    def init_ui(self):
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(5)
+        layout.addStretch()
+
+        self.key_input = QLineEdit(self)
+        self.key_input.setPlaceholderText("Введите команду (например: 'загрузки')")
+        self.key_input.returnPressed.connect(self.apply_command)
+
+        # Label для ошибок
+        self.error_label = QLabel(self)
+        self.error_label.setStyleSheet("color: red; font-size: 11px; background-color: transparent; height: 15px;")
+
+        self.label_command_folder = QLabel("Команда (уникальное слово):")
+        self.label_command_folder.setStyleSheet("background: transparent;")
+
+        self.url_path = QLineEdit(self)
+        self.url_path.setPlaceholderText("https://example.com или example.com")
+        self.url_path.returnPressed.connect(self.apply_command)
+
+        self.label_url = QLabel("Укажите ссылку:")
+        self.label_url.setStyleSheet("background: transparent;")
+
+        self.apply_button = QPushButton("Добавить команду", self)
+        self.apply_button.clicked.connect(self.apply_command)
+
+        layout.addWidget(self.label_command_folder)
+        layout.addWidget(self.key_input)
+        layout.addWidget(self.error_label)
+        layout.addWidget(self.label_url)
+        layout.addWidget(self.url_path)
+        layout.addWidget(self.apply_button)
+
+    def normalize_url_for_comparison(self, url):
+        """
+        Нормализует URL для сравнения: убирает www, http, https, приводит к единому формату
+        Возвращает кортеж: (нормализованный URL, оригинальный URL)
+        """
+        if not url:
+            return "", url
+
+        original_url = url
+        url = url.lower().strip()
+
+        # Убираем протоколы
+        if url.startswith('http://'):
+            url = url[7:]
+        elif url.startswith('https://'):
+            url = url[8:]
+
+        # Убираем www.
+        if url.startswith('www.'):
+            url = url[4:]
+
+        # Убираем слэш в конце
+        if url.endswith('/'):
+            url = url[:-1]
+
+        return url, original_url
+
+    def apply_command(self):
+        key = self.key_input.text().strip().lower()
+        url = self.url_path.text().strip()
+
+        if not key or not url:
+            self.show_error("Заполните все поля!")
+            return
+
+        if key in self.assistant.commands:
+            self.show_error(f"Команда '{key}' уже существует!")
+            return
+
+        # Проверяем, что это валидный URL
+        normalized_url, _ = self.normalize_url_for_comparison(url)
+        if not self.is_valid_url(normalized_url):
+            self.show_error("Некорректный URL!")
+            return
+
+        # Сохраняем URL в оригинальном формате
+        self.assistant.commands[key] = url
+        commands_signal.commands_updated.emit()
+        self.assistant.show_notification_message(f"Команда '{key}' добавлена!")
+        self.key_input.clear()
+        self.url_path.clear()
+        self.error_label_clear()
+
+    def is_valid_url(self, url):
+        """
+        Проверяет, является ли строка валидным URL после нормализации
+        """
+        # Должна быть хотя бы одна точка и домен верхнего уровня
+        if '.' not in url or len(url.split('.')[-1]) < 2:
+            return False
+
+        # Проверяем валидные символы в домене
+        domain_part = url.split('/')[0]
+        if not re.match(r'^[a-zA-Z0-9.-]+$', domain_part):
+            return False
+
+        return True
 
     def show_error(self, message):
         """Показывает сообщение об ошибке."""

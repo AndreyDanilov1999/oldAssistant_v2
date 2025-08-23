@@ -39,7 +39,8 @@ import psutil
 from bin.commands_widgets import CreateCommandsWidget, CommandsWidget, ProcessLinksWidget
 from bin.other_options_widgets import CensorCounterWidget, CheckUpdateWidget, DebugLoggerWidget, \
     RelaxWidget
-from bin.func_list import handler_links, handler_folder, get_config_value, set_config_value, update_version
+from bin.utils import handler_links, handler_folder, get_config_value, set_config_value, update_version, \
+    is_url_string
 from bin.function_list_main import *
 from path_builder import get_path
 import threading
@@ -61,7 +62,7 @@ from PyQt5.QtCore import Qt, QFileSystemWatcher, QTimer, QEvent, pyqtSignal, QPr
 
 MUTEX_NAME = "Assistant_123456789AB"
 build_ini = get_config_value("app", "build")
-version_file = "1.5.1"
+version_file = "1.5.2"
 update_version(version_file)
 
 def activate_existing_window():
@@ -116,7 +117,6 @@ class Assistant(QMainWindow):
         self.version = self.get_version()
         self.ps = "Powered by theoldman"
         self.label_version = QLabel(f"Версия: {self.version} {self.ps}", self)
-        self.label_message = QLabel('', self)
         self.latest_version_url = None
         self.relax_button = None
         self.drag_pos = None
@@ -134,6 +134,7 @@ class Assistant(QMainWindow):
         self._current_panel = None
         self.widget_window = None
         self.is_manual_check = False
+        self.stop_checking = False
         gui_signals.open_widget_signal.connect(self.open_widget)
         gui_signals.close_widget_signal.connect(self.close_widget)
         color_signal.color_changed.connect(self.update_colors)
@@ -283,7 +284,7 @@ class Assistant(QMainWindow):
             self.setWindowFlags(Qt.FramelessWindowHint)
             self.setWindowIcon(QIcon(get_path('icon_assist.ico')))
             self.setWindowTitle("Ассистент")
-            self.resize(900, 650)
+            self.resize(900, 700)
 
             # Центрирование окна
             screen_geometry = self.screen().availableGeometry()
@@ -365,7 +366,7 @@ class Assistant(QMainWindow):
             self.left_container.setMaximumWidth(250)
             self.left_container_layout = QVBoxLayout(self.left_container)
             self.left_container_layout.setContentsMargins(5, 5, 5, 5)
-            self.left_container_layout.setSpacing(10)
+            self.left_container_layout.setSpacing(5)
 
             # === 1. Основные кнопки ===
             self.left_buttons_panel = QWidget()
@@ -631,7 +632,6 @@ class Assistant(QMainWindow):
             self.styles = self.style_manager.load_styles()
             # Применение к конкретным виджетам
             self.style_manager.apply_to_widget(self.label_version, 'label_version')
-            self.style_manager.apply_to_widget(self.label_message, 'label_message')
             self.style_manager.apply_to_widget(self.update_label, 'update_label')
 
             self.style_manager.apply_progressbar(key="QPushButton", widget=self.progress_load, style="parts")
@@ -844,9 +844,11 @@ class Assistant(QMainWindow):
 
     def check_update_app(self):
         """Проверяет обновления"""
-        self.animation_start_load()
-        progress_signal.start_progress.emit()
+        if self.stop_checking:
+            return
         try:
+            self.animation_start_load()
+            progress_signal.start_progress.emit()
             self.toggle_update_button()
             self.update_label.hide()
 
@@ -861,7 +863,7 @@ class Assistant(QMainWindow):
             debug_logger.error(f"Неожиданная ошибка: {str(e)}", exc_info=True)
             self.update_label.show()
             self.update_label.setText("Ошибка обновления")
-            QTimer.singleShot(2000, lambda: self.check_update_app())
+            QTimer.singleShot(2000, self.check_update_app)
 
     def handle_version_check(self, stable_version, exp_version):
         # Обработка полученных версий
@@ -887,6 +889,7 @@ class Assistant(QMainWindow):
             self.toggle_update_button()
             self.update_checked.emit(True, "Установлена последняя версия")
             self.swap_update_file()
+            self.stop_checking = False
             QTimer.singleShot(2000, lambda: self.update_complete())
 
     def handle_check_failed(self):
@@ -905,6 +908,7 @@ class Assistant(QMainWindow):
                 self.type_version = "exp" if "exp_" in os.path.basename(file_path).lower() else "stable"
                 version = self.extract_version_simple(file_path)
                 self.show_notification_message(f"Доступно обновление (v.{version})")
+                self.stop_checking = True
                 if skipped:
                     self.show_notification_message("Сейчас будет установлена новая версия")
                     debug_logger.info(f"[SKIP] Файл уже существует")
@@ -932,118 +936,6 @@ class Assistant(QMainWindow):
         self.activateWindow()
         QApplication.processEvents()
         QTimer.singleShot(500, lambda: self.update_app(type_version=self.type_version))
-
-    # def show_update_notice(self, version):
-    #     """Показ уведомления о новой версии"""
-    #     if not self.isVisible():  # Если окно скрыто в трее
-    #         pass
-    #     else:
-    #         # Если окно видимо - показываем обычный диалог
-    #         self.show_popup(version)
-    #
-    # def show_popup(self, version):
-    #     """Кастомное окно обновления"""
-    #     dialog = QDialog(self)
-    #     dialog.setWindowFlags(Qt.FramelessWindowHint | Qt.Dialog)
-    #     dialog.setFixedSize(450, 200)
-    #     screen_geometry = QApplication.primaryScreen().availableGeometry()
-    #     dialog.move(
-    #         screen_geometry.center() - dialog.rect().center()
-    #     )
-    #
-    #     # Основной контейнер с рамкой
-    #     container = QWidget(dialog)
-    #     container.setObjectName("WindowContainer")
-    #     container.setGeometry(0, 0, dialog.width(), dialog.height())
-    #
-    #     # Заголовок с крестиком
-    #     title_bar = QWidget(container)
-    #     title_bar.setObjectName("TitleBar")
-    #     title_bar.setGeometry(1, 1, dialog.width() - 2, 35)
-    #     title_layout = QHBoxLayout(title_bar)
-    #     title_layout.setContentsMargins(10, 5, 10, 5)
-    #
-    #     title_label = QLabel("Доступно обновление")
-    #     title_label.setStyleSheet("background: transparent;")
-    #     title_layout.addWidget(title_label)
-    #     title_layout.addStretch()
-    #
-    #     close_btn = QPushButton("✕")
-    #     close_btn.setFixedSize(25, 25)
-    #     close_btn.setObjectName("CloseButton")
-    #     close_btn.clicked.connect(dialog.reject)
-    #     title_layout.addWidget(close_btn)
-    #
-    #     # Основное содержимое
-    #     content_widget = QWidget(container)
-    #     content_widget.setGeometry(1, 36, dialog.width() - 2, dialog.height() - 37)
-    #
-    #     # Вертикальный layout
-    #     layout = QVBoxLayout(content_widget)
-    #     layout.setContentsMargins(10, 10, 10, 10)
-    #
-    #     # Текст сообщения
-    #     text_label = QLabel(
-    #         f"<b>Доступна новая версия\n{version}</b>"
-    #     )
-    #     text_label.setStyleSheet("background: transparent;")
-    #     text_label.setAlignment(Qt.AlignCenter)
-    #     text_label.setWordWrap(True)
-    #     layout.addWidget(text_label)
-    #
-    #     # Чекбокс
-    #     checkbox = QCheckBox("Больше не показывать")
-    #     checkbox.setStyleSheet("background: transparent;")
-    #     layout.addWidget(checkbox, 0, Qt.AlignLeft)
-    #
-    #     button_layout = QHBoxLayout()
-    #     button_layout.setSpacing(10)
-    #
-    #     changes_btn = QPushButton("Список изменений")
-    #     install_btn = QPushButton("Установить")
-    #     later_btn = QPushButton("Позже")
-    #
-    #     # Настройка кнопок (одинаковая ширина и высота)
-    #     for btn in [changes_btn, install_btn, later_btn]:
-    #         btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-    #         btn.setMinimumHeight(30)
-    #
-    #     # Добавляем кнопки в горизонтальный layout
-    #     button_layout.addWidget(changes_btn)
-    #     button_layout.addWidget(install_btn)
-    #     button_layout.addWidget(later_btn)
-    #
-    #     # Вставляем горизонтальный layout в основной вертикальный
-    #     layout.addLayout(button_layout)
-    #
-    #     # Обработчики
-    #     def on_changes():
-    #         self.changelog_window(None)
-    #
-    #     def on_install():
-    #         self.update_app(type_version=self.type_version)
-    #         if checkbox.isChecked():
-    #             self.show_upd_msg = False
-    #             self.save_settings()
-    #         dialog.accept()
-    #
-    #     def on_later():
-    #         if checkbox.isChecked():
-    #             self.show_upd_msg = False
-    #             self.save_settings()
-    #         dialog.reject()
-    #
-    #     changes_btn.clicked.connect(on_changes)
-    #     install_btn.clicked.connect(on_install)
-    #     later_btn.clicked.connect(on_later)
-    #
-    #     # Позиционирование
-    #     if self.parent():
-    #         dialog.move(
-    #             self.parent().geometry().center() - dialog.rect().center()
-    #         )
-    #     winsound.MessageBeep(winsound.MB_ICONASTERISK)
-    #     dialog.exec_()
 
     def init_logger(self):
         """Инициализация логгера."""
@@ -2128,7 +2020,7 @@ class Assistant(QMainWindow):
         """Обработка команд для приложений"""
         for keyword, filename in self.commands.items():
             if keyword in text:
-                if not filename.endswith('.lnk') and not filename.endswith('.url'):
+                if not filename.endswith('.lnk') and not filename.endswith('.url') and not is_url_string(filename):
                     return False  # Прекращаем обработку, если это папка
                 handler_links(filename, action)  # Вызываем обработчик ярлыков
                 return True  # Возвращаем True, если команда была успешно обработана
@@ -2138,7 +2030,7 @@ class Assistant(QMainWindow):
         """Обработка команд для папок"""
         for keyword, folder_path in self.commands.items():
             if keyword in text:
-                if folder_path.endswith('.lnk') or folder_path.endswith('.url'):
+                if folder_path.endswith('.lnk') or folder_path.endswith('.url') or is_url_string(folder_path):
                     return False  # Прекращаем обработку, если это файл приложения
                 handler_folder(folder_path, action)  # Вызываем обработчик папок
                 return True  # Возвращаем True, если команда была успешно обработана
