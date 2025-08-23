@@ -327,15 +327,6 @@ def handler_links(filename, action):
     # Получаем путь к ярлыку
     shortcut_path = os.path.join(root_folder, filename)
 
-    if is_url_string(filename):
-        try:
-            if action == 'open':
-                open_browser_link(filename)
-
-        except Exception as e:
-            logger.info(f"Ошибка при обработке ссылки: {filename}: {e}")
-            debug_logger.info(f"Ошибка при обработке ссылки: {filename}: {e}")
-
     # Обработка .lnk файлов
     if filename.endswith(".lnk"):
         try:
@@ -356,23 +347,33 @@ def handler_links(filename, action):
             debug_logger.info(f"Ошибка при извлечении пути из ярлыка {filename}: {e}")
 
     # Обработка .url файлов (Steam и Epic Games)
-    if filename.endswith(".url"):
+
+    elif filename.endswith(".url"):
         try:
             game_id_or_url = read_url_shortcut(shortcut_path)
             if not game_id_or_url:
                 logger.info(f"Не удалось извлечь game_id или URL из файла {filename}")
                 debug_logger.info(f"Не удалось извлечь game_id или URL из файла {filename}")
+                return  # Прекращаем выполнение, если не удалось извлечь URL
+
+            if action == 'open':
+                open_url_link(game_id_or_url, filename)  # Передаём game_id или URL
+            elif action == 'close':
+                close_link(filename)
+
         except Exception as e:
             logger.info(f"Ошибка при чтении .url файла {filename}: {e}")
             debug_logger.info(f"Ошибка при чтении .url файла {filename}: {e}")
 
-        if action == 'open':
-            open_url_link(game_id_or_url, filename)  # Передаём game_id или URL
-        if action == 'close':
-            close_link(filename)
+    elif is_url_string(filename):
+        try:
+            if action == 'open':
+                open_browser_link(filename)
 
-
-
+        except Exception as e:
+            logger.info(f"Ошибка при обработке ссылки: {filename}: {e}")
+            debug_logger.info(f"Ошибка при обработке ссылки: {filename}: {e}")
+        return
 
 def handler_folder(folder_path, action):
     """

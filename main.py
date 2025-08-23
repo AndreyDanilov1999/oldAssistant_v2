@@ -62,7 +62,7 @@ from PyQt5.QtCore import Qt, QFileSystemWatcher, QTimer, QEvent, pyqtSignal, QPr
 
 MUTEX_NAME = "Assistant_123456789AB"
 build_ini = get_config_value("app", "build")
-version_file = "1.5.2"
+version_file = "1.5.3"
 update_version(version_file)
 
 def activate_existing_window():
